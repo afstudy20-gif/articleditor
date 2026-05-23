@@ -1,86 +1,128 @@
-# EndNoteRe
+# Article Editor
 
-Online akademik yazım & EndNote dönüştürücü.
+Online academic writing & EndNote converter — by Dr. Yusuf Hoşoğlu, 2026.
 
-Word belgesindeki düz metin numaralı atıfları (`[1]`, `[2]`, …) **aktif EndNote alan kodlarına** dönüştürür. Word + EndNote CWYW açıldığında numaralar otomatik tanınır ve araya yeni atıf eklendiğinde otomatik kayar.
+Browser-based editor that converts plain-text numbered citations (`[1]`, `[2]`…) in Word documents into **active EndNote field codes** (`ADDIN EN.CITE`). Open the output `.docx` in Word + EndNote CWYW and citations are live — insert a new ref and numbers re-number automatically.
 
-## Özellikler
+🌐 Live: [articleditor.drtr.uk](https://articleditor.drtr.uk/) (planned)
+📦 Repo: [github.com/afstudy20-gif/articleditor](https://github.com/afstudy20-gif/articleditor)
 
-- **.docx yükle veya metin yapıştır** — kaynakça bölümü ("Kaynaklar/References/Bibliography") otomatik algılanır
-- **Heuristik biblio parser** — numbered/Vancouver/APA/IEEE formatlarını yakalar
-- **DOI / PMID taraması** — CrossRef + NCBI E-utilities (anahtarsız çalışır)
-- **Çıktı modları**:
-  - Aktif EndNote `.docx` (ADDIN EN.CITE alan kodları gömülü)
-  - Placeholder `.docx` (`{Yazar, Yıl #N}` — EndNote "Update Citations" ile aktifleşir)
-  - `.ris` (EndNote kütüphanesine import için)
-- **Online editör** (yakında) — TipTap tabanlı, canlı kaynakça paneli, otomatik numaralandırma
-- **AI yardımcı** (opsiyonel, BYO-key) — Paperpal benzeri clarity/concision/akademik ton
+## Features
 
-## Geliştirme
+- 📄 **Word import** — `.docx` upload or paste; bibliography auto-detected
+- 🔍 **DOI / PMID / abstract lookup** — CrossRef, OpenAlex, PubMed (no API key needed)
+- ✍️ **TipTap editor** — multi-cite, live numbering, click-to-edit citation popover
+- 🎨 **Citation styles** — Vancouver, APA 7, AMA, IEEE (switchable, live re-render)
+- 📤 **Exports**:
+  - **Active EndNote** `.docx` — ADDIN EN.CITE field codes, opens live in Word+EndNote
+  - **Placeholder** `.docx` — `{Author, Year #N}`, EndNote "Update Citations" friendly
+  - **LaTeX** bundle (`.tex` + `.bib`) — Overleaf/TeXLive compatible
+  - **RIS** for EndNote library import
+  - **JSON** project backup
+- 📚 **Library import** — EndNote XML, `.enw`, BibTeX, RIS (auto-detect)
+- 🔒 **Privacy-first** — all data in your browser's IndexedDB, no server storage
+- 🌗 **Light / dark theme**, **TR / EN** UI, **PWA** with offline support
+
+## Stack
+
+Next.js 14 (App Router) · React 18 · TypeScript · TipTap (ProseMirror) · Tailwind · Dexie (IndexedDB) · JSZip · fast-xml-parser · Zod
+
+## Local development
 
 ```bash
 npm install
-npm run dev        # http://localhost:3000
+npm run dev          # http://localhost:3000
 npm run typecheck
 npm run build
 ```
 
-## Docker (Coolify)
+## Docker
 
 ```bash
-docker build -t endnotere .
-docker run -p 3000:3000 endnotere
+docker build -t article-editor .
+docker run -p 3000:3000 article-editor
 ```
 
-Coolify panelinde:
-1. New Resource → Docker Compose veya Dockerfile
-2. Repo'yu bağla (lokal/Git)
-3. Environment variables: `.env.example` referans
-4. Port: 3000
-5. Healthcheck: `/api/health`
+## Coolify deployment
 
-## Çevre Değişkenleri
+1. **Coolify panel** → New Resource → **Public Repository**
+2. Repository: `https://github.com/afstudy20-gif/articleditor`
+3. Branch: `main`
+4. Build pack: **Dockerfile** (auto-detected)
+5. Port: `3000`
+6. Healthcheck path: `/api/health`
+7. **Environment variables** (all optional):
 
-Tümü opsiyonel. Anahtarsız da çalışır.
+   | Key | Purpose |
+   |---|---|
+   | `CROSSREF_MAILTO` | CrossRef polite-pool (higher rate limits) |
+   | `NCBI_API_KEY` | NCBI E-utilities rate limit boost |
+   | `NCBI_EMAIL` | Polite identifier for PubMed |
+   | `ANTHROPIC_API_KEY` | Optional AI features (server fallback; users can BYO-key in UI) |
+   | `OPENAI_API_KEY` | Same, OpenAI-compatible providers |
+   | `OPENAI_BASE_URL` | Custom OpenAI-compatible endpoint (LM Studio, Groq, OpenRouter) |
 
-| Değişken | Amaç |
-|---|---|
-| `CROSSREF_MAILTO` | CrossRef polite pool (yüksek rate-limit) |
-| `NCBI_API_KEY` | PubMed E-utilities rate-limit artırır |
-| `NCBI_EMAIL` | PubMed istek tanımlayıcısı |
-| `ANTHROPIC_API_KEY` | AI yardımcı (server fallback) |
-| `OPENAI_API_KEY` | AI yardımcı (OpenAI veya uyumlu) |
-| `OPENAI_BASE_URL` | Generic OpenAI uyumlu endpoint (LM Studio, Groq, OpenRouter) |
+8. **Domain** — point your subdomain (e.g. `articleditor.drtr.uk`) at Coolify
+9. **Persistent volume** — none required (all data is client-side IndexedDB)
+10. Deploy. The container exposes `:3000`, healthcheck `/api/health` returns 200 JSON.
 
-Kullanıcı kendi anahtarını ayarlardan (UI) girebilir; o durumda env var gerekmez.
+### docker-compose.yml (also included)
 
-## İş Akışı (Dönüştürücü)
+```yaml
+services:
+  article-editor:
+    build: .
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+```
 
-1. `/convert` aç
-2. `.docx` yükle veya metin yapıştır
-3. Önizleme: gövde + algılanan referanslar + güven skorları
-4. "DOI tara" ile referansları zenginleştir
-5. Aktif EndNote modunda `.docx` indir
-6. `.ris` indir → EndNote kütüphanesine import et
-7. `.docx`'i Word'de aç — EndNote CWYW alan kodlarını tanır
+## Privacy
 
-## Mimari
+- All projects, article text and your reference library live in **IndexedDB on your device**
+- DOI/PubMed lookups send only the reference **title + first author + year** to public APIs (CrossRef / OpenAlex / NCBI E-utilities)
+- Optional AI features use **your own API key** stored only in your browser
+- **No tracking, no analytics, no cookies**
+
+See `/privacy` in the running app for full details.
+
+## Project structure
 
 ```
-endnotere/
-├── app/                 # Next.js App Router (UI + API)
-├── lib/
-│   ├── docx/            # .docx parse + build (JSZip + OOXML)
-│   ├── refs/            # Biblio parser, RIS, EndNote XML payload
-│   ├── lookup/          # CrossRef + PubMed adaptörleri
-│   └── markers/         # [N], [N,M], [N-M] tespit
+articleditor/
+├── app/                        # Next.js App Router (UI + API routes)
+│   ├── page.tsx                # Landing
+│   ├── about/, privacy/, tutorial/
+│   ├── edit/                   # Workspace (editor + project list)
+│   └── api/{health,lookup}     # CrossRef/OpenAlex/PubMed proxy
 ├── components/
-│   ├── Convert/         # Dönüştürücü UI
-│   └── Editor/          # Online editör (yakında)
-├── store/               # IndexedDB (Dexie) + tipler
-└── Dockerfile
+│   ├── Editor/                 # TipTap editor + Citation node
+│   ├── RefsPanel/              # Citation library
+│   ├── RefDetail/              # Abstract + metadata
+│   ├── Bibliography/           # Formatted bibliography
+│   ├── Convert/                # Dropzone, PasteBox, PreviewParsed
+│   └── SiteChrome.tsx          # Header, footer, refresh-app button
+├── lib/
+│   ├── docx/{parse,build}      # .docx ↔ TipTap JSON
+│   ├── refs/                   # parse-biblio, ris, enxml, bibtex-out, styles
+│   ├── lookup/                 # crossref, openalex, pubmed, enrich
+│   ├── markers/                # [N], [N,M], [N-M] detection
+│   ├── editor/                 # TipTap → docx build input
+│   ├── tex/                    # LaTeX export
+│   ├── projects/               # JSON backup/restore
+│   └── i18n/                   # TR/EN + theme hooks
+├── store/                      # Dexie (IndexedDB) + types
+├── public/{sw.js,manifest.webmanifest,icon.svg}
+├── Dockerfile, docker-compose.yml
+└── package.json
 ```
 
-## Lisans
+## License
 
-Henüz tanımlanmadı. Şahsi/klinik kullanım için.
+Free for personal, clinical and academic use.
+
+© 2026 Dr. Yusuf Hoşoğlu
