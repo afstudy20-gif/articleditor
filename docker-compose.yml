@@ -1,0 +1,20 @@
+services:
+  endnotere:
+    build: .
+    container_name: endnotere
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      CROSSREF_MAILTO: ${CROSSREF_MAILTO:-}
+      NCBI_API_KEY: ${NCBI_API_KEY:-}
+      NCBI_EMAIL: ${NCBI_EMAIL:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

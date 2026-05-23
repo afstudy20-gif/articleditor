@@ -1,0 +1,117 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root,
+[data-theme='light'] {
+  --bg: #f8fafc;
+  --surface: #ffffff;
+  --text-primary: #0f172a;
+  --text-secondary: #334155;
+  --text-muted: #64748b;
+  --text-faint: #94a3b8;
+  --border: #e2e8f0;
+  --teal: #0f766e;
+  --teal-bg: #f0fdfa;
+  --red: #dc2626;
+  --red-bg: #fef2f2;
+  --card-bg: #ffffff;
+  --slate-50: #f8fafc;
+  --slate-100: #f1f5f9;
+  color-scheme: light;
+}
+
+[data-theme='dark'] {
+  --bg: #0b1220;
+  --surface: #111827;
+  --text-primary: #f1f5f9;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
+  --text-faint: #64748b;
+  --border: #1f2937;
+  --teal: #5eead4;
+  --teal-bg: #134e4a;
+  --red: #f87171;
+  --red-bg: #450a0a;
+  --card-bg: #111827;
+  --slate-50: #0f172a;
+  --slate-100: #1e293b;
+  color-scheme: dark;
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--text-secondary);
+}
+
+/* Dark mode tweaks for Tailwind-rendered widgets */
+[data-theme='dark'] .card,
+[data-theme='dark'] .bg-surface {
+  background-color: var(--card-bg) !important;
+}
+[data-theme='dark'] .bg-white {
+  background-color: var(--card-bg) !important;
+}
+[data-theme='dark'] .bg-slate-50 {
+  background-color: var(--slate-50) !important;
+}
+[data-theme='dark'] .bg-slate-100 {
+  background-color: var(--slate-100) !important;
+}
+[data-theme='dark'] .border-border {
+  border-color: var(--border) !important;
+}
+[data-theme='dark'] .text-primary {
+  color: var(--text-primary) !important;
+}
+[data-theme='dark'] .text-secondary {
+  color: var(--text-secondary) !important;
+}
+[data-theme='dark'] .text-muted {
+  color: var(--text-muted) !important;
+}
+[data-theme='dark'] .text-faint {
+  color: var(--text-faint) !important;
+}
+[data-theme='dark'] input,
+[data-theme='dark'] textarea,
+[data-theme='dark'] select {
+  background-color: var(--slate-100);
+  color: var(--text-primary);
+  border-color: var(--border);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed;
+}
+.btn-primary {
+  @apply btn bg-teal text-white hover:bg-teal-dark;
+}
+.btn-secondary {
+  @apply btn bg-white text-secondary border border-border hover:bg-slate-50;
+}
+.btn-danger {
+  @apply btn bg-white text-red border border-red-200 hover:bg-red-bg;
+}
+
+.card {
+  @apply bg-surface border border-border rounded-xl shadow-card;
+}
+
+.tool-label {
+  @apply text-xs font-semibold uppercase tracking-wider text-muted;
+}
+
+/* Citation node decoration applied via ProseMirror plugin when ref is highlighted */
+.enr-citation-active,
+.enr-citation-active.enr-citation {
+  background-color: #dc2626 !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  box-shadow: 0 1px 3px rgba(220, 38, 38, 0.3);
+}
