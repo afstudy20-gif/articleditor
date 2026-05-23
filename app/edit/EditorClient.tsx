@@ -18,6 +18,7 @@ import { BibliographyPreview } from '@/components/Bibliography/BibliographyPrevi
 import { buildLatex } from '@/lib/tex/build';
 import JSZip from 'jszip';
 import { CitationPopover } from '@/components/Editor/CitationPopover';
+import { FindReplace } from '@/components/Editor/FindReplace';
 
 type Props = {
   project: Project;
@@ -52,6 +53,7 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
   const [bottomColWidth, setBottomColWidth] = useState<number>(380);
   const [topRowHeight, setTopRowHeight] = useState<number>(560);
   const [citationPopover, setCitationPopover] = useState<{ pos: number; refIds: string[] } | null>(null);
+  const [showFind, setShowFind] = useState(false);
   const editorInstance = useRef<any>(null);
   const docxInputRef = useRef<HTMLInputElement>(null);
   const projectImportRef = useRef<HTMLInputElement>(null);
@@ -383,6 +385,22 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
     };
   }, []);
 
+  // Global keyboard shortcuts: Ctrl/Cmd+F (find), Ctrl/Cmd+H (replace).
+  useEffect(() => {
+    function onKey(e: KeyboardEvent): void {
+      const mod = e.ctrlKey || e.metaKey;
+      if (mod && (e.key === 'f' || e.key === 'F')) {
+        e.preventDefault();
+        setShowFind(true);
+      } else if (mod && (e.key === 'h' || e.key === 'H')) {
+        e.preventDefault();
+        setShowFind(true);
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   function replaceCitationRef(pos: number, newRefIds: string[]): void {
     const ed = editorInstance.current;
     if (!ed) return;
@@ -659,6 +677,13 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
               }}
             />
             <span className="w-px h-6 bg-border self-center mx-1" />
+            <button
+              className="btn-secondary text-xs"
+              onClick={() => setShowFind(true)}
+              title="Bul ve Değiştir (Ctrl+F / Ctrl+H)"
+            >
+              🔍 Bul
+            </button>
             <button className="btn-secondary text-xs" onClick={updateAllCitations} title="Atıfları yeniden numaralandır + orphan'ları temizle">
               ↻ Update Citations
             </button>
@@ -893,6 +918,10 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
           onReplace={replaceCitationRef}
           onDelete={deleteCitationAtPos}
         />
+      )}
+
+      {showFind && editorInstance.current && (
+        <FindReplace editor={editorInstance.current} onClose={() => setShowFind(false)} />
       )}
     </div>
   );

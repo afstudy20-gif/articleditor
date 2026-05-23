@@ -85,8 +85,13 @@ function CitationNodeView({ node, getPos }: any) {
   );
 }
 
+import { findPlugin } from './find-plugin';
+
 export const CitationWithView = CitationCore.extend({
   addNodeView() {
     return ReactNodeViewRenderer(CitationNodeView);
+  },
+  addProseMirrorPlugins() {
+    return [findPlugin];
   },
 });
