@@ -398,6 +398,26 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
     setRefs((prev) => prev.filter((r) => !ids.includes(r.id)));
   }, []);
 
+  // Enrich refs in-place (no add) — used by plaintext import to fetch DOI/PMID.
+  const enrichRefs = useCallback(async (input: Ref[]): Promise<Ref[]> => {
+    const concurrency = 2;
+    const out: Ref[] = input.map((r) => ({ ...r }));
+    let cursor = 0;
+    async function worker(): Promise<void> {
+      while (cursor < input.length) {
+        const i = cursor++;
+        try {
+          const updated = await callLookup(input[i]);
+          if (updated) out[i] = { ...updated, id: input[i].id };
+        } catch {
+          // ignore individual failures
+        }
+      }
+    }
+    await Promise.all(Array.from({ length: concurrency }, () => worker()));
+    return out;
+  }, []);
+
   // Install click handler on window so Citation NodeView can call it.
   useEffect(() => {
     window.__enrOnCitationClick = (pos, ids) => {
@@ -834,6 +854,7 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
             selectedIds={librarySelectedIds}
             onSelectedIdsChange={setLibrarySelectedIds}
             onBulkDelete={bulkDeleteRefs}
+            onEnrichRefs={enrichRefs}
           />
           </div>
         </div>
@@ -910,6 +931,10 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
           lookupAllBusy={lookupAllBusy}
           selectedId={highlightRefId}
           onSelectRef={selectRef}
+          selectedIds={librarySelectedIds}
+          onSelectedIdsChange={setLibrarySelectedIds}
+          onBulkDelete={bulkDeleteRefs}
+          onEnrichRefs={enrichRefs}
         />
         <BibliographyPreview refs={refs} refOrder={refOrder} style={style} selectedId={highlightRefId} onSelect={selectRef} />
         <RefDetail

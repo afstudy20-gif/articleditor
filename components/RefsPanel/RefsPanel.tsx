@@ -23,6 +23,7 @@ type Props = {
   selectedIds?: Set<string>;
   onSelectedIdsChange?: (next: Set<string>) => void;
   onBulkDelete?: (ids: string[]) => void;
+  onEnrichRefs?: (refs: Ref[]) => Promise<Ref[]>;
 };
 
 export function RefsPanel({
@@ -44,6 +45,7 @@ export function RefsPanel({
   selectedIds: extSelectedIds,
   onSelectedIdsChange,
   onBulkDelete,
+  onEnrichRefs,
 }: Props) {
   const [tab, setTab] = useState<'list' | 'add'>('list');
   const [internalSelectedIds, setInternalSelectedIds] = useState<Set<string>>(new Set());
@@ -143,7 +145,7 @@ export function RefsPanel({
             onHighlight={onSelectRef}
           />
         ) : (
-          <AddPanel onAddByDoi={onAddByDoi} onSearch={onSearch} onAddRef={onAddRef} />
+          <AddPanel onAddByDoi={onAddByDoi} onSearch={onSearch} onAddRef={onAddRef} onEnrichRefs={onEnrichRefs} />
         )}
       </div>
     </div>
@@ -592,10 +594,12 @@ function AddPanel({
   onAddByDoi,
   onSearch,
   onAddRef,
+  onEnrichRefs,
 }: {
   onAddByDoi: (doi: string) => Promise<void>;
   onSearch: (q: string) => Promise<Ref[]>;
   onAddRef: (ref: Ref) => void;
+  onEnrichRefs?: (refs: Ref[]) => Promise<Ref[]>;
 }): JSX.Element {
   const [doi, setDoi] = useState('');
   const [q, setQ] = useState('');
@@ -603,26 +607,52 @@ function AddPanel({
   const [busy, setBusy] = useState(false);
   const [importText, setImportText] = useState('');
   const [importMsg, setImportMsg] = useState<string | null>(null);
+  const [importBusy, setImportBusy] = useState(false);
   const [detectedFormat, setDetectedFormat] = useState<ImportFormat | null>(null);
   const importFileRef = useRef<HTMLInputElement>(null);
 
-  function commitImport(refs: Ref[], format: ImportFormat): void {
+  async function commitImport(refs: Ref[], format: ImportFormat): Promise<void> {
     if (refs.length === 0) {
       setImportMsg(`Hiç referans bulunamadı (${FORMAT_LABELS[format]}). Format farklı olabilir.`);
       return;
     }
-    for (const r of refs) onAddRef(r);
-    setImportMsg(`${refs.length} referans eklendi (${FORMAT_LABELS[format]}).`);
-    setImportText('');
-    setDetectedFormat(null);
-    setTimeout(() => setImportMsg(null), 5000);
+    setImportBusy(true);
+    try {
+      let toAdd = refs;
+      // For plaintext (no DOI/PMID), auto-enrich via CrossRef/PubMed when handler available.
+      if (format === 'plaintext' && onEnrichRefs) {
+        const needLookup = refs.filter((r) => !r.doi && !r.pmid);
+        if (needLookup.length > 0) {
+          setImportMsg(`${refs.length} referans algılandı, DOI/PMID için aranıyor…`);
+          try {
+            const enriched = await onEnrichRefs(needLookup);
+            const byRaw = new Map(enriched.map((r) => [r.raw ?? r.title ?? '', r]));
+            toAdd = refs.map((r) => byRaw.get(r.raw ?? r.title ?? '') ?? r);
+          } catch (e: unknown) {
+            // Non-fatal: still add originals.
+          }
+        }
+      }
+      for (const r of toAdd) onAddRef(r);
+      const withDoi = toAdd.filter((r) => r.doi || r.pmid).length;
+      setImportMsg(
+        format === 'plaintext'
+          ? `${toAdd.length} referans eklendi (düz metin). ${withDoi}/${toAdd.length} için DOI veya PMID bulundu.`
+          : `${toAdd.length} referans eklendi (${FORMAT_LABELS[format]}).`,
+      );
+      setImportText('');
+      setDetectedFormat(null);
+      setTimeout(() => setImportMsg(null), 8000);
+    } finally {
+      setImportBusy(false);
+    }
   }
 
-  function importFromText(text: string): void {
+  async function importFromText(text: string): Promise<void> {
     if (!text || text.trim().length < 10) return;
     try {
       const { format, refs } = importByAutoDetect(text);
-      commitImport(refs, format);
+      await commitImport(refs, format);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       setImportMsg(`İçe aktarma hatası: ${msg}`);
@@ -633,7 +663,7 @@ function AddPanel({
     try {
       const text = await file.text();
       const { format, refs } = importByExtension(file.name, text);
-      commitImport(refs, format);
+      await commitImport(refs, format);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       setImportMsg(`Dosya açılamadı: ${msg}`);
@@ -761,7 +791,8 @@ function AddPanel({
           />
         </div>
         <p className="text-xs text-muted mb-1.5">
-          Destek: RIS, EndNote .enw, EndNote XML, BibTeX. Format otomatik algılanır.
+          Destek: RIS, EndNote .enw, EndNote XML, BibTeX, düz metin (Vancouver/APA gibi). Format otomatik algılanır.
+          Düz metinde DOI/PMID yoksa CrossRef + PubMed üzerinden aranır.
         </p>
         <textarea
           value={importText}
@@ -778,11 +809,13 @@ function AddPanel({
         <div className="mt-2 flex items-center justify-between gap-2">
           {importMsg && <span className="text-xs text-teal flex-1">{importMsg}</span>}
           <button
-            onClick={() => importFromText(importText)}
-            disabled={importText.trim().length < 10 || detectedFormat === 'unknown'}
-            className="btn-primary text-xs px-3 py-1.5 ml-auto"
+            onClick={() => void importFromText(importText)}
+            disabled={
+              importBusy || importText.trim().length < 10 || detectedFormat === 'unknown'
+            }
+            className="btn-primary text-xs px-3 py-1.5 ml-auto disabled:opacity-50"
           >
-            İçe aktar
+            {importBusy ? 'İşleniyor…' : 'İçe aktar'}
           </button>
         </div>
       </div>
