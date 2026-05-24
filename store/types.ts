@@ -34,6 +34,7 @@ export type Ref = {
   userNote?: string;
   confidence?: number;
   enRecNum?: number;
+  source?: string;
 };
 
 export type Citation = {

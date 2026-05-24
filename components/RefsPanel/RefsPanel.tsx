@@ -992,7 +992,13 @@ function AddPanel({
                   {r.authors[0]?.family || '—'}
                   {r.authors.length > 1 ? ' et al.' : ''} · {r.year ?? '?'} · {r.containerTitle ?? '—'}
                 </div>
-                {r.doi && <div className="text-teal mt-0.5">{r.doi}</div>}
+                <div className="mt-1 flex items-center gap-2 flex-wrap">
+                  {r.doi && <span className="text-teal text-xs">{r.doi}</span>}
+                  {r.pmid && <span className="bg-teal-bg text-teal px-1.5 py-0.5 rounded text-xs">PMID {r.pmid}</span>}
+                  {r.source && (
+                    <span className="bg-slate-100 text-muted px-1.5 py-0.5 rounded text-xs">{r.source}</span>
+                  )}
+                </div>
                 <div className="mt-2 flex justify-end">
                   <button
                     onClick={() => {
