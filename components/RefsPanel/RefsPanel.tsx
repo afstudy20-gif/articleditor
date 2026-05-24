@@ -707,25 +707,36 @@ function AddPanel({
       </div>
 
       {results.length > 0 && (
-        <ul className="space-y-1.5 max-h-[300px] overflow-auto">
-          {results.map((r) => (
-            <li
-              key={r.id}
-              className="border border-border rounded-lg p-2 text-xs hover:bg-slate-50 cursor-pointer"
-              onClick={() => {
-                onAddRef(r);
-                setResults(results.filter((x) => x.id !== r.id));
-              }}
-            >
-              <div className="font-medium text-primary text-sm leading-snug">{r.title}</div>
-              <div className="text-muted mt-0.5">
-                {r.authors[0]?.family || '—'}
-                {r.authors.length > 1 ? ' et al.' : ''} · {r.year ?? '?'} · {r.containerTitle ?? '—'}
-              </div>
-              {r.doi && <div className="text-teal mt-0.5">{r.doi}</div>}
-            </li>
-          ))}
-        </ul>
+        <div className="space-y-1.5 max-h-[400px] overflow-auto">
+          <div className="text-xs text-muted px-1">{results.length} sonuç — &quot;+ Ekle&quot; ile kütüphaneye al</div>
+          <ul className="space-y-1.5">
+            {results.map((r) => (
+              <li
+                key={r.id}
+                className="border border-border rounded-lg p-2 text-xs hover:bg-slate-50"
+              >
+                <div className="font-medium text-primary text-sm leading-snug">{r.title}</div>
+                <div className="text-muted mt-0.5">
+                  {r.authors[0]?.family || '—'}
+                  {r.authors.length > 1 ? ' et al.' : ''} · {r.year ?? '?'} · {r.containerTitle ?? '—'}
+                </div>
+                {r.doi && <div className="text-teal mt-0.5">{r.doi}</div>}
+                <div className="mt-2 flex justify-end">
+                  <button
+                    onClick={() => {
+                      onAddRef(r);
+                      setResults(results.filter((x) => x.id !== r.id));
+                    }}
+                    className="btn-primary text-xs px-3 py-1"
+                    title="Bu referansı kütüphaneye ekle"
+                  >
+                    + Kütüphaneye ekle
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
 
       <div className="pt-3 border-t border-border">
