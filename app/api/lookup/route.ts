@@ -13,6 +13,8 @@ const BodySchema = z.object({
   ref: z.any().optional(),
   query: z.string().optional(),
   doi: z.string().optional(),
+  fromYear: z.number().int().min(1700).max(2100).optional(),
+  toYear: z.number().int().min(1700).max(2100).optional(),
 });
 
 export async function POST(req: Request) {
@@ -33,11 +35,18 @@ export async function POST(req: Request) {
     }
     if (parsed.mode === 'search' && parsed.query) {
       const q = parsed.query;
+      const fromYear = parsed.fromYear;
+      const toYear = parsed.toYear;
+      // PubMed year filter: AND YYYY[PDAT] for single year, AND YYYY:YYYY[PDAT] for range.
+      let pmQuery = q;
+      if (fromYear && toYear) pmQuery = `${q} AND ${fromYear}:${toYear}[PDAT]`;
+      else if (fromYear) pmQuery = `${q} AND ${fromYear}:3000[PDAT]`;
+      else if (toYear) pmQuery = `${q} AND 1700:${toYear}[PDAT]`;
       const [crResult, oaResult, pmResult] = await Promise.allSettled([
-        searchCrossRef(q, { mailto, rows: 5 }),
-        searchOpenAlex(q, { mailto }),
+        searchCrossRef(q, { mailto, rows: 5, fromYear, toYear }),
+        searchOpenAlex(q, { mailto, fromYear, toYear }),
         (async () => {
-          const ids = await searchPubmed(q, { apiKey: ncbiKey, email: ncbiEmail, retmax: 5 });
+          const ids = await searchPubmed(pmQuery, { apiKey: ncbiKey, email: ncbiEmail, retmax: 5 });
           return ids.length === 0 ? [] : fetchPubmedSummaries(ids, { apiKey: ncbiKey, email: ncbiEmail });
         })(),
       ]);

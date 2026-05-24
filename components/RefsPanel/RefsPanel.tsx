@@ -8,7 +8,7 @@ type Props = {
   refs: Ref[];
   refOrder: Map<string, number>;
   onAddByDoi: (doi: string) => Promise<void>;
-  onSearch: (query: string) => Promise<Ref[]>;
+  onSearch: (query: string, opts?: { fromYear?: number; toYear?: number }) => Promise<Ref[]>;
   onAddRef: (ref: Ref) => void;
   onInsertCitation: (refId: string) => void;
   onInsertCitationMulti?: (refIds: string[]) => void;
@@ -839,12 +839,14 @@ function AddPanel({
   onEnrichRefs,
 }: {
   onAddByDoi: (doi: string) => Promise<void>;
-  onSearch: (q: string) => Promise<Ref[]>;
+  onSearch: (q: string, opts?: { fromYear?: number; toYear?: number }) => Promise<Ref[]>;
   onAddRef: (ref: Ref) => void;
   onEnrichRefs?: (refs: Ref[]) => Promise<Ref[]>;
 }): JSX.Element {
   const [doi, setDoi] = useState('');
   const [q, setQ] = useState('');
+  const [fromYear, setFromYear] = useState('');
+  const [toYear, setToYear] = useState('');
   const [results, setResults] = useState<Ref[]>([]);
   const [busy, setBusy] = useState(false);
   const [importText, setImportText] = useState('');
@@ -937,7 +939,9 @@ function AddPanel({
     if (!q.trim()) return;
     setBusy(true);
     try {
-      const r = await onSearch(q.trim());
+      const fy = fromYear.trim() ? parseInt(fromYear, 10) : undefined;
+      const ty = toYear.trim() ? parseInt(toYear, 10) : undefined;
+      const r = await onSearch(q.trim(), { fromYear: fy, toYear: ty });
       setResults(r);
     } finally {
       setBusy(false);
@@ -968,13 +972,47 @@ function AddPanel({
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Kardiyak biyomarkerler 2023"
+            placeholder="Kardiyak biyomarkerler"
             className="flex-1 border border-border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-teal"
             onKeyDown={(e) => e.key === 'Enter' && doSearch()}
           />
           <button onClick={doSearch} disabled={busy} className="btn-secondary text-xs px-3 py-1.5">
-            Ara
+            {busy ? 'Aranıyor…' : 'Ara'}
           </button>
+        </div>
+        <div className="mt-1.5 flex items-center gap-2">
+          <span className="text-xs text-muted">Yıl:</span>
+          <input
+            value={fromYear}
+            onChange={(e) => setFromYear(e.target.value.replace(/\D/g, '').slice(0, 4))}
+            placeholder="2020"
+            maxLength={4}
+            inputMode="numeric"
+            className="w-20 border border-border rounded px-2 py-1 text-xs focus:outline-none focus:border-teal"
+            onKeyDown={(e) => e.key === 'Enter' && doSearch()}
+          />
+          <span className="text-xs text-muted">—</span>
+          <input
+            value={toYear}
+            onChange={(e) => setToYear(e.target.value.replace(/\D/g, '').slice(0, 4))}
+            placeholder="2025"
+            maxLength={4}
+            inputMode="numeric"
+            className="w-20 border border-border rounded px-2 py-1 text-xs focus:outline-none focus:border-teal"
+            onKeyDown={(e) => e.key === 'Enter' && doSearch()}
+          />
+          {(fromYear || toYear) && (
+            <button
+              onClick={() => {
+                setFromYear('');
+                setToYear('');
+              }}
+              className="text-xs text-muted hover:text-red ml-auto"
+              title="Yıl filtresini temizle"
+            >
+              temizle
+            </button>
+          )}
         </div>
       </div>
 

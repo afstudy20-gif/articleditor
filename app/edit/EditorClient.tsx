@@ -340,11 +340,19 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
     }
   }, []);
 
-  const search = useCallback(async (query: string): Promise<Ref[]> => {
+  const search = useCallback(async (
+    query: string,
+    opts?: { fromYear?: number; toYear?: number },
+  ): Promise<Ref[]> => {
     const res = await fetch('/api/lookup', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mode: 'search', query }),
+      body: JSON.stringify({
+        mode: 'search',
+        query,
+        fromYear: opts?.fromYear,
+        toYear: opts?.toYear,
+      }),
     });
     const data = await res.json();
     return (data?.refs ?? []) as Ref[];

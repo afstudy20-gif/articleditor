@@ -22,6 +22,8 @@ type CrossRefWork = {
 export type CrossRefSearchOptions = {
   mailto?: string;
   rows?: number;
+  fromYear?: number;
+  toYear?: number;
 };
 
 async function fetchWithTimeout(url: string, ms: number, init: RequestInit = {}): Promise<Response> {
@@ -44,6 +46,10 @@ export async function searchCrossRef(
     rows: String(rows),
   });
   if (opts.mailto) params.set('mailto', opts.mailto);
+  const filters: string[] = [];
+  if (opts.fromYear) filters.push(`from-pub-date:${opts.fromYear}`);
+  if (opts.toYear) filters.push(`until-pub-date:${opts.toYear}-12-31`);
+  if (filters.length > 0) params.set('filter', filters.join(','));
   const url = `${CROSSREF_BASE}/works?${params.toString()}`;
   const res = await fetchWithTimeout(url, 12000, {
     headers: { Accept: 'application/json', 'User-Agent': 'ArticleEditor/0.1 (mailto:' + (opts.mailto ?? 'noreply@article-editor') + ')' },

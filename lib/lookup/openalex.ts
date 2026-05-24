@@ -26,6 +26,8 @@ async function fetchWithTimeout(url: string, ms: number, init: RequestInit = {})
 
 export type OpenAlexOptions = {
   mailto?: string;
+  fromYear?: number;
+  toYear?: number;
 };
 
 function cleanDoi(doi: string): string {
@@ -64,6 +66,15 @@ export async function searchOpenAlex(query: string, opts: OpenAlexOptions = {}):
   });
   const mailto = opts.mailto || 'polite@article-editor.com';
   params.set('mailto', mailto);
+  const filters: string[] = [];
+  if (opts.fromYear && opts.toYear) {
+    filters.push(`publication_year:${opts.fromYear}-${opts.toYear}`);
+  } else if (opts.fromYear) {
+    filters.push(`from_publication_date:${opts.fromYear}-01-01`);
+  } else if (opts.toYear) {
+    filters.push(`to_publication_date:${opts.toYear}-12-31`);
+  }
+  if (filters.length > 0) params.set('filter', filters.join(','));
   const url = `${OPENALEX_BASE}/works?${params.toString()}`;
   try {
     const res = await fetchWithTimeout(url, 10000, {
