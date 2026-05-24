@@ -103,7 +103,11 @@ export function RefsPanel({
             <button onClick={clearSelection} className="text-xs text-muted hover:text-primary">
               İptal
             </button>
-            <button onClick={insertSelected} className="btn-primary text-xs px-2 py-1">
+            <button
+              onClick={insertSelected}
+              className="btn-primary text-xs px-2 py-1"
+              title="Seçili referansları tek bir atıf olarak ekle (örn. [1,2,3])"
+            >
               Birlikte yerleştir →
             </button>
           </div>

@@ -19,6 +19,7 @@ import { buildLatex } from '@/lib/tex/build';
 import JSZip from 'jszip';
 import { CitationPopover } from '@/components/Editor/CitationPopover';
 import { FindReplace } from '@/components/Editor/FindReplace';
+import { CitationInsertPicker } from '@/components/Editor/CitationInsertPicker';
 
 type Props = {
   project: Project;
@@ -54,6 +55,7 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
   const [topRowHeight, setTopRowHeight] = useState<number>(560);
   const [citationPopover, setCitationPopover] = useState<{ pos: number; refIds: string[] } | null>(null);
   const [showFind, setShowFind] = useState(false);
+  const [showInsertPicker, setShowInsertPicker] = useState(false);
   const editorInstance = useRef<any>(null);
   const docxInputRef = useRef<HTMLInputElement>(null);
   const projectImportRef = useRef<HTMLInputElement>(null);
@@ -776,6 +778,7 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
               onReady={(ed) => {
                 editorInstance.current = ed;
               }}
+              onInsertRequest={() => setShowInsertPicker(true)}
             />
           </div>
         </div>
@@ -865,6 +868,7 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
           onReady={(ed) => {
             editorInstance.current = ed;
           }}
+          onInsertRequest={() => setShowInsertPicker(true)}
         />
         <RefsPanel
           refs={refs}
@@ -922,6 +926,18 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
 
       {showFind && editorInstance.current && (
         <FindReplace editor={editorInstance.current} onClose={() => setShowFind(false)} />
+      )}
+
+      {showInsertPicker && (
+        <CitationInsertPicker
+          allRefs={refs}
+          refOrder={refOrder}
+          onClose={() => setShowInsertPicker(false)}
+          onInsert={(ids) => {
+            if (ids.length === 1) insertCitation(ids[0]);
+            else insertCitationMulti(ids);
+          }}
+        />
       )}
     </div>
   );
