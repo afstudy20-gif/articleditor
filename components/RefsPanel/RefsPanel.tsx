@@ -773,6 +773,17 @@ function ContextMenu({
               🔗 Full text aç ({r.doi ? 'DOI' : 'URL'}) ↗
             </a>
           )}
+          {r.doi && (
+            <a
+              href={`https://sci-hub.ist/${r.doi}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={onClose}
+              className="block px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal"
+            >
+              🔓 Sci-Hub'da aç ↗
+            </a>
+          )}
           {pubmedUrl && (
             <a
               href={pubmedUrl}
