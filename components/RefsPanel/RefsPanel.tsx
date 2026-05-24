@@ -20,6 +20,9 @@ type Props = {
   lookupAllBusy?: boolean;
   selectedId?: string | null;
   onSelectRef?: (id: string) => void;
+  selectedIds?: Set<string>;
+  onSelectedIdsChange?: (next: Set<string>) => void;
+  onBulkDelete?: (ids: string[]) => void;
 };
 
 export function RefsPanel({
@@ -38,26 +41,33 @@ export function RefsPanel({
   lookupAllBusy,
   selectedId,
   onSelectRef,
+  selectedIds: extSelectedIds,
+  onSelectedIdsChange,
+  onBulkDelete,
 }: Props) {
   const [tab, setTab] = useState<'list' | 'add'>('list');
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [internalSelectedIds, setInternalSelectedIds] = useState<Set<string>>(new Set());
+  const selectedIds = extSelectedIds ?? internalSelectedIds;
+  const setSelectedIds = (next: Set<string>): void => {
+    if (onSelectedIdsChange) onSelectedIdsChange(next);
+    else setInternalSelectedIds(next);
+  };
 
   function toggleSelect(id: string): void {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+    const next = new Set(selectedIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedIds(next);
   }
   function clearSelection(): void {
     setSelectedIds(new Set());
   }
-  function insertSelected(): void {
-    if (selectedIds.size === 0 || !onInsertCitationMulti) return;
-    // Preserve refs panel order when sending IDs.
-    const ordered = refs.filter((r) => selectedIds.has(r.id)).map((r) => r.id);
-    onInsertCitationMulti(ordered);
+  function bulkDelete(): void {
+    if (selectedIds.size === 0) return;
+    const ids = Array.from(selectedIds);
+    const msg = `${ids.length} referans silinecek. Devam edilsin mi? Makale içindeki atıflar boş kalır.`;
+    if (!confirm(msg)) return;
+    if (onBulkDelete) onBulkDelete(ids);
     clearSelection();
   }
   return (
@@ -96,20 +106,24 @@ export function RefsPanel({
         </div>
       )}
 
-      {tab === 'list' && selectedIds.size > 0 && onInsertCitationMulti && (
+      {tab === 'list' && selectedIds.size > 0 && (
         <div className="px-3 py-2 border-b border-border bg-teal-bg flex items-center justify-between gap-2">
-          <span className="text-xs text-teal font-semibold">{selectedIds.size} ref seçili</span>
+          <span className="text-xs text-teal font-semibold">
+            {selectedIds.size} ref seçili — toolbar &quot;+ Atıf ekle&quot; ile yerleştir
+          </span>
           <div className="flex gap-2">
             <button onClick={clearSelection} className="text-xs text-muted hover:text-primary">
               İptal
             </button>
-            <button
-              onClick={insertSelected}
-              className="btn-primary text-xs px-2 py-1"
-              title="Seçili referansları tek bir atıf olarak ekle (örn. [1,2,3])"
-            >
-              Birlikte yerleştir →
-            </button>
+            {onBulkDelete && (
+              <button
+                onClick={bulkDelete}
+                className="btn-danger text-xs px-2 py-1"
+                title="Seçili referansları kütüphaneden sil"
+              >
+                🗑️ Sil ({selectedIds.size})
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -124,7 +138,7 @@ export function RefsPanel({
             onLookup={onLookupRef}
             lookupBusyId={lookupBusyId}
             selectedIds={selectedIds}
-            onToggleSelect={onInsertCitationMulti ? toggleSelect : undefined}
+            onToggleSelect={toggleSelect}
             highlightedId={selectedId}
             onHighlight={onSelectRef}
           />

@@ -19,7 +19,6 @@ import { buildLatex } from '@/lib/tex/build';
 import JSZip from 'jszip';
 import { CitationPopover } from '@/components/Editor/CitationPopover';
 import { FindReplace } from '@/components/Editor/FindReplace';
-import { CitationInsertPicker } from '@/components/Editor/CitationInsertPicker';
 
 type Props = {
   project: Project;
@@ -55,7 +54,7 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
   const [topRowHeight, setTopRowHeight] = useState<number>(560);
   const [citationPopover, setCitationPopover] = useState<{ pos: number; refIds: string[] } | null>(null);
   const [showFind, setShowFind] = useState(false);
-  const [showInsertPicker, setShowInsertPicker] = useState(false);
+  const [librarySelectedIds, setLibrarySelectedIds] = useState<Set<string>>(new Set());
   const editorInstance = useRef<any>(null);
   const docxInputRef = useRef<HTMLInputElement>(null);
   const projectImportRef = useRef<HTMLInputElement>(null);
@@ -375,6 +374,28 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
     const ed = editorInstance.current;
     if (!ed || refIds.length === 0) return;
     ed.chain().focus().insertCitation(refIds).run();
+  }, []);
+
+  const insertFromLibrary = useCallback((): void => {
+    const ed = editorInstance.current;
+    if (!ed) return;
+    const ids = Array.from(librarySelectedIds);
+    if (ids.length === 0) {
+      alert('Kütüphaneden checkbox ile bir veya daha fazla referans seç, sonra "+ Atıf ekle"ye tıkla. Cursor’un olduğu yere yerleşir.');
+      return;
+    }
+    // Preserve refs panel order
+    const orderedIds = refs.filter((r) => librarySelectedIds.has(r.id)).map((r) => r.id);
+    if (orderedIds.length === 1) {
+      ed.chain().focus().insertCitation(orderedIds).run();
+    } else {
+      ed.chain().focus().insertCitation(orderedIds).run();
+    }
+    setLibrarySelectedIds(new Set());
+  }, [librarySelectedIds, refs]);
+
+  const bulkDeleteRefs = useCallback((ids: string[]) => {
+    setRefs((prev) => prev.filter((r) => !ids.includes(r.id)));
   }, []);
 
   // Install click handler on window so Citation NodeView can call it.
@@ -778,7 +799,7 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
               onReady={(ed) => {
                 editorInstance.current = ed;
               }}
-              onInsertRequest={() => setShowInsertPicker(true)}
+              onInsertRequest={insertFromLibrary}
             />
           </div>
         </div>
@@ -810,6 +831,9 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
             lookupAllBusy={lookupAllBusy}
             selectedId={highlightRefId}
             onSelectRef={selectRef}
+            selectedIds={librarySelectedIds}
+            onSelectedIdsChange={setLibrarySelectedIds}
+            onBulkDelete={bulkDeleteRefs}
           />
           </div>
         </div>
@@ -868,7 +892,7 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
           onReady={(ed) => {
             editorInstance.current = ed;
           }}
-          onInsertRequest={() => setShowInsertPicker(true)}
+          onInsertRequest={insertFromLibrary}
         />
         <RefsPanel
           refs={refs}
@@ -928,17 +952,6 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
         <FindReplace editor={editorInstance.current} onClose={() => setShowFind(false)} />
       )}
 
-      {showInsertPicker && (
-        <CitationInsertPicker
-          allRefs={refs}
-          refOrder={refOrder}
-          onClose={() => setShowInsertPicker(false)}
-          onInsert={(ids) => {
-            if (ids.length === 1) insertCitation(ids[0]);
-            else insertCitationMulti(ids);
-          }}
-        />
-      )}
     </div>
   );
 }

@@ -155,6 +155,7 @@ export function ArticleEditor({ initialContent, refs, onChange, onInsertRequest,
           ref={insertBtnRef}
           onClick={() => onInsertRequest?.()}
           className="px-3 py-1 rounded-md bg-teal text-white text-xs font-semibold hover:bg-teal-dark"
+          title="Sağdan kütüphaneden checkbox ile seçili referansları cursor konumuna ekle. Birden fazla seçilirse birleşik atıf (örn. [1,2,3]) yerleşir."
         >
           + Atıf ekle
         </button>
