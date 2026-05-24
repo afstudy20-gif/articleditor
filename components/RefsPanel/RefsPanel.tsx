@@ -185,6 +185,7 @@ function RefList({
 }): JSX.Element {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const useExternalHighlight = !!onHighlight;
 
   function toggleExpand(id: string): void {
@@ -394,9 +395,240 @@ function RefList({
           onSaveNote={(note: string) => {
             onUpdate(ctxRef.id, { userNote: note });
           }}
+          onEdit={() => {
+            setEditingId(ctxRef.id);
+            closeContext();
+          }}
         />
       )}
+      {editingId && (() => {
+        const target = refs.find((r) => r.id === editingId);
+        if (!target) return null;
+        return (
+          <RefEditModal
+            reference={target}
+            onClose={() => setEditingId(null)}
+            onSave={(patch) => {
+              onUpdate(target.id, patch);
+              setEditingId(null);
+            }}
+          />
+        );
+      })()}
     </ol>
+  );
+}
+
+function RefEditModal({
+  reference: r,
+  onClose,
+  onSave,
+}: {
+  reference: Ref;
+  onClose: () => void;
+  onSave: (patch: Partial<Ref>) => void;
+}): JSX.Element {
+  const authorsToText = (rr: Ref): string =>
+    rr.authors
+      .map((a) => (a.literal ? a.literal : [a.family, a.given].filter(Boolean).join(', ')))
+      .join('; ');
+  const [title, setTitle] = useState(r.title ?? '');
+  const [authorsText, setAuthorsText] = useState(authorsToText(r));
+  const [year, setYear] = useState<string>(r.year ? String(r.year) : '');
+  const [container, setContainer] = useState(r.containerTitle ?? '');
+  const [volume, setVolume] = useState(r.volume ?? '');
+  const [issue, setIssue] = useState(r.issue ?? '');
+  const [pages, setPages] = useState(r.pages ?? '');
+  const [doi, setDoi] = useState(r.doi ?? '');
+  const [pmid, setPmid] = useState(r.pmid ?? '');
+  const [url, setUrl] = useState(r.url ?? '');
+  const [type, setType] = useState<string>(r.type ?? 'journal-article');
+  const [abstractText, setAbstractText] = useState(r.abstract ?? '');
+
+  function parseAuthorsField(text: string): Ref['authors'] {
+    return text
+      .split(/;\s*|\n/)
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .map((entry) => {
+        // "Family, Given" or "literal text"
+        const m = entry.match(/^([^,]+),\s*(.+)$/);
+        if (m) return { family: m[1].trim(), given: m[2].trim() };
+        // Single token w/ space: assume "Given Family" → split last word as family.
+        const parts = entry.split(/\s+/);
+        if (parts.length >= 2) {
+          const fam = parts[parts.length - 1];
+          const given = parts.slice(0, -1).join(' ');
+          return { family: fam, given };
+        }
+        return { literal: entry };
+      });
+  }
+
+  function handleSave(): void {
+    const patch: Partial<Ref> = {
+      title: title.trim() || undefined,
+      authors: parseAuthorsField(authorsText),
+      year: year.trim() ? parseInt(year, 10) : undefined,
+      containerTitle: container.trim() || undefined,
+      volume: volume.trim() || undefined,
+      issue: issue.trim() || undefined,
+      pages: pages.trim() || undefined,
+      doi: doi.trim() || undefined,
+      pmid: pmid.trim() || undefined,
+      url: url.trim() || undefined,
+      type: type as Ref['type'],
+      abstract: abstractText.trim() || undefined,
+    };
+    onSave(patch);
+  }
+
+  return (
+    <>
+      <div className="fixed inset-0 z-40 bg-black/40" onClick={onClose} />
+      <div
+        className="fixed z-50 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-xl w-[min(640px,95vw)] max-h-[90vh] flex flex-col"
+        onContextMenu={(e) => e.preventDefault()}
+      >
+        <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+          <h3 className="font-semibold text-primary">Referansı düzelt</h3>
+          <button onClick={onClose} className="text-muted hover:text-primary text-lg leading-none">
+            ×
+          </button>
+        </div>
+        <div className="flex-1 overflow-auto px-4 py-3 space-y-3 text-sm">
+          <Field label="Başlık">
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="w-full border border-border rounded px-2 py-1.5 outline-none focus:border-teal"
+            />
+          </Field>
+          <Field
+            label="Yazarlar"
+            hint='Format: "Family, Given" — birden fazla için ; ile ayır. Örn: Smith, John A; Doe, Jane B'
+          >
+            <textarea
+              value={authorsText}
+              onChange={(e) => setAuthorsText(e.target.value)}
+              rows={2}
+              className="w-full border border-border rounded px-2 py-1.5 outline-none focus:border-teal font-mono text-xs"
+            />
+          </Field>
+          <div className="grid grid-cols-3 gap-2">
+            <Field label="Yıl">
+              <input
+                value={year}
+                onChange={(e) => setYear(e.target.value.replace(/\D/g, ''))}
+                maxLength={4}
+                className="w-full border border-border rounded px-2 py-1.5 outline-none focus:border-teal"
+              />
+            </Field>
+            <Field label="Tür">
+              <select
+                value={type}
+                onChange={(e) => setType(e.target.value)}
+                className="w-full border border-border rounded px-2 py-1.5 outline-none focus:border-teal"
+              >
+                <option value="journal-article">Makale</option>
+                <option value="book">Kitap</option>
+                <option value="book-chapter">Kitap bölümü</option>
+                <option value="conference-paper">Konferans</option>
+                <option value="thesis">Tez</option>
+                <option value="webpage">Web sayfası</option>
+                <option value="report">Rapor</option>
+                <option value="other">Diğer</option>
+              </select>
+            </Field>
+            <Field label="DOI">
+              <input
+                value={doi}
+                onChange={(e) => setDoi(e.target.value)}
+                className="w-full border border-border rounded px-2 py-1.5 outline-none focus:border-teal font-mono text-xs"
+              />
+            </Field>
+          </div>
+          <Field label="Dergi / kaynak">
+            <input
+              value={container}
+              onChange={(e) => setContainer(e.target.value)}
+              className="w-full border border-border rounded px-2 py-1.5 outline-none focus:border-teal"
+            />
+          </Field>
+          <div className="grid grid-cols-4 gap-2">
+            <Field label="Cilt">
+              <input
+                value={volume}
+                onChange={(e) => setVolume(e.target.value)}
+                className="w-full border border-border rounded px-2 py-1.5 outline-none focus:border-teal"
+              />
+            </Field>
+            <Field label="Sayı">
+              <input
+                value={issue}
+                onChange={(e) => setIssue(e.target.value)}
+                className="w-full border border-border rounded px-2 py-1.5 outline-none focus:border-teal"
+              />
+            </Field>
+            <Field label="Sayfa">
+              <input
+                value={pages}
+                onChange={(e) => setPages(e.target.value)}
+                className="w-full border border-border rounded px-2 py-1.5 outline-none focus:border-teal"
+              />
+            </Field>
+            <Field label="PMID">
+              <input
+                value={pmid}
+                onChange={(e) => setPmid(e.target.value)}
+                className="w-full border border-border rounded px-2 py-1.5 outline-none focus:border-teal"
+              />
+            </Field>
+          </div>
+          <Field label="URL">
+            <input
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              className="w-full border border-border rounded px-2 py-1.5 outline-none focus:border-teal font-mono text-xs"
+            />
+          </Field>
+          <Field label="Özet">
+            <textarea
+              value={abstractText}
+              onChange={(e) => setAbstractText(e.target.value)}
+              rows={5}
+              className="w-full border border-border rounded px-2 py-1.5 outline-none focus:border-teal text-xs"
+            />
+          </Field>
+        </div>
+        <div className="px-4 py-3 border-t border-border flex justify-end gap-2">
+          <button onClick={onClose} className="text-muted hover:text-primary text-sm px-3 py-1.5">
+            İptal
+          </button>
+          <button onClick={handleSave} className="btn-primary text-sm px-4 py-1.5">
+            Kaydet
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function Field({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+}): JSX.Element {
+  return (
+    <div>
+      <label className="tool-label block mb-0.5">{label}</label>
+      {children}
+      {hint && <p className="text-xs text-muted mt-0.5">{hint}</p>}
+    </div>
   );
 }
 
@@ -410,6 +642,7 @@ function ContextMenu({
   onLookup,
   onShowAbstract,
   onSaveNote,
+  onEdit,
 }: {
   reference: Ref;
   x: number;
@@ -420,6 +653,7 @@ function ContextMenu({
   onLookup?: () => void;
   onShowAbstract?: () => void;
   onSaveNote?: (note: string) => void;
+  onEdit?: () => void;
 }): JSX.Element {
   const [noteEdit, setNoteEdit] = useState(false);
   const [noteValue, setNoteValue] = useState(r.userNote ?? '');
@@ -570,6 +804,14 @@ function ContextMenu({
           >
             ➕ Metne yerleştir
           </button>
+          {onEdit && (
+            <button
+              onClick={onEdit}
+              className="block w-full text-left px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal"
+            >
+              ✏️ Düzelt
+            </button>
+          )}
           {onLookup && r.abstract && (
             <button
               onClick={onLookup}
