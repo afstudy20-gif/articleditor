@@ -24,6 +24,8 @@ import { ScorePanel } from '@/components/AI/ScorePanel';
 import { EnhanceModal, type EnhanceState } from '@/components/AI/EnhanceModal';
 import { CitationSuggestionsPanel, type Suggestion } from '@/components/AI/CitationSuggestionsPanel';
 import { GapDetectPanel } from '@/components/AI/GapDetectPanel';
+import { CompareModal } from '@/components/AI/CompareModal';
+import { DeepResearchPanel } from '@/components/AI/DeepResearchPanel';
 import type { ReviewIssueT, ScoreResultT, EnhanceModeT, ClaimT } from '@/lib/ai/schemas';
 import { embedMissingRefs, embedTexts, embedInputFor } from '@/lib/ai/embed-refs';
 import { topK } from '@/lib/ai/cosine';
@@ -103,6 +105,8 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
     items: Array<{ claim: ClaimT; suggestions: Suggestion[]; loadingSuggestions: boolean }>;
   }>({ open: false, loading: false, error: null, items: [] });
   const [embedBusy, setEmbedBusy] = useState<{ done: number; total: number } | null>(null);
+  const [compareOpen, setCompareOpen] = useState(false);
+  const [researchOpen, setResearchOpen] = useState(false);
   const editorInstance = useRef<any>(null);
   const docxInputRef = useRef<HTMLInputElement>(null);
   const projectImportRef = useRef<HTMLInputElement>(null);
@@ -858,6 +862,88 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
     }
   }, []);
 
+  // Try to detect abstract (paragraph after first heading containing "abstract"/"özet").
+  const detectAbstract = useCallback((): string => {
+    const ed = editorInstance.current;
+    if (!ed) return '';
+    const doc = ed.state.doc;
+    let abstractText = '';
+    let inAbstract = false;
+    let firstParaText = '';
+    doc.descendants((node: any) => {
+      if (abstractText) return false;
+      if (node.type?.name === 'heading') {
+        const text = (node.textContent ?? '').toLowerCase();
+        if (inAbstract && abstractText === '') {
+          // Found a new heading after abstract; stop accumulation.
+          return false;
+        }
+        if (/(abstract|özet)/i.test(text)) {
+          inAbstract = true;
+        } else if (inAbstract) {
+          return false;
+        }
+        return true;
+      }
+      if (node.type?.name === 'paragraph') {
+        const t = node.textContent ?? '';
+        if (!firstParaText && t.length > 20) firstParaText = t;
+        if (inAbstract && t.length > 20) {
+          abstractText = t;
+          return false;
+        }
+      }
+      return true;
+    });
+    return abstractText || firstParaText;
+  }, []);
+
+  const runAICompare = useCallback(() => {
+    if (refs.length === 0) {
+      alert('Önce kütüphaneye en az bir referans ekle.');
+      return;
+    }
+    setCompareOpen(true);
+  }, [refs.length]);
+
+  const runAIDeepResearch = useCallback(() => {
+    setResearchOpen(true);
+  }, []);
+
+  // C3: doc-scope structural review reuses Reviewer with full doc text.
+  // The reviewer prompt is generic enough to surface structural/coherence issues
+  // when given the whole manuscript.
+  const runAIStructureCheck = useCallback(async () => {
+    const text = extractFullDocWithCitations();
+    if (text.length < 100) {
+      alert('Yapı kontrolü için belge çok kısa.');
+      return;
+    }
+    setAiReview({ open: true, loading: true, error: null, issues: [], summary: null });
+    try {
+      const res = await fetch('/api/ai/review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, lang: 'tr', section: 'Tüm belge (yapı kontrolü)' }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+        throw new Error(data.error || `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      setAiReview({
+        open: true,
+        loading: false,
+        error: null,
+        issues: data.issues ?? [],
+        summary: data.summary ?? null,
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setAiReview({ open: true, loading: false, error: msg, issues: [], summary: null });
+    }
+  }, [extractFullDocWithCitations]);
+
   const insertCitationForClaim = useCallback((claim: ClaimT, refIds: string[]) => {
     const ed = editorInstance.current;
     if (!ed || !claim.quote) return;
@@ -1346,6 +1432,9 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
               onAIEnhance={runAIEnhance}
               onAISuggestCitation={runAISuggestCitation}
               onAIDetectGaps={runAIDetectGaps}
+              onAICompare={runAICompare}
+              onAIDeepResearch={runAIDeepResearch}
+              onAIStructureCheck={runAIStructureCheck}
             />
           </div>
         </div>
@@ -1446,6 +1535,9 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
               onAIEnhance={runAIEnhance}
               onAISuggestCitation={runAISuggestCitation}
               onAIDetectGaps={runAIDetectGaps}
+              onAICompare={runAICompare}
+              onAIDeepResearch={runAIDeepResearch}
+              onAIStructureCheck={runAIStructureCheck}
         />
         <RefsPanel
           refs={refs}
@@ -1566,6 +1658,34 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
       {embedBusy && (
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-white border border-border rounded-lg shadow-lg px-4 py-2 text-xs text-secondary">
           Referanslar gömülüyor: {embedBusy.done} / {embedBusy.total}
+        </div>
+      )}
+
+      {compareOpen && (
+        <CompareModal
+          myAbstract={detectAbstract()}
+          refs={refs}
+          onClose={() => setCompareOpen(false)}
+          onInsertSnippet={(snippet) => {
+            const ed = editorInstance.current;
+            if (!ed) return;
+            ed.chain().focus().insertContent(snippet).run();
+            setCompareOpen(false);
+          }}
+          onExtractAspects={extractAspectsFor}
+        />
+      )}
+
+      {researchOpen && (
+        <div className="fixed right-4 top-20 bottom-4 w-[440px] z-30 shadow-xl">
+          <DeepResearchPanel
+            initialAbstract={detectAbstract()}
+            onClose={() => setResearchOpen(false)}
+            onAddRef={(r) => {
+              const newRef: Ref = { ...r, id: newRefId() };
+              setRefs((prev) => [...prev, newRef]);
+            }}
+          />
         </div>
       )}
 

@@ -19,6 +19,9 @@ type Props = {
   onAIEnhance?: (mode: 'expand' | 'shorten' | 'rephrase' | 'tone-academic' | 'clarity' | 'concision' | 'grammar') => void;
   onAISuggestCitation?: () => void;
   onAIDetectGaps?: () => void;
+  onAICompare?: () => void;
+  onAIDeepResearch?: () => void;
+  onAIStructureCheck?: () => void;
 };
 
 const SECTION_PRESETS: Array<{ label: string; level: 1 | 2 | 3 }> = [
@@ -68,6 +71,9 @@ export function ArticleEditor({
   onAIEnhance,
   onAISuggestCitation,
   onAIDetectGaps,
+  onAICompare,
+  onAIDeepResearch,
+  onAIStructureCheck,
 }: Props) {
   const refsById = useMemo(() => {
     const m = new Map<string, Ref>();
@@ -213,6 +219,33 @@ export function ArticleEditor({
             title="Tüm belgede atıf gerektiren ancak atıfsız iddiaları tespit eder, her biri için uygun atıf önerir"
           >
             🩹 Atıfsız iddialar
+          </button>
+        )}
+        {onAICompare && (
+          <button
+            onClick={() => onAICompare()}
+            className="px-3 py-1 rounded-md bg-cyan-600 text-white text-xs font-semibold hover:bg-cyan-700"
+            title="Kütüphandeki bir referansla makaleni karşılaştır: örtüşmeler, boşluklar, farklılaştırıcılar"
+          >
+            ⚖️ Karşılaştır
+          </button>
+        )}
+        {onAIDeepResearch && (
+          <button
+            onClick={() => onAIDeepResearch()}
+            className="px-3 py-1 rounded-md bg-sky-600 text-white text-xs font-semibold hover:bg-sky-700"
+            title="Özetinden alt sorgular üret, CrossRef/OpenAlex/PubMed tara, tematik kümele"
+          >
+            🗺️ Related Work
+          </button>
+        )}
+        {onAIStructureCheck && (
+          <button
+            onClick={() => onAIStructureCheck()}
+            className="px-3 py-1 rounded-md bg-purple-600 text-white text-xs font-semibold hover:bg-purple-700"
+            title="Tüm belgeyi yapı/akış/eksik bölüm açısından eleştir (doc-scope reviewer)"
+          >
+            🩹 Yapı kontrolü
           </button>
         )}
       </div>
