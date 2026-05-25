@@ -21,7 +21,14 @@ import { CitationPopover } from '@/components/Editor/CitationPopover';
 import { FindReplace } from '@/components/Editor/FindReplace';
 import { IssuesPanel } from '@/components/AI/IssuesPanel';
 import { ScorePanel } from '@/components/AI/ScorePanel';
-import type { ReviewIssueT, ScoreResultT } from '@/lib/ai/schemas';
+import { EnhanceModal, type EnhanceState } from '@/components/AI/EnhanceModal';
+import type { ReviewIssueT, ScoreResultT, EnhanceModeT } from '@/lib/ai/schemas';
+import {
+  encodeSelection,
+  decodeToTipTapContent,
+  encodedToPreview,
+  type CitationNodeJSON,
+} from '@/lib/editor/mixed-content';
 
 type Props = {
   project: Project;
@@ -71,6 +78,13 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
     error: string | null;
     result: ScoreResultT | null;
   }>({ open: false, loading: false, error: null, result: null });
+  const [aiEnhance, setAiEnhance] = useState<{
+    state: EnhanceState;
+    mode: EnhanceModeT | null;
+    range: { from: number; to: number } | null;
+    nodes: CitationNodeJSON[];
+    afterEncoded: string;
+  }>({ state: { status: 'idle' }, mode: null, range: null, nodes: [], afterEncoded: '' });
   const editorInstance = useRef<any>(null);
   const docxInputRef = useRef<HTMLInputElement>(null);
   const projectImportRef = useRef<HTMLInputElement>(null);
@@ -555,6 +569,101 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
     }
   }, [extractFullDocWithCitations]);
 
+  const runAIEnhance = useCallback(
+    async (mode: EnhanceModeT, retryRange?: { from: number; to: number }) => {
+      const ed = editorInstance.current;
+      if (!ed) return;
+      const { state } = ed;
+      let from: number;
+      let to: number;
+      if (retryRange) {
+        ({ from, to } = retryRange);
+      } else if (!state.selection.empty) {
+        from = state.selection.from;
+        to = state.selection.to;
+      } else {
+        // Use current block as fallback.
+        const $pos = state.doc.resolve(state.selection.from);
+        from = $pos.start($pos.depth);
+        to = $pos.end($pos.depth);
+      }
+      const sel = encodeSelection(state, from, to);
+      const beforePreview = encodedToPreview(sel.encoded, sel.nodes, refOrder);
+      if (beforePreview.length < 10) {
+        alert('İyileştirme için en az 10 karakterlik metin gerekli.');
+        return;
+      }
+      setAiEnhance({
+        state: { status: 'loading', before: beforePreview },
+        mode,
+        range: { from: sel.from, to: sel.to },
+        nodes: sel.nodes,
+        afterEncoded: '',
+      });
+      try {
+        const res = await fetch('/api/ai/enhance', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: sel.encoded, mode, lang: 'tr' }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+          throw new Error(data.error || `HTTP ${res.status}`);
+        }
+        const data = (await res.json()) as {
+          after: string;
+          rationale?: string;
+          citationCheck: { total: number; missing: number[]; extras: number[] };
+        };
+        const afterPreview = encodedToPreview(data.after, sel.nodes, refOrder);
+        setAiEnhance({
+          state: {
+            status: 'ready',
+            before: beforePreview,
+            after: afterPreview,
+            rationale: data.rationale,
+            citationCheck: data.citationCheck,
+          },
+          mode,
+          range: { from: sel.from, to: sel.to },
+          nodes: sel.nodes,
+          afterEncoded: data.after,
+        });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setAiEnhance({
+          state: { status: 'error', before: beforePreview, error: msg },
+          mode,
+          range: { from: sel.from, to: sel.to },
+          nodes: sel.nodes,
+          afterEncoded: '',
+        });
+      }
+    },
+    [refOrder],
+  );
+
+  const acceptEnhance = useCallback(() => {
+    const ed = editorInstance.current;
+    if (!ed || !aiEnhance.range || aiEnhance.state.status !== 'ready') return;
+    const content = decodeToTipTapContent(aiEnhance.afterEncoded, aiEnhance.nodes);
+    if (content.length === 0) return;
+    ed.chain()
+      .focus()
+      .insertContentAt({ from: aiEnhance.range.from, to: aiEnhance.range.to }, content)
+      .run();
+    setAiEnhance({ state: { status: 'idle' }, mode: null, range: null, nodes: [], afterEncoded: '' });
+  }, [aiEnhance]);
+
+  const closeEnhance = useCallback(() => {
+    setAiEnhance({ state: { status: 'idle' }, mode: null, range: null, nodes: [], afterEncoded: '' });
+  }, []);
+
+  const retryEnhance = useCallback(() => {
+    if (!aiEnhance.mode || !aiEnhance.range) return;
+    void runAIEnhance(aiEnhance.mode, aiEnhance.range);
+  }, [aiEnhance.mode, aiEnhance.range, runAIEnhance]);
+
   const runAIReview = useCallback(async () => {
     const sel = extractSelectionWithCitations();
     if (!sel || sel.text.length < 20) {
@@ -1017,6 +1126,7 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
               onInsertRequest={insertFromLibrary}
               onAIReview={runAIReview}
               onAIScore={runAIScore}
+              onAIEnhance={runAIEnhance}
             />
           </div>
         </div>
@@ -1113,6 +1223,7 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
           onInsertRequest={insertFromLibrary}
           onAIReview={runAIReview}
               onAIScore={runAIScore}
+              onAIEnhance={runAIEnhance}
         />
         <RefsPanel
           refs={refs}
@@ -1188,6 +1299,14 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
           />
         </div>
       )}
+
+      <EnhanceModal
+        state={aiEnhance.state}
+        mode={aiEnhance.mode}
+        onAccept={acceptEnhance}
+        onClose={closeEnhance}
+        onRetry={retryEnhance}
+      />
 
       {aiScore.open && (
         <div className="fixed right-4 top-20 bottom-4 w-[380px] z-30 shadow-xl">

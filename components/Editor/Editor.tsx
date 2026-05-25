@@ -16,6 +16,7 @@ type Props = {
   onReady?: (editor: any) => void;
   onAIReview?: () => void;
   onAIScore?: () => void;
+  onAIEnhance?: (mode: 'expand' | 'shorten' | 'rephrase' | 'tone-academic' | 'clarity' | 'concision' | 'grammar') => void;
 };
 
 const SECTION_PRESETS: Array<{ label: string; level: 1 | 2 | 3 }> = [
@@ -54,7 +55,16 @@ function computeRefOrder(json: any, refIds: string[]): string[] {
   return seen;
 }
 
-export function ArticleEditor({ initialContent, refs, onChange, onInsertRequest, onReady, onAIReview, onAIScore }: Props) {
+export function ArticleEditor({
+  initialContent,
+  refs,
+  onChange,
+  onInsertRequest,
+  onReady,
+  onAIReview,
+  onAIScore,
+  onAIEnhance,
+}: Props) {
   const refsById = useMemo(() => {
     const m = new Map<string, Ref>();
     for (const r of refs) m.set(r.id, r);
@@ -182,11 +192,56 @@ export function ArticleEditor({ initialContent, refs, onChange, onInsertRequest,
             📊 Skor
           </button>
         )}
+        {onAIEnhance && <EnhanceMenu onPick={onAIEnhance} />}
       </div>
       <EditorContent
         editor={editor}
         className="prose max-w-none p-6 flex-1 min-h-0 overflow-auto focus-within:outline-none [&_p]:my-2 [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:mt-4 [&_h2]:text-xl [&_h2]:font-bold [&_h3]:text-lg [&_h3]:font-semibold"
       />
+    </div>
+  );
+}
+
+const ENHANCE_MODES: Array<{ key: 'expand' | 'shorten' | 'rephrase' | 'tone-academic' | 'clarity' | 'concision' | 'grammar'; label: string; icon: string }> = [
+  { key: 'rephrase', label: 'Yeniden yaz', icon: '🔁' },
+  { key: 'expand', label: 'Genişlet', icon: '➕' },
+  { key: 'shorten', label: 'Kısalt', icon: '➖' },
+  { key: 'tone-academic', label: 'Akademik ton', icon: '🎓' },
+  { key: 'clarity', label: 'Açıklık', icon: '💡' },
+  { key: 'concision', label: 'Sadelik', icon: '✂️' },
+  { key: 'grammar', label: 'Dilbilgisi', icon: '📝' },
+];
+
+function EnhanceMenu({ onPick }: { onPick: (mode: typeof ENHANCE_MODES[number]['key']) => void }): JSX.Element {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="px-3 py-1 rounded-md bg-violet-500 text-white text-xs font-semibold hover:bg-violet-600"
+        title="Seçili metni AI ile iyileştir"
+      >
+        ✏️ İyileştir ▾
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute top-full left-0 mt-1 z-20 bg-white border border-border rounded-lg shadow-lg w-56 py-1">
+            {ENHANCE_MODES.map((m) => (
+              <button
+                key={m.key}
+                onClick={() => {
+                  onPick(m.key);
+                  setOpen(false);
+                }}
+                className="block w-full text-left px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal"
+              >
+                {m.icon} {m.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }
