@@ -451,19 +451,32 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
   }
 
   const addByDoi = useCallback(async (doi: string) => {
-    const res = await fetch('/api/lookup', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mode: 'doi', doi }),
-    });
-    const data = await res.json();
-    if (data?.ref) {
-      // After fetching by DOI, also enrich (to pull abstract/PMID).
+    try {
+      const res = await fetch('/api/lookup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'doi', doi }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.ref) {
+        const msg = data?.error || `Bulunamadı (HTTP ${res.status}). DOI veya PMID doğru mu?`;
+        alert(msg);
+        return;
+      }
       const enriched: Ref = (await callLookup(data.ref as Ref).catch(() => data.ref as Ref)) ?? (data.ref as Ref);
       const r: Ref = { ...enriched, id: newRefId() };
       setRefs((prev) => [...prev, r]);
+      addHistory(
+        'add-ref',
+        `Eklendi (DOI/PMID): ${truncate(r.title ?? r.doi ?? r.pmid ?? doi, 60)}`,
+        () => {
+          setRefs((prev) => prev.filter((x) => x.id !== r.id));
+        },
+      );
+    } catch (err) {
+      alert(`Lookup hatası: ${err instanceof Error ? err.message : String(err)}`);
     }
-  }, []);
+  }, [addHistory]);
 
   const search = useCallback(async (
     query: string,

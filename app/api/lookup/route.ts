@@ -76,7 +76,22 @@ export async function POST(req: Request) {
       return NextResponse.json({ refs });
     }
     if (parsed.mode === 'doi' && parsed.doi) {
-      const ref = await getCrossRefByDoi(parsed.doi, { mailto });
+      const raw = parsed.doi.trim();
+      // PMID = pure digits (PubMed IDs are 1-9 digit numbers). Anything else
+      // treat as DOI (incl. forms like "https://doi.org/10.x/y" or "doi:10.x/y").
+      const isPmid = /^\d{1,9}$/.test(raw);
+      if (isPmid) {
+        const refs = await fetchPubmedSummaries([raw], { apiKey: ncbiKey, email: ncbiEmail });
+        const ref = refs[0] ?? null;
+        if (!ref) {
+          return NextResponse.json({ error: `PMID ${raw} bulunamadı.` }, { status: 404 });
+        }
+        return NextResponse.json({ ref });
+      }
+      const ref = await getCrossRefByDoi(raw, { mailto });
+      if (!ref) {
+        return NextResponse.json({ error: `DOI bulunamadı: ${raw}` }, { status: 404 });
+      }
       return NextResponse.json({ ref });
     }
     return NextResponse.json({ error: 'missing params' }, { status: 400 });
