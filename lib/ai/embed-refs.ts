@@ -3,6 +3,7 @@
 // similarity matches semantic content across both surface form + topic.
 
 import type { Ref } from '@/store/types';
+import { aiHeaders } from './user-keys';
 
 export function embedInputFor(ref: Ref): string {
   const parts: string[] = [];
@@ -33,7 +34,7 @@ export function refNeedsEmbedding(ref: Ref): boolean {
 export async function embedTexts(texts: string[]): Promise<{ embeddings: number[][]; provider: string }> {
   const res = await fetch('/api/ai/embed-batch', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: aiHeaders(),
     body: JSON.stringify({ texts }),
   });
   if (!res.ok) {

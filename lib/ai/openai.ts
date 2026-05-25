@@ -1,34 +1,28 @@
 import OpenAI from 'openai';
 import { AIError, type GenerateOptions } from './provider';
 
-function getClient(): OpenAI {
-  const key = process.env.OPENAI_API_KEY;
-  if (!key) throw new AIError('openai', 'config', 'OPENAI_API_KEY not configured');
+type OpenAICfg = { apiKey?: string; baseUrl?: string; model: string; embedModel: string };
+
+function getClient(cfg: OpenAICfg): OpenAI {
+  if (!cfg.apiKey) throw new AIError('openai', 'config', 'OPENAI_API_KEY not configured');
   return new OpenAI({
-    apiKey: key,
-    baseURL: process.env.OPENAI_BASE_URL || undefined,
+    apiKey: cfg.apiKey,
+    baseURL: cfg.baseUrl || undefined,
   });
-}
-
-function getModel(): string {
-  return process.env.OPENAI_MODEL || 'gpt-4o-mini';
-}
-
-function getEmbedModel(): string {
-  return process.env.OPENAI_EMBED_MODEL || 'text-embedding-3-small';
 }
 
 export async function generateTextOpenAI(
   prompt: string,
-  opts?: GenerateOptions,
+  opts: GenerateOptions | undefined,
+  cfg: OpenAICfg,
 ): Promise<string> {
-  const client = getClient();
+  const client = getClient(cfg);
   try {
     const messages: Array<{ role: 'system' | 'user'; content: string }> = [];
     if (opts?.system) messages.push({ role: 'system', content: opts.system });
     messages.push({ role: 'user', content: prompt });
     const res = await client.chat.completions.create({
-      model: getModel(),
+      model: cfg.model,
       messages,
       temperature: opts?.temperature ?? 0.2,
       max_tokens: opts?.maxTokens ?? 4096,
@@ -46,15 +40,16 @@ export async function generateTextOpenAI(
 
 export async function* streamTextOpenAI(
   prompt: string,
-  opts?: GenerateOptions,
+  opts: GenerateOptions | undefined,
+  cfg: OpenAICfg,
 ): AsyncIterable<string> {
-  const client = getClient();
+  const client = getClient(cfg);
   try {
     const messages: Array<{ role: 'system' | 'user'; content: string }> = [];
     if (opts?.system) messages.push({ role: 'system', content: opts.system });
     messages.push({ role: 'user', content: prompt });
     const stream = await client.chat.completions.create({
-      model: getModel(),
+      model: cfg.model,
       messages,
       temperature: opts?.temperature ?? 0.2,
       max_tokens: opts?.maxTokens ?? 4096,
@@ -70,12 +65,12 @@ export async function* streamTextOpenAI(
   }
 }
 
-export async function embedBatchOpenAI(texts: string[]): Promise<number[][]> {
+export async function embedBatchOpenAI(texts: string[], cfg: OpenAICfg): Promise<number[][]> {
   if (texts.length === 0) return [];
-  const client = getClient();
+  const client = getClient(cfg);
   try {
     const res = await client.embeddings.create({
-      model: getEmbedModel(),
+      model: cfg.embedModel,
       input: texts,
     });
     return res.data.map((d) => d.embedding);

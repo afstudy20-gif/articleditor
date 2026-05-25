@@ -29,6 +29,8 @@ import { DeepResearchPanel } from '@/components/AI/DeepResearchPanel';
 import type { ReviewIssueT, ScoreResultT, EnhanceModeT, ClaimT } from '@/lib/ai/schemas';
 import { embedMissingRefs, embedTexts, embedInputFor } from '@/lib/ai/embed-refs';
 import { topK } from '@/lib/ai/cosine';
+import { aiHeaders } from '@/lib/ai/user-keys';
+import { SettingsModal } from '@/components/AI/SettingsModal';
 import {
   encodeSelection,
   decodeToTipTapContent,
@@ -108,18 +110,25 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
   const [compareOpen, setCompareOpen] = useState(false);
   const [researchOpen, setResearchOpen] = useState(false);
   const [aiConfigured, setAiConfigured] = useState<boolean | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   // One-shot AI config check on mount — disables AI buttons when no key.
   useEffect(() => {
     let alive = true;
-    fetch('/api/ai/status')
-      .then((r) => r.json())
-      .then((d) => {
-        if (alive) setAiConfigured(Boolean(d?.configured));
-      })
-      .catch(() => alive && setAiConfigured(false));
+    const refresh = (): void => {
+      fetch('/api/ai/status', { headers: aiHeaders() })
+        .then((r) => r.json())
+        .then((d) => {
+          if (alive) setAiConfigured(Boolean(d?.configured));
+        })
+        .catch(() => alive && setAiConfigured(false));
+    };
+    refresh();
+    const onKeyUpdate = (): void => refresh();
+    window.addEventListener('enr-keys-updated', onKeyUpdate);
     return () => {
       alive = false;
+      window.removeEventListener('enr-keys-updated', onKeyUpdate);
     };
   }, []);
   const editorInstance = useRef<any>(null);
@@ -591,7 +600,7 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
     try {
       const res = await fetch('/api/ai/score', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: aiHeaders(),
         body: JSON.stringify({ text, scope: 'document', lang: 'tr' }),
       });
       if (!res.ok) {
@@ -640,7 +649,7 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
       try {
         const res = await fetch('/api/ai/enhance', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: aiHeaders(),
           body: JSON.stringify({ text: sel.encoded, mode, lang: 'tr' }),
         });
         if (!res.ok) {
@@ -720,7 +729,7 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
       try {
         const res = await fetch('/api/ai/extract-aspects', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: aiHeaders(),
           body: JSON.stringify(body),
         });
         if (!res.ok) {
@@ -804,7 +813,7 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
     try {
       const res = await fetch('/api/ai/gap-detect', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: aiHeaders(),
         body: JSON.stringify({ text, scope: 'document', lang: 'tr' }),
       });
       if (!res.ok) {
@@ -938,7 +947,7 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
     try {
       const res = await fetch('/api/ai/review', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: aiHeaders(),
         body: JSON.stringify({ text, lang: 'tr', section: 'Tüm belge (yapı kontrolü)' }),
       });
       if (!res.ok) {
@@ -992,7 +1001,7 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
     try {
       const res = await fetch('/api/ai/review', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: aiHeaders(),
         body: JSON.stringify({ text: sel.text, context: sel.context, lang: 'tr' }),
       });
       if (!res.ok) {
@@ -1365,6 +1374,13 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
             <button className="btn-primary text-xs" onClick={() => exportDocx('active')}>
               Aktif EndNote .docx
             </button>
+            <button
+              onClick={() => setSettingsOpen(true)}
+              className={`text-xs px-2 py-1 rounded-md border ${aiConfigured ? 'border-teal text-teal' : 'border-border text-muted'} hover:bg-slate-50`}
+              title={aiConfigured ? 'AI ayarlanmış — API anahtarlarını düzenle' : 'AI servisi yapılandırılmamış — API anahtarı gir'}
+            >
+              ⚙️ AI {aiConfigured === false && <span className="ml-1 inline-block w-1.5 h-1.5 rounded-full bg-red-500 align-middle" />}
+            </button>
           </div>
         </div>
       </header>
@@ -1690,6 +1706,15 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
             setCompareOpen(false);
           }}
           onExtractAspects={extractAspectsFor}
+        />
+      )}
+
+      {settingsOpen && (
+        <SettingsModal
+          onClose={() => setSettingsOpen(false)}
+          onSaved={() => {
+            // status hook re-fetches via 'enr-keys-updated' event
+          }}
         />
       )}
 

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getProvider, getDefaultProvider, isAIConfigured, AIError } from '@/lib/ai/provider';
+import { getProvider, getDefaultProvider, isAIConfigured, AIError, configFromHeaders } from '@/lib/ai/provider';
 
 export const runtime = 'nodejs';
 
@@ -9,9 +9,10 @@ const BodySchema = z.object({
 });
 
 export async function POST(req: Request) {
-  if (!isAIConfigured()) {
+  const cfg = configFromHeaders(req.headers);
+  if (!isAIConfigured(cfg)) {
     return NextResponse.json(
-      { error: 'AI configured değil. GEMINI_API_KEY veya benzeri ayarlanmalı.' },
+      { error: 'AI configured değil. Sağ üstteki ayarlardan API anahtarı gir.' },
       { status: 503 },
     );
   }
@@ -28,7 +29,7 @@ export async function POST(req: Request) {
     let lastErr: Error | null = null;
     for (const name of order) {
       try {
-        const provider = getProvider(name);
+        const provider = getProvider(name, cfg);
         if (!provider.embedBatch) continue;
         const embeddings = await provider.embedBatch(body.texts);
         const dim = embeddings[0]?.length ?? 0;

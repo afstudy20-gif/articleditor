@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
-import { isAIConfigured, getDefaultProvider } from '@/lib/ai/provider';
+import { isAIConfigured, getDefaultProvider, configFromHeaders } from '@/lib/ai/provider';
 
 export const runtime = 'nodejs';
 
-export async function GET() {
+export async function GET(req: Request) {
+  const cfg = configFromHeaders(req.headers);
   return NextResponse.json({
-    configured: isAIConfigured(),
-    provider: isAIConfigured() ? getDefaultProvider() : null,
+    configured: isAIConfigured(cfg),
+    provider: isAIConfigured(cfg) ? getDefaultProvider(cfg) : null,
   });
 }

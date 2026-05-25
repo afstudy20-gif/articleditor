@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { Ref } from '@/store/types';
+import { aiHeaders } from '@/lib/ai/user-keys';
 
 type Cluster = {
   theme: string;
@@ -36,7 +37,7 @@ export function DeepResearchPanel({ initialAbstract, onClose, onAddRef }: Props)
     try {
       const res = await fetch('/api/ai/deep-research', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: aiHeaders(),
         body: JSON.stringify({ title, abstract, lang: 'tr' }),
       });
       if (!res.ok) {

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import type { CompareResultT } from '@/lib/ai/schemas';
 import type { Ref } from '@/store/types';
+import { aiHeaders } from '@/lib/ai/user-keys';
 
 type Props = {
   myAbstract: string;
@@ -59,7 +60,7 @@ export function CompareModal({ myAbstract: initialAbstract, refs, onClose, onIns
       };
       const res = await fetch('/api/ai/compare', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: aiHeaders(),
         body: JSON.stringify(payload),
       });
       if (!res.ok) {

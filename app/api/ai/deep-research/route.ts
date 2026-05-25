@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import type { Ref } from '@/store/types';
-import { generateStructured, isAIConfigured, AIError } from '@/lib/ai/provider';
+import { generateStructured, isAIConfigured, AIError, configFromHeaders } from '@/lib/ai/provider';
 import { DeepResearchResult } from '@/lib/ai/schemas';
 import { searchCrossRef } from '@/lib/lookup/crossref';
 import { searchOpenAlex } from '@/lib/lookup/openalex';
@@ -49,7 +49,8 @@ function dedupeRefs(refs: Ref[]): Ref[] {
 }
 
 export async function POST(req: Request) {
-  if (!isAIConfigured()) {
+  const cfg = configFromHeaders(req.headers);
+  if (!isAIConfigured(cfg)) {
     return NextResponse.json(
       { error: 'AI configured değil. GEMINI_API_KEY veya benzeri ayarlanmalı.' },
       { status: 503 },
@@ -85,6 +86,7 @@ export async function POST(req: Request) {
       system: body.lang === 'tr' ? SUBQUERY_SYSTEM_TR : SUBQUERY_SYSTEM_EN,
       temperature: 0.5,
       maxTokens: 1024,
+      config: cfg,
     });
 
     // 2. Parallel retrieval across CrossRef + OpenAlex + PubMed per sub-query.
@@ -149,6 +151,7 @@ export async function POST(req: Request) {
       system: body.lang === 'tr' ? CLUSTER_SYSTEM_TR : CLUSTER_SYSTEM_EN,
       temperature: 0.3,
       maxTokens: 3072,
+      config: cfg,
     });
 
     // 4. Map ref_ids back to full Ref objects.

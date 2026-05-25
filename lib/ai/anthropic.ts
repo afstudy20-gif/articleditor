@@ -1,24 +1,22 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { AIError, type GenerateOptions } from './provider';
 
-function getClient(): Anthropic {
-  const key = process.env.ANTHROPIC_API_KEY;
-  if (!key) throw new AIError('anthropic', 'config', 'ANTHROPIC_API_KEY not configured');
-  return new Anthropic({ apiKey: key });
-}
+type AnthropicCfg = { apiKey?: string; model: string };
 
-function getModel(): string {
-  return process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-5-20250929';
+function getClient(cfg: AnthropicCfg): Anthropic {
+  if (!cfg.apiKey) throw new AIError('anthropic', 'config', 'ANTHROPIC_API_KEY not configured');
+  return new Anthropic({ apiKey: cfg.apiKey });
 }
 
 export async function generateTextAnthropic(
   prompt: string,
-  opts?: GenerateOptions,
+  opts: GenerateOptions | undefined,
+  cfg: AnthropicCfg,
 ): Promise<string> {
-  const client = getClient();
+  const client = getClient(cfg);
   try {
     const res = await client.messages.create({
-      model: getModel(),
+      model: cfg.model,
       system: opts?.system,
       max_tokens: opts?.maxTokens ?? 4096,
       temperature: opts?.temperature ?? 0.2,
@@ -36,12 +34,13 @@ export async function generateTextAnthropic(
 
 export async function* streamTextAnthropic(
   prompt: string,
-  opts?: GenerateOptions,
+  opts: GenerateOptions | undefined,
+  cfg: AnthropicCfg,
 ): AsyncIterable<string> {
-  const client = getClient();
+  const client = getClient(cfg);
   try {
     const stream = client.messages.stream({
-      model: getModel(),
+      model: cfg.model,
       system: opts?.system,
       max_tokens: opts?.maxTokens ?? 4096,
       temperature: opts?.temperature ?? 0.2,

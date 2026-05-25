@@ -1,5 +1,6 @@
 // Gemini provider adapter using @google/generative-ai SDK.
-// Maps unified GenerateOptions to Gemini's GenerationConfig + safety settings.
+// Accepts per-call ResolvedGeminiConfig (key, model, embedModel) so BYO-key
+// headers can override env defaults without mutating module state.
 
 import {
   GoogleGenerativeAI,
@@ -9,14 +10,11 @@ import {
 } from '@google/generative-ai';
 import { AIError, type GenerateOptions } from './provider';
 
-function getClient(): GoogleGenerativeAI {
-  const key = process.env.GEMINI_API_KEY;
-  if (!key) throw new AIError('gemini', 'config', 'GEMINI_API_KEY not configured');
-  return new GoogleGenerativeAI(key);
-}
+type GeminiCfg = { apiKey?: string; model: string; embedModel: string };
 
-function getModel(): string {
-  return process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+function getClient(cfg: GeminiCfg): GoogleGenerativeAI {
+  if (!cfg.apiKey) throw new AIError('gemini', 'config', 'GEMINI_API_KEY not configured');
+  return new GoogleGenerativeAI(cfg.apiKey);
 }
 
 const safetySettings = [
@@ -31,19 +29,18 @@ function buildConfig(opts?: GenerateOptions): GenerationConfig {
     temperature: opts?.temperature ?? 0.2,
     maxOutputTokens: opts?.maxTokens ?? 8192,
   };
-  if (opts?.jsonMode) {
-    cfg.responseMimeType = 'application/json';
-  }
+  if (opts?.jsonMode) cfg.responseMimeType = 'application/json';
   return cfg;
 }
 
 export async function generateTextGemini(
   prompt: string,
-  opts?: GenerateOptions,
+  opts: GenerateOptions | undefined,
+  cfg: GeminiCfg,
 ): Promise<string> {
-  const client = getClient();
+  const client = getClient(cfg);
   const model = client.getGenerativeModel({
-    model: getModel(),
+    model: cfg.model,
     systemInstruction: opts?.system,
     generationConfig: buildConfig(opts),
     safetySettings,
@@ -62,11 +59,12 @@ export async function generateTextGemini(
 
 export async function* streamTextGemini(
   prompt: string,
-  opts?: GenerateOptions,
+  opts: GenerateOptions | undefined,
+  cfg: GeminiCfg,
 ): AsyncIterable<string> {
-  const client = getClient();
+  const client = getClient(cfg);
   const model = client.getGenerativeModel({
-    model: getModel(),
+    model: cfg.model,
     systemInstruction: opts?.system,
     generationConfig: buildConfig(opts),
     safetySettings,
@@ -83,14 +81,11 @@ export async function* streamTextGemini(
   }
 }
 
-export async function embedBatchGemini(texts: string[]): Promise<number[][]> {
+export async function embedBatchGemini(texts: string[], cfg: GeminiCfg): Promise<number[][]> {
   if (texts.length === 0) return [];
-  const client = getClient();
-  const modelName = process.env.GEMINI_EMBED_MODEL || 'text-embedding-004';
-  const model = client.getGenerativeModel({ model: modelName });
+  const client = getClient(cfg);
+  const model = client.getGenerativeModel({ model: cfg.embedModel });
   try {
-    // Gemini supports batchEmbedContents; we call per-text for simpler error handling.
-    // For large batches consider switching to batchEmbedContents() with grouped requests.
     const out: number[][] = [];
     for (const text of texts) {
       const result = await model.embedContent(text);

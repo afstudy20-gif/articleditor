@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { generateStructured, isAIConfigured, AIError } from '@/lib/ai/provider';
+import { generateStructured, isAIConfigured, AIError, configFromHeaders } from '@/lib/ai/provider';
 import { ScoreResult } from '@/lib/ai/schemas';
 import { encodeCitations, citationPreservationInstruction } from '@/lib/ai/citation-safety';
 
@@ -59,7 +59,8 @@ function buildPrompt(args: { encodedText: string; scope: string; lang: 'tr' | 'e
 }
 
 export async function POST(req: Request) {
-  if (!isAIConfigured()) {
+  const cfg = configFromHeaders(req.headers);
+  if (!isAIConfigured(cfg)) {
     return NextResponse.json(
       { error: 'AI configured değil. GEMINI_API_KEY veya benzeri ayarlanmalı.' },
       { status: 503 },
@@ -84,6 +85,7 @@ export async function POST(req: Request) {
       system: body.lang === 'tr' ? SYSTEM_TR : SYSTEM_EN,
       temperature: 0.2,
       maxTokens: 2048,
+      config: cfg,
     });
     return NextResponse.json(result);
   } catch (err) {
