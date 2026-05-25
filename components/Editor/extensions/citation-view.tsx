@@ -16,9 +16,6 @@ declare global {
     __enrStyle?: CitationStyle;
     __enrHighlightRefId?: string | null;
     __enrOnCitationClick?: (pos: number, refIds: string[]) => void;
-    // Position of the most-recently-inserted citation; consumed by NodeView
-    // to flash a yellow tint for ~3s. Set by Citation extension command.
-    __enrFreshCitationPos?: number | null;
   }
 }
 
@@ -29,38 +26,19 @@ function CitationNodeView({ node, getPos }: any) {
   );
   const [, setTick] = useState(0);
 
-  // Fresh state driven by a global pos pointer set by Citation extension on
-  // insertion. NodeView checks if its own getPos() matches.
-  const computeFresh = (): boolean => {
-    if (typeof window === 'undefined') return false;
-    const target = window.__enrFreshCitationPos;
-    if (target == null) return false;
-    const myPos = typeof getPos === 'function' ? getPos() : -1;
-    return myPos === target;
-  };
-  const [fresh, setFresh] = useState(false);
-
   useEffect(() => {
-    // Check immediately on mount — covers the initial render after insert.
-    setFresh(computeFresh());
     function onHighlight(): void {
       setCurrentHighlight((typeof window !== 'undefined' && window.__enrHighlightRefId) || null);
     }
     function onRefresh(): void {
       setTick((t) => t + 1);
     }
-    function onFresh(): void {
-      setFresh(computeFresh());
-    }
     window.addEventListener('enr:highlight', onHighlight);
     window.addEventListener('enr:refresh', onRefresh);
-    window.addEventListener('enr:fresh-citation', onFresh);
     return () => {
       window.removeEventListener('enr:highlight', onHighlight);
       window.removeEventListener('enr:refresh', onRefresh);
-      window.removeEventListener('enr:fresh-citation', onFresh);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const highlighted: boolean =
@@ -84,11 +62,9 @@ function CitationNodeView({ node, getPos }: any) {
     .join(' | ');
 
   const baseCls = 'enr-citation inline-block px-1 mx-0.5 rounded text-xs cursor-pointer select-none align-baseline transition-colors duration-300';
-  const className = fresh
-    ? `${baseCls} bg-yellow-300 text-amber-900 font-bold ring-2 ring-amber-400 shadow-sm font-semibold`
-    : highlighted
-      ? `${baseCls} bg-red text-white font-bold shadow-sm`
-      : `${baseCls} bg-teal-bg text-teal font-semibold`;
+  const className = highlighted
+    ? `${baseCls} bg-red text-white font-bold shadow-sm`
+    : `${baseCls} bg-teal-bg text-teal font-semibold`;
 
   return (
     <NodeViewWrapper

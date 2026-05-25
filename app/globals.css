@@ -116,6 +116,21 @@ body {
   box-shadow: 0 1px 3px rgba(220, 38, 38, 0.3);
 }
 
+/* Freshly inserted citation — pulses yellow for ~3s after insert */
+.enr-citation-fresh,
+.enr-citation-fresh.enr-citation {
+  background-color: #fde047 !important;
+  color: #713f12 !important;
+  font-weight: 700 !important;
+  box-shadow: 0 0 0 2px #f59e0b, 0 1px 3px rgba(245, 158, 11, 0.4) !important;
+  animation: enr-fresh-pulse 1s ease-in-out 2;
+}
+
+@keyframes enr-fresh-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+}
+
 /* Find/Replace highlight */
 .enr-find-match {
   background-color: #fef08a;
