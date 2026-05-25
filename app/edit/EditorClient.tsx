@@ -107,6 +107,21 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
   const [embedBusy, setEmbedBusy] = useState<{ done: number; total: number } | null>(null);
   const [compareOpen, setCompareOpen] = useState(false);
   const [researchOpen, setResearchOpen] = useState(false);
+  const [aiConfigured, setAiConfigured] = useState<boolean | null>(null);
+
+  // One-shot AI config check on mount — disables AI buttons when no key.
+  useEffect(() => {
+    let alive = true;
+    fetch('/api/ai/status')
+      .then((r) => r.json())
+      .then((d) => {
+        if (alive) setAiConfigured(Boolean(d?.configured));
+      })
+      .catch(() => alive && setAiConfigured(false));
+    return () => {
+      alive = false;
+    };
+  }, []);
   const editorInstance = useRef<any>(null);
   const docxInputRef = useRef<HTMLInputElement>(null);
   const projectImportRef = useRef<HTMLInputElement>(null);
@@ -1435,6 +1450,7 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
               onAICompare={runAICompare}
               onAIDeepResearch={runAIDeepResearch}
               onAIStructureCheck={runAIStructureCheck}
+              aiDisabled={aiConfigured === false}
             />
           </div>
         </div>
@@ -1538,6 +1554,7 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
               onAICompare={runAICompare}
               onAIDeepResearch={runAIDeepResearch}
               onAIStructureCheck={runAIStructureCheck}
+              aiDisabled={aiConfigured === false}
         />
         <RefsPanel
           refs={refs}
@@ -1603,7 +1620,7 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
       )}
 
       {aiReview.open && (
-        <div className="fixed right-4 top-20 bottom-4 w-[380px] z-30 shadow-xl">
+        <div className="fixed left-4 top-20 bottom-4 w-[380px] z-40 shadow-2xl">
           <IssuesPanel
             issues={aiReview.issues}
             summary={aiReview.summary ?? undefined}
@@ -1624,7 +1641,7 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
       />
 
       {aiSuggest.open && (
-        <div className="fixed right-4 top-20 bottom-4 w-[400px] z-30 shadow-xl">
+        <div className="fixed left-4 top-20 bottom-4 w-[400px] z-40 shadow-2xl">
           <CitationSuggestionsPanel
             query={aiSuggest.query}
             suggestions={aiSuggest.suggestions}
@@ -1641,7 +1658,7 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
       )}
 
       {aiGaps.open && (
-        <div className="fixed right-4 top-20 bottom-4 w-[400px] z-30 shadow-xl">
+        <div className="fixed left-4 top-20 bottom-4 w-[400px] z-40 shadow-2xl">
           <GapDetectPanel
             claims={aiGaps.items}
             loading={aiGaps.loading}
@@ -1677,7 +1694,7 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
       )}
 
       {researchOpen && (
-        <div className="fixed right-4 top-20 bottom-4 w-[440px] z-30 shadow-xl">
+        <div className="fixed left-4 top-20 bottom-4 w-[440px] z-40 shadow-2xl">
           <DeepResearchPanel
             initialAbstract={detectAbstract()}
             onClose={() => setResearchOpen(false)}
@@ -1690,7 +1707,7 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
       )}
 
       {aiScore.open && (
-        <div className="fixed right-4 top-20 bottom-4 w-[380px] z-30 shadow-xl">
+        <div className="fixed left-4 top-20 bottom-4 w-[380px] z-40 shadow-2xl">
           <ScorePanel
             result={aiScore.result}
             loading={aiScore.loading}

@@ -22,6 +22,7 @@ type Props = {
   onAICompare?: () => void;
   onAIDeepResearch?: () => void;
   onAIStructureCheck?: () => void;
+  aiDisabled?: boolean;
 };
 
 const SECTION_PRESETS: Array<{ label: string; level: 1 | 2 | 3 }> = [
@@ -74,6 +75,7 @@ export function ArticleEditor({
   onAICompare,
   onAIDeepResearch,
   onAIStructureCheck,
+  aiDisabled,
 }: Props) {
   const refsById = useMemo(() => {
     const m = new Map<string, Ref>();
@@ -186,8 +188,9 @@ export function ArticleEditor({
             <Sep />
             <button
               onClick={() => onAIReview()}
-              className="px-3 py-1 rounded-md bg-amber-500 text-white text-xs font-semibold hover:bg-amber-600"
-              title="Seçili metni (veya yoksa tüm paragrafı) AI ile eleştir: akademik clarity, tone, structure, evidence, grammar geri bildirimi."
+              disabled={aiDisabled}
+              className="px-3 py-1 rounded-md bg-amber-500 text-white text-xs font-semibold hover:bg-amber-600 disabled:opacity-40 disabled:cursor-not-allowed"
+              title={aiDisabled ? 'AI servisi yapılandırılmamış (GEMINI_API_KEY env değişkeni eksik)' : 'Seçili metni (veya yoksa tüm paragrafı) AI ile eleştir.'}
             >
               🔍 AI Eleştir
             </button>
@@ -196,18 +199,20 @@ export function ArticleEditor({
         {onAIScore && (
           <button
             onClick={() => onAIScore()}
-            className="px-3 py-1 rounded-md bg-indigo-500 text-white text-xs font-semibold hover:bg-indigo-600"
-            title="Belge geneli akademik skor: clarity, coherence, academic tone (0-100) + iyileştirme önerileri."
+            disabled={aiDisabled}
+            className="px-3 py-1 rounded-md bg-indigo-500 text-white text-xs font-semibold hover:bg-indigo-600 disabled:opacity-40 disabled:cursor-not-allowed"
+            title={aiDisabled ? 'AI servisi yapılandırılmamış' : 'Belge geneli akademik skor (clarity, coherence, tone).'}
           >
             📊 Skor
           </button>
         )}
-        {onAIEnhance && <EnhanceMenu onPick={onAIEnhance} />}
+        {onAIEnhance && <EnhanceMenu onPick={onAIEnhance} disabled={aiDisabled} />}
         {onAISuggestCitation && (
           <button
             onClick={() => onAISuggestCitation()}
-            className="px-3 py-1 rounded-md bg-emerald-500 text-white text-xs font-semibold hover:bg-emerald-600"
-            title="Seçili metne (veya cursor paragrafına) kütüphaneden semantik olarak uygun atıf önerileri"
+            disabled={aiDisabled}
+            className="px-3 py-1 rounded-md bg-emerald-500 text-white text-xs font-semibold hover:bg-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed"
+            title={aiDisabled ? 'AI servisi yapılandırılmamış' : 'Seçili metne uygun atıf önerileri'}
           >
             🎯 Atıf öner
           </button>
@@ -215,8 +220,9 @@ export function ArticleEditor({
         {onAIDetectGaps && (
           <button
             onClick={() => onAIDetectGaps()}
-            className="px-3 py-1 rounded-md bg-rose-500 text-white text-xs font-semibold hover:bg-rose-600"
-            title="Tüm belgede atıf gerektiren ancak atıfsız iddiaları tespit eder, her biri için uygun atıf önerir"
+            disabled={aiDisabled}
+            className="px-3 py-1 rounded-md bg-rose-500 text-white text-xs font-semibold hover:bg-rose-600 disabled:opacity-40 disabled:cursor-not-allowed"
+            title={aiDisabled ? 'AI servisi yapılandırılmamış' : 'Atıfsız iddiaları tespit et'}
           >
             🩹 Atıfsız iddialar
           </button>
@@ -224,8 +230,9 @@ export function ArticleEditor({
         {onAICompare && (
           <button
             onClick={() => onAICompare()}
-            className="px-3 py-1 rounded-md bg-cyan-600 text-white text-xs font-semibold hover:bg-cyan-700"
-            title="Kütüphandeki bir referansla makaleni karşılaştır: örtüşmeler, boşluklar, farklılaştırıcılar"
+            disabled={aiDisabled}
+            className="px-3 py-1 rounded-md bg-cyan-600 text-white text-xs font-semibold hover:bg-cyan-700 disabled:opacity-40 disabled:cursor-not-allowed"
+            title={aiDisabled ? 'AI servisi yapılandırılmamış' : 'Kütüphandeki bir referansla makaleni karşılaştır'}
           >
             ⚖️ Karşılaştır
           </button>
@@ -233,8 +240,9 @@ export function ArticleEditor({
         {onAIDeepResearch && (
           <button
             onClick={() => onAIDeepResearch()}
-            className="px-3 py-1 rounded-md bg-sky-600 text-white text-xs font-semibold hover:bg-sky-700"
-            title="Özetinden alt sorgular üret, CrossRef/OpenAlex/PubMed tara, tematik kümele"
+            disabled={aiDisabled}
+            className="px-3 py-1 rounded-md bg-sky-600 text-white text-xs font-semibold hover:bg-sky-700 disabled:opacity-40 disabled:cursor-not-allowed"
+            title={aiDisabled ? 'AI servisi yapılandırılmamış' : 'Related work haritası'}
           >
             🗺️ Related Work
           </button>
@@ -242,8 +250,9 @@ export function ArticleEditor({
         {onAIStructureCheck && (
           <button
             onClick={() => onAIStructureCheck()}
-            className="px-3 py-1 rounded-md bg-purple-600 text-white text-xs font-semibold hover:bg-purple-700"
-            title="Tüm belgeyi yapı/akış/eksik bölüm açısından eleştir (doc-scope reviewer)"
+            disabled={aiDisabled}
+            className="px-3 py-1 rounded-md bg-purple-600 text-white text-xs font-semibold hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed"
+            title={aiDisabled ? 'AI servisi yapılandırılmamış' : 'Tüm belgeyi yapı/akış açısından eleştir'}
           >
             🩹 Yapı kontrolü
           </button>
@@ -267,14 +276,21 @@ const ENHANCE_MODES: Array<{ key: 'expand' | 'shorten' | 'rephrase' | 'tone-acad
   { key: 'grammar', label: 'Dilbilgisi', icon: '📝' },
 ];
 
-function EnhanceMenu({ onPick }: { onPick: (mode: typeof ENHANCE_MODES[number]['key']) => void }): JSX.Element {
+function EnhanceMenu({
+  onPick,
+  disabled,
+}: {
+  onPick: (mode: typeof ENHANCE_MODES[number]['key']) => void;
+  disabled?: boolean;
+}): JSX.Element {
   const [open, setOpen] = useState(false);
   return (
     <div className="relative">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="px-3 py-1 rounded-md bg-violet-500 text-white text-xs font-semibold hover:bg-violet-600"
-        title="Seçili metni AI ile iyileştir"
+        disabled={disabled}
+        className="px-3 py-1 rounded-md bg-violet-500 text-white text-xs font-semibold hover:bg-violet-600 disabled:opacity-40 disabled:cursor-not-allowed"
+        title={disabled ? 'AI servisi yapılandırılmamış (GEMINI_API_KEY env değişkeni eksik)' : 'Seçili metni AI ile iyileştir'}
       >
         ✏️ İyileştir ▾
       </button>
