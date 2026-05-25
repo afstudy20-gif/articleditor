@@ -131,7 +131,23 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
       window.removeEventListener('enr-keys-updated', onKeyUpdate);
     };
   }, []);
-  const editorInstance = useRef<any>(null);
+  // Both desktop + mobile ArticleEditor mount unconditionally — Tailwind only
+  // toggles visibility via lg:hidden/hidden lg:flex. We track BOTH editors and
+  // return the one whose DOM is currently laid out (offsetParent !== null).
+  const editorRegistry = useRef<any[]>([]);
+  const editorInstance = {
+    get current(): any {
+      const eds = editorRegistry.current;
+      for (const ed of eds) {
+        if (ed?.view?.dom?.offsetParent) return ed;
+      }
+      return eds[eds.length - 1] ?? null;
+    },
+  };
+  const registerEditor = (ed: any): void => {
+    if (!ed) return;
+    if (!editorRegistry.current.includes(ed)) editorRegistry.current.push(ed);
+  };
   const docxInputRef = useRef<HTMLInputElement>(null);
   const projectImportRef = useRef<HTMLInputElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
@@ -1473,7 +1489,7 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
               refs={refs}
               onChange={(json) => setDoc(json)}
               onReady={(ed) => {
-                editorInstance.current = ed;
+                registerEditor(ed);
               }}
               onInsertRequest={insertFromLibrary}
               onAIReview={runAIReview}
@@ -1577,7 +1593,7 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
           refs={refs}
           onChange={(json) => setDoc(json)}
           onReady={(ed) => {
-            editorInstance.current = ed;
+            registerEditor(ed);
           }}
           onInsertRequest={insertFromLibrary}
           onAIReview={runAIReview}
