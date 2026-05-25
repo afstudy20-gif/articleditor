@@ -22,7 +22,11 @@ import { FindReplace } from '@/components/Editor/FindReplace';
 import { IssuesPanel } from '@/components/AI/IssuesPanel';
 import { ScorePanel } from '@/components/AI/ScorePanel';
 import { EnhanceModal, type EnhanceState } from '@/components/AI/EnhanceModal';
-import type { ReviewIssueT, ScoreResultT, EnhanceModeT } from '@/lib/ai/schemas';
+import { CitationSuggestionsPanel, type Suggestion } from '@/components/AI/CitationSuggestionsPanel';
+import { GapDetectPanel } from '@/components/AI/GapDetectPanel';
+import type { ReviewIssueT, ScoreResultT, EnhanceModeT, ClaimT } from '@/lib/ai/schemas';
+import { embedMissingRefs, embedTexts, embedInputFor } from '@/lib/ai/embed-refs';
+import { topK } from '@/lib/ai/cosine';
 import {
   encodeSelection,
   decodeToTipTapContent,
@@ -85,6 +89,20 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
     nodes: CitationNodeJSON[];
     afterEncoded: string;
   }>({ state: { status: 'idle' }, mode: null, range: null, nodes: [], afterEncoded: '' });
+  const [aiSuggest, setAiSuggest] = useState<{
+    open: boolean;
+    loading: boolean;
+    error: string | null;
+    query: string;
+    suggestions: Suggestion[];
+  }>({ open: false, loading: false, error: null, query: '', suggestions: [] });
+  const [aiGaps, setAiGaps] = useState<{
+    open: boolean;
+    loading: boolean;
+    error: string | null;
+    items: Array<{ claim: ClaimT; suggestions: Suggestion[]; loadingSuggestions: boolean }>;
+  }>({ open: false, loading: false, error: null, items: [] });
+  const [embedBusy, setEmbedBusy] = useState<{ done: number; total: number } | null>(null);
   const editorInstance = useRef<any>(null);
   const docxInputRef = useRef<HTMLInputElement>(null);
   const projectImportRef = useRef<HTMLInputElement>(null);
@@ -664,6 +682,205 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
     void runAIEnhance(aiEnhance.mode, aiEnhance.range);
   }, [aiEnhance.mode, aiEnhance.range, runAIEnhance]);
 
+  // ── Aspect extractor (Faz B) ────────────────────────────────────────────
+  const extractAspectsFor = useCallback(
+    async (id: string): Promise<void> => {
+      const ref = refs.find((r) => r.id === id);
+      if (!ref) return;
+      const body = {
+        title: ref.title,
+        abstract: ref.abstract,
+        authors: ref.authors
+          .map((a) => (a.literal ? a.literal : [a.family, a.given].filter(Boolean).join(', ')))
+          .join('; '),
+        year: ref.year,
+        containerTitle: ref.containerTitle,
+        raw: ref.raw,
+        lang: 'tr' as const,
+      };
+      try {
+        const res = await fetch('/api/ai/extract-aspects', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+          throw new Error(data.error || `HTTP ${res.status}`);
+        }
+        const aspects = await res.json();
+        setRefs((prev) => prev.map((r) => (r.id === id ? { ...r, aspects } : r)));
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        alert(`Aspect çıkarımı başarısız: ${msg}`);
+      }
+    },
+    [refs],
+  );
+
+  // ── Embedding library + citation suggestions (Faz B) ────────────────────
+  const ensureLibraryEmbedded = useCallback(async (): Promise<Ref[]> => {
+    const needs = refs.filter((r) => !r.embedding || !r.embeddingSource);
+    if (needs.length === 0) return refs;
+    setEmbedBusy({ done: 0, total: needs.length });
+    try {
+      const updated = await embedMissingRefs(refs, {
+        onProgress: (done, total) => setEmbedBusy({ done, total }),
+      });
+      setRefs(updated);
+      return updated;
+    } finally {
+      setEmbedBusy(null);
+    }
+  }, [refs]);
+
+  const runAISuggestCitation = useCallback(async () => {
+    const ed = editorInstance.current;
+    if (!ed) return;
+    const sel = extractSelectionWithCitations();
+    if (!sel || sel.text.length < 20) {
+      alert('Atıf önerisi için en az 20 karakterlik metin seçmelisin (veya cursor’u bir paragrafa koy).');
+      return;
+    }
+    setAiSuggest({ open: true, loading: true, error: null, query: sel.text, suggestions: [] });
+    try {
+      const library = await ensureLibraryEmbedded();
+      if (library.length === 0) {
+        throw new Error('Kütüphane boş. Önce referans ekle.');
+      }
+      const { embeddings } = await embedTexts([sel.text]);
+      const query = embeddings[0];
+      if (!query) throw new Error('Sorgu gömme başarısız');
+      const matches = topK(library, query, (r) => r.embedding, 8);
+      setAiSuggest({
+        open: true,
+        loading: false,
+        error: null,
+        query: sel.text,
+        suggestions: matches.map((m) => ({ ref: m.item, score: m.score })),
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setAiSuggest({ open: true, loading: false, error: msg, query: sel.text, suggestions: [] });
+    }
+  }, [ensureLibraryEmbedded, extractSelectionWithCitations]);
+
+  const insertSuggestedCitation = useCallback(
+    (refIds: string[]) => {
+      const ed = editorInstance.current;
+      if (!ed) return;
+      ed.chain().focus().insertCitation(refIds).run();
+    },
+    [],
+  );
+
+  // ── Citation gap detection ──────────────────────────────────────────────
+  const runAIDetectGaps = useCallback(async () => {
+    const text = extractFullDocWithCitations();
+    if (text.length < 50) {
+      alert('Belge çok kısa.');
+      return;
+    }
+    setAiGaps({ open: true, loading: true, error: null, items: [] });
+    try {
+      const res = await fetch('/api/ai/gap-detect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, scope: 'document', lang: 'tr' }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+        throw new Error(data.error || `HTTP ${res.status}`);
+      }
+      const data = (await res.json()) as { claims: ClaimT[] };
+      setAiGaps({
+        open: true,
+        loading: false,
+        error: null,
+        items: data.claims.map((c) => ({ claim: c, suggestions: [], loadingSuggestions: false })),
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setAiGaps({ open: true, loading: false, error: msg, items: [] });
+    }
+  }, [extractFullDocWithCitations]);
+
+  const loadSuggestionsForClaim = useCallback(
+    async (claim: ClaimT) => {
+      setAiGaps((s) => ({
+        ...s,
+        items: s.items.map((it) =>
+          it.claim === claim ? { ...it, loadingSuggestions: true } : it,
+        ),
+      }));
+      try {
+        const library = await ensureLibraryEmbedded();
+        const { embeddings } = await embedTexts([claim.quote]);
+        const query = embeddings[0];
+        if (!query) throw new Error('Embed failed');
+        const matches = topK(library, query, (r) => r.embedding, 5);
+        const suggestions: Suggestion[] = matches.map((m) => ({ ref: m.item, score: m.score }));
+        setAiGaps((s) => ({
+          ...s,
+          items: s.items.map((it) =>
+            it.claim === claim ? { ...it, suggestions, loadingSuggestions: false } : it,
+          ),
+        }));
+      } catch {
+        setAiGaps((s) => ({
+          ...s,
+          items: s.items.map((it) =>
+            it.claim === claim ? { ...it, loadingSuggestions: false } : it,
+          ),
+        }));
+      }
+    },
+    [ensureLibraryEmbedded],
+  );
+
+  const jumpToClaim = useCallback((claim: ClaimT) => {
+    const ed = editorInstance.current;
+    if (!ed || !claim.quote) return;
+    let found = -1;
+    ed.state.doc.descendants((node: any, pos: number) => {
+      if (found >= 0) return false;
+      if (node.isText) {
+        const i = (node.text ?? '').indexOf(claim.quote);
+        if (i >= 0) {
+          found = pos + i;
+          return false;
+        }
+      }
+      return true;
+    });
+    if (found >= 0) {
+      ed.chain().focus().setTextSelection({ from: found, to: found + claim.quote.length }).scrollIntoView().run();
+    }
+  }, []);
+
+  const insertCitationForClaim = useCallback((claim: ClaimT, refIds: string[]) => {
+    const ed = editorInstance.current;
+    if (!ed || !claim.quote) return;
+    let endPos = -1;
+    ed.state.doc.descendants((node: any, pos: number) => {
+      if (endPos >= 0) return false;
+      if (node.isText) {
+        const i = (node.text ?? '').indexOf(claim.quote);
+        if (i >= 0) {
+          endPos = pos + i + claim.quote.length;
+          return false;
+        }
+      }
+      return true;
+    });
+    if (endPos >= 0) {
+      ed.chain().focus().setTextSelection({ from: endPos, to: endPos }).insertCitation(refIds).run();
+    } else {
+      // fallback: cursor position
+      ed.chain().focus().insertCitation(refIds).run();
+    }
+  }, []);
+
   const runAIReview = useCallback(async () => {
     const sel = extractSelectionWithCitations();
     if (!sel || sel.text.length < 20) {
@@ -1127,6 +1344,8 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
               onAIReview={runAIReview}
               onAIScore={runAIScore}
               onAIEnhance={runAIEnhance}
+              onAISuggestCitation={runAISuggestCitation}
+              onAIDetectGaps={runAIDetectGaps}
             />
           </div>
         </div>
@@ -1161,6 +1380,7 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
             selectedIds={librarySelectedIds}
             onSelectedIdsChange={setLibrarySelectedIds}
             onBulkDelete={bulkDeleteRefs}
+            onExtractAspects={extractAspectsFor}
             onEnrichRefs={enrichRefs}
           />
           </div>
@@ -1224,6 +1444,8 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
           onAIReview={runAIReview}
               onAIScore={runAIScore}
               onAIEnhance={runAIEnhance}
+              onAISuggestCitation={runAISuggestCitation}
+              onAIDetectGaps={runAIDetectGaps}
         />
         <RefsPanel
           refs={refs}
@@ -1244,6 +1466,7 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
           selectedIds={librarySelectedIds}
           onSelectedIdsChange={setLibrarySelectedIds}
           onBulkDelete={bulkDeleteRefs}
+            onExtractAspects={extractAspectsFor}
           onEnrichRefs={enrichRefs}
         />
         <BibliographyPreview refs={refs} refOrder={refOrder} style={style} selectedId={highlightRefId} onSelect={selectRef} />
@@ -1307,6 +1530,44 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
         onClose={closeEnhance}
         onRetry={retryEnhance}
       />
+
+      {aiSuggest.open && (
+        <div className="fixed right-4 top-20 bottom-4 w-[400px] z-30 shadow-xl">
+          <CitationSuggestionsPanel
+            query={aiSuggest.query}
+            suggestions={aiSuggest.suggestions}
+            loading={aiSuggest.loading}
+            error={aiSuggest.error}
+            onClose={() => setAiSuggest((s) => ({ ...s, open: false }))}
+            onInsert={(refIds) => {
+              insertSuggestedCitation(refIds);
+              setAiSuggest((s) => ({ ...s, open: false }));
+            }}
+            refOrder={refOrder}
+          />
+        </div>
+      )}
+
+      {aiGaps.open && (
+        <div className="fixed right-4 top-20 bottom-4 w-[400px] z-30 shadow-xl">
+          <GapDetectPanel
+            claims={aiGaps.items}
+            loading={aiGaps.loading}
+            error={aiGaps.error}
+            onClose={() => setAiGaps((s) => ({ ...s, open: false }))}
+            onJumpTo={jumpToClaim}
+            onInsertCitation={insertCitationForClaim}
+            onLoadSuggestions={loadSuggestionsForClaim}
+            refOrder={refOrder}
+          />
+        </div>
+      )}
+
+      {embedBusy && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-white border border-border rounded-lg shadow-lg px-4 py-2 text-xs text-secondary">
+          Referanslar gömülüyor: {embedBusy.done} / {embedBusy.total}
+        </div>
+      )}
 
       {aiScore.open && (
         <div className="fixed right-4 top-20 bottom-4 w-[380px] z-30 shadow-xl">

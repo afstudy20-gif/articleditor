@@ -17,6 +17,8 @@ type Props = {
   onAIReview?: () => void;
   onAIScore?: () => void;
   onAIEnhance?: (mode: 'expand' | 'shorten' | 'rephrase' | 'tone-academic' | 'clarity' | 'concision' | 'grammar') => void;
+  onAISuggestCitation?: () => void;
+  onAIDetectGaps?: () => void;
 };
 
 const SECTION_PRESETS: Array<{ label: string; level: 1 | 2 | 3 }> = [
@@ -64,6 +66,8 @@ export function ArticleEditor({
   onAIReview,
   onAIScore,
   onAIEnhance,
+  onAISuggestCitation,
+  onAIDetectGaps,
 }: Props) {
   const refsById = useMemo(() => {
     const m = new Map<string, Ref>();
@@ -193,6 +197,24 @@ export function ArticleEditor({
           </button>
         )}
         {onAIEnhance && <EnhanceMenu onPick={onAIEnhance} />}
+        {onAISuggestCitation && (
+          <button
+            onClick={() => onAISuggestCitation()}
+            className="px-3 py-1 rounded-md bg-emerald-500 text-white text-xs font-semibold hover:bg-emerald-600"
+            title="Seçili metne (veya cursor paragrafına) kütüphaneden semantik olarak uygun atıf önerileri"
+          >
+            🎯 Atıf öner
+          </button>
+        )}
+        {onAIDetectGaps && (
+          <button
+            onClick={() => onAIDetectGaps()}
+            className="px-3 py-1 rounded-md bg-rose-500 text-white text-xs font-semibold hover:bg-rose-600"
+            title="Tüm belgede atıf gerektiren ancak atıfsız iddiaları tespit eder, her biri için uygun atıf önerir"
+          >
+            🩹 Atıfsız iddialar
+          </button>
+        )}
       </div>
       <EditorContent
         editor={editor}

@@ -35,6 +35,20 @@ export type Ref = {
   confidence?: number;
   enRecNum?: number;
   source?: string;
+  // Cached embedding of (title + abstract + container) for semantic citation
+  // suggestion. Regenerated when any of those fields change.
+  embedding?: number[];
+  embeddingSource?: string; // hash of input used to compute embedding
+  // Aspect-level structured extraction (used by Compare My Work + Citation Gap).
+  aspects?: {
+    goals?: string[];
+    methods?: string[];
+    datasets?: string[];
+    eval_protocols?: string[];
+    limitations?: string[];
+    contributions?: string[];
+    findings?: string[];
+  };
 };
 
 export type Citation = {

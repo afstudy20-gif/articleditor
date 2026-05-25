@@ -15,6 +15,7 @@ type Props = {
   onUpdateRef: (id: string, patch: Partial<Ref>) => void;
   onDeleteRef: (id: string) => void;
   onLookupRef?: (id: string) => Promise<void>;
+  onExtractAspects?: (id: string) => Promise<void>;
   onLookupAll?: () => Promise<void>;
   lookupBusyId?: string | null;
   lookupAllBusy?: boolean;
@@ -37,6 +38,7 @@ export function RefsPanel({
   onUpdateRef,
   onDeleteRef,
   onLookupRef,
+  onExtractAspects,
   onLookupAll,
   lookupBusyId,
   lookupAllBusy,
@@ -138,6 +140,7 @@ export function RefsPanel({
             onUpdate={onUpdateRef}
             onDelete={onDeleteRef}
             onLookup={onLookupRef}
+            onExtractAspects={onExtractAspects}
             lookupBusyId={lookupBusyId}
             selectedIds={selectedIds}
             onToggleSelect={toggleSelect}
@@ -164,6 +167,7 @@ function RefList({
   onInsert,
   onDelete,
   onLookup,
+  onExtractAspects,
   lookupBusyId,
   selectedIds,
   onToggleSelect,
@@ -177,6 +181,7 @@ function RefList({
   onUpdate: (id: string, patch: Partial<Ref>) => void;
   onDelete: (id: string) => void;
   onLookup?: (id: string) => Promise<void>;
+  onExtractAspects?: (id: string) => Promise<void>;
   lookupBusyId?: string | null;
   selectedIds?: Set<string>;
   onToggleSelect?: (id: string) => void;
@@ -384,6 +389,9 @@ function RefList({
             closeContext();
           }}
           onLookup={onLookup ? () => onLookup(ctxRef.id).then(closeContext) : undefined}
+          onExtractAspects={
+            onExtractAspects ? () => onExtractAspects(ctxRef.id).then(closeContext) : undefined
+          }
           onShowAbstract={
             onHighlight
               ? () => {
@@ -643,6 +651,7 @@ function ContextMenu({
   onShowAbstract,
   onSaveNote,
   onEdit,
+  onExtractAspects,
 }: {
   reference: Ref;
   x: number;
@@ -654,6 +663,7 @@ function ContextMenu({
   onShowAbstract?: () => void;
   onSaveNote?: (note: string) => void;
   onEdit?: () => void;
+  onExtractAspects?: () => void;
 }): JSX.Element {
   const [noteEdit, setNoteEdit] = useState(false);
   const [noteValue, setNoteValue] = useState(r.userNote ?? '');
@@ -699,6 +709,35 @@ function ContextMenu({
             >
               🔍 Özet/DOI tara
             </button>
+          )}
+
+          {r.aspects && (
+            <div className="px-3 py-2 border-b border-border text-xs">
+              <div className="tool-label mb-1">AI aspect çıkarımı</div>
+              {(['goals', 'methods', 'datasets', 'eval_protocols', 'limitations', 'contributions', 'findings'] as const).map((k) => {
+                const items = r.aspects?.[k];
+                if (!items || items.length === 0) return null;
+                const label: Record<string, string> = {
+                  goals: 'Hedefler',
+                  methods: 'Yöntem',
+                  datasets: 'Veri',
+                  eval_protocols: 'Değerlendirme',
+                  limitations: 'Kısıtlılık',
+                  contributions: 'Katkı',
+                  findings: 'Bulgu',
+                };
+                return (
+                  <div key={k} className="mb-1">
+                    <span className="font-semibold text-primary">{label[k]}:</span>
+                    <ul className="list-disc list-inside text-secondary">
+                      {items.map((it, i) => (
+                        <li key={i} className="leading-snug">{it}</li>
+                      ))}
+                    </ul>
+                  </div>
+                );
+              })}
+            </div>
           )}
 
           {/* Manual note section */}
@@ -829,6 +868,15 @@ function ContextMenu({
               className="block w-full text-left px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal"
             >
               🔄 Tekrar DOI tara
+            </button>
+          )}
+          {onExtractAspects && (
+            <button
+              onClick={onExtractAspects}
+              className="block w-full text-left px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal"
+              title="Özetten yapısal alanları çıkar: hedef, yöntem, veri, kısıtlılık, katkı, bulgu"
+            >
+              🔬 AI ile aspect çıkar
             </button>
           )}
           <button
