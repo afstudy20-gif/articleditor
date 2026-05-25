@@ -14,6 +14,7 @@ type Props = {
   onChange: (json: unknown, plainText: string) => void;
   onInsertRequest?: () => void;
   onReady?: (editor: any) => void;
+  onAIReview?: () => void;
 };
 
 const SECTION_PRESETS: Array<{ label: string; level: 1 | 2 | 3 }> = [
@@ -52,7 +53,7 @@ function computeRefOrder(json: any, refIds: string[]): string[] {
   return seen;
 }
 
-export function ArticleEditor({ initialContent, refs, onChange, onInsertRequest, onReady }: Props) {
+export function ArticleEditor({ initialContent, refs, onChange, onInsertRequest, onReady, onAIReview }: Props) {
   const refsById = useMemo(() => {
     const m = new Map<string, Ref>();
     for (const r of refs) m.set(r.id, r);
@@ -159,6 +160,18 @@ export function ArticleEditor({ initialContent, refs, onChange, onInsertRequest,
         >
           + Atıf ekle
         </button>
+        {onAIReview && (
+          <>
+            <Sep />
+            <button
+              onClick={() => onAIReview()}
+              className="px-3 py-1 rounded-md bg-amber-500 text-white text-xs font-semibold hover:bg-amber-600"
+              title="Seçili metni (veya yoksa tüm paragrafı) AI ile eleştir: akademik clarity, tone, structure, evidence, grammar geri bildirimi."
+            >
+              🔍 AI Eleştir
+            </button>
+          </>
+        )}
       </div>
       <EditorContent
         editor={editor}

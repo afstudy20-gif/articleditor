@@ -19,6 +19,8 @@ import { buildLatex } from '@/lib/tex/build';
 import JSZip from 'jszip';
 import { CitationPopover } from '@/components/Editor/CitationPopover';
 import { FindReplace } from '@/components/Editor/FindReplace';
+import { IssuesPanel } from '@/components/AI/IssuesPanel';
+import type { ReviewIssueT } from '@/lib/ai/schemas';
 
 type Props = {
   project: Project;
@@ -55,6 +57,13 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
   const [citationPopover, setCitationPopover] = useState<{ pos: number; refIds: string[] } | null>(null);
   const [showFind, setShowFind] = useState(false);
   const [librarySelectedIds, setLibrarySelectedIds] = useState<Set<string>>(new Set());
+  const [aiReview, setAiReview] = useState<{
+    open: boolean;
+    loading: boolean;
+    error: string | null;
+    issues: ReviewIssueT[];
+    summary: string | null;
+  }>({ open: false, loading: false, error: null, issues: [], summary: null });
   const editorInstance = useRef<any>(null);
   const docxInputRef = useRef<HTMLInputElement>(null);
   const projectImportRef = useRef<HTMLInputElement>(null);
@@ -424,6 +433,119 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
     }
     await Promise.all(Array.from({ length: concurrency }, () => worker()));
     return out;
+  }, []);
+
+  // Extract selection text with [N] citation markers preserved. Falls back to
+  // the surrounding paragraph (or doc start..1500 chars) if nothing is selected.
+  const extractSelectionWithCitations = useCallback((): {
+    text: string;
+    context: string;
+  } | null => {
+    const ed = editorInstance.current;
+    if (!ed) return null;
+    const { state } = ed;
+    const { from, to, empty } = state.selection;
+
+    const order = refOrder;
+    const renderNode = (node: any, fragText: string[]): void => {
+      if (!node) return;
+      if (node.isText) {
+        fragText.push(node.text ?? '');
+        return;
+      }
+      if (node.type?.name === 'citation') {
+        const ids: string[] = node.attrs?.refIds ?? [];
+        const nums = ids
+          .map((id) => order.get(id) ?? 0)
+          .filter((n) => n > 0)
+          .sort((a, b) => a - b);
+        fragText.push(nums.length > 0 ? `[${nums.join(',')}]` : '[?]');
+        return;
+      }
+      if (node.content && node.content.forEach) {
+        node.content.forEach((child: any) => renderNode(child, fragText));
+      }
+    };
+
+    const sliceText = (a: number, b: number): string => {
+      const out: string[] = [];
+      const slice = state.doc.slice(a, b);
+      slice.content.forEach((node: any) => renderNode(node, out));
+      return out.join('').trim();
+    };
+
+    if (!empty) {
+      const text = sliceText(from, to);
+      // Pull a 200-char window of context on either side for the reviewer.
+      const ctxStart = Math.max(0, from - 200);
+      const ctxEnd = Math.min(state.doc.content.size, to + 200);
+      const context = sliceText(ctxStart, ctxEnd);
+      return { text, context };
+    }
+    // Empty selection: use the current paragraph (or surrounding block).
+    const $pos = state.doc.resolve(from);
+    const blockStart = $pos.start($pos.depth);
+    const blockEnd = $pos.end($pos.depth);
+    const text = sliceText(blockStart, blockEnd);
+    return { text, context: text };
+  }, [refOrder]);
+
+  const runAIReview = useCallback(async () => {
+    const sel = extractSelectionWithCitations();
+    if (!sel || sel.text.length < 20) {
+      alert('AI eleştirisi için en az 20 karakterlik metin seçmelisin (veya cursor’u bir paragrafa koy).');
+      return;
+    }
+    setAiReview({ open: true, loading: true, error: null, issues: [], summary: null });
+    try {
+      const res = await fetch('/api/ai/review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: sel.text, context: sel.context, lang: 'tr' }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+        throw new Error(data.error || `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      setAiReview({
+        open: true,
+        loading: false,
+        error: null,
+        issues: data.issues ?? [],
+        summary: data.summary ?? null,
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setAiReview({ open: true, loading: false, error: msg, issues: [], summary: null });
+    }
+  }, [extractSelectionWithCitations]);
+
+  const jumpToIssue = useCallback((issue: ReviewIssueT) => {
+    const ed = editorInstance.current;
+    if (!ed || !issue.quote) return;
+    const plain = ed.getText() as string;
+    const idx = plain.indexOf(issue.quote);
+    if (idx < 0) return;
+    // ProseMirror positions don't equal plain-text indices exactly; use a
+    // best-effort textBetween scan over the doc.
+    const { doc } = ed.state;
+    let found = -1;
+    doc.descendants((node: any, pos: number) => {
+      if (found >= 0) return false;
+      if (node.isText) {
+        const i = (node.text ?? '').indexOf(issue.quote);
+        if (i >= 0) {
+          found = pos + i;
+          return false;
+        }
+      }
+      return true;
+    });
+    if (found >= 0) {
+      const to = found + issue.quote.length;
+      ed.chain().focus().setTextSelection({ from: found, to }).scrollIntoView().run();
+    }
   }, []);
 
   // Install click handler on window so Citation NodeView can call it.
@@ -828,6 +950,7 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
                 editorInstance.current = ed;
               }}
               onInsertRequest={insertFromLibrary}
+              onAIReview={runAIReview}
             />
           </div>
         </div>
@@ -922,6 +1045,7 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
             editorInstance.current = ed;
           }}
           onInsertRequest={insertFromLibrary}
+          onAIReview={runAIReview}
         />
         <RefsPanel
           refs={refs}
@@ -983,6 +1107,19 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
 
       {showFind && editorInstance.current && (
         <FindReplace editor={editorInstance.current} onClose={() => setShowFind(false)} />
+      )}
+
+      {aiReview.open && (
+        <div className="fixed right-4 top-20 bottom-4 w-[380px] z-30 shadow-xl">
+          <IssuesPanel
+            issues={aiReview.issues}
+            summary={aiReview.summary ?? undefined}
+            loading={aiReview.loading}
+            error={aiReview.error}
+            onClose={() => setAiReview((s) => ({ ...s, open: false }))}
+            onJumpTo={jumpToIssue}
+          />
+        </div>
       )}
 
     </div>

@@ -10,17 +10,22 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.1",
+    "@google/generative-ai": "^0.24.1",
     "@tiptap/extension-link": "2.10.3",
     "@tiptap/extension-placeholder": "2.10.3",
     "@tiptap/pm": "2.10.3",
     "@tiptap/react": "2.10.3",
     "@tiptap/starter-kit": "2.10.3",
+    "@types/diff": "^7.0.2",
     "dexie": "4.0.10",
     "dexie-react-hooks": "1.1.7",
+    "diff": "^9.0.0",
     "fast-xml-parser": "4.5.0",
     "jszip": "3.10.1",
     "lru-cache": "11.0.2",
     "next": "14.2.18",
+    "openai": "^6.39.0",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "zod": "3.23.8"
