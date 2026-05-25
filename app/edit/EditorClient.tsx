@@ -1305,40 +1305,43 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
                 : `Son kayıt ${new Date(savedAt).toLocaleTimeString('tr-TR')}`}
             </span>
           </div>
-          <div className="flex gap-2 flex-wrap items-center">
-            <label className="flex items-center gap-1.5 text-xs">
-              <span className="text-muted font-semibold">Stil</span>
-              <select
-                value={style}
-                onChange={(e) => setStyle(e.target.value as CitationStyle)}
-                className="border border-border rounded-md px-2 py-1 text-xs bg-white focus:outline-none focus:border-teal"
-                title="Atıf ve kaynakça stili"
-              >
-                {(Object.keys(STYLE_LABELS) as CitationStyle[]).map((s) => (
-                  <option key={s} value={s}>
-                    {STYLE_LABELS[s]}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <span className="w-px h-6 bg-border self-center mx-1" />
-            <button
-              className="btn-secondary text-xs"
-              onClick={() => {
-                setShowImportModal(true);
-                setImportPreview(null);
-                setImportError(null);
-                setImportPasteText('');
-              }}
+          <div className="flex gap-1 items-center text-xs">
+            <select
+              value={style}
+              onChange={(e) => setStyle(e.target.value as CitationStyle)}
+              className="border border-border rounded px-1.5 py-0.5 text-xs bg-white focus:outline-none focus:border-teal"
+              title="Atıf ve kaynakça stili"
             >
-              İçeri aktar
-            </button>
-            <button className="btn-secondary text-xs" onClick={exportProjectJson}>
-              Projeyi indir (.json)
-            </button>
-            <button className="btn-secondary text-xs" onClick={() => projectImportRef.current?.click()}>
-              Proje yükle (.json)
-            </button>
+              {(Object.keys(STYLE_LABELS) as CitationStyle[]).map((s) => (
+                <option key={s} value={s}>
+                  {STYLE_LABELS[s]}
+                </option>
+              ))}
+            </select>
+            <HeaderIcon
+              onClick={() => setShowFind(true)}
+              title="Bul ve Değiştir (Ctrl+F / Ctrl+H)"
+              label="🔍"
+            />
+            <HeaderIcon
+              onClick={updateAllCitations}
+              title="Atıfları yeniden numaralandır + orphan'ları temizle"
+              label="↻"
+            />
+            <HeaderDropdown label="📥 Proje ▾">
+              <DropItem
+                onClick={() => {
+                  setShowImportModal(true);
+                  setImportPreview(null);
+                  setImportError(null);
+                  setImportPasteText('');
+                }}
+              >
+                📄 İçeri aktar (docx, RIS…)
+              </DropItem>
+              <DropItem onClick={exportProjectJson}>💾 Projeyi indir (.json)</DropItem>
+              <DropItem onClick={() => projectImportRef.current?.click()}>📂 Proje yükle (.json)</DropItem>
+            </HeaderDropdown>
             <input
               ref={projectImportRef}
               type="file"
@@ -1350,36 +1353,18 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
                 if (f) await importProjectJson(f);
               }}
             />
-            <span className="w-px h-6 bg-border self-center mx-1" />
-            <button
-              className="btn-secondary text-xs"
-              onClick={() => setShowFind(true)}
-              title="Bul ve Değiştir (Ctrl+F / Ctrl+H)"
-            >
-              🔍 Bul
-            </button>
-            <button className="btn-secondary text-xs" onClick={updateAllCitations} title="Atıfları yeniden numaralandır + orphan'ları temizle">
-              ↻ Update Citations
-            </button>
-            <span className="w-px h-6 bg-border self-center mx-1" />
-            <button className="btn-secondary text-xs" onClick={exportRis}>
-              .ris
-            </button>
-            <button className="btn-secondary text-xs" onClick={exportLatex}>
-              LaTeX (.zip)
-            </button>
-            <button className="btn-secondary text-xs" onClick={() => exportDocx('placeholder')}>
-              Placeholder .docx
-            </button>
-            <button className="btn-primary text-xs" onClick={() => exportDocx('active')}>
-              Aktif EndNote .docx
-            </button>
+            <HeaderDropdown label="📤 Dışa aktar ▾" primary>
+              <DropItem onClick={() => exportDocx('active')}>📝 Aktif EndNote .docx</DropItem>
+              <DropItem onClick={() => exportDocx('placeholder')}>📝 Placeholder .docx</DropItem>
+              <DropItem onClick={exportRis}>🗂️ .ris</DropItem>
+              <DropItem onClick={exportLatex}>📐 LaTeX (.zip)</DropItem>
+            </HeaderDropdown>
             <button
               onClick={() => setSettingsOpen(true)}
-              className={`text-xs px-2 py-1 rounded-md border ${aiConfigured ? 'border-teal text-teal' : 'border-border text-muted'} hover:bg-slate-50`}
+              className={`text-xs px-2 py-0.5 rounded border ${aiConfigured ? 'border-teal text-teal' : 'border-border text-muted'} hover:bg-slate-50`}
               title={aiConfigured ? 'AI ayarlanmış — API anahtarlarını düzenle' : 'AI servisi yapılandırılmamış — API anahtarı gir'}
             >
-              ⚙️ AI {aiConfigured === false && <span className="ml-1 inline-block w-1.5 h-1.5 rounded-full bg-red-500 align-middle" />}
+              ⚙️ {aiConfigured === false && <span className="ml-0.5 inline-block w-1.5 h-1.5 rounded-full bg-red-500 align-middle" />}
             </button>
           </div>
         </div>
@@ -1938,5 +1923,75 @@ function slugify(s: string): string {
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '')
       .slice(0, 60) || 'makale'
+  );
+}
+
+function HeaderIcon({
+  onClick,
+  title,
+  label,
+}: {
+  onClick: () => void;
+  title: string;
+  label: string;
+}): JSX.Element {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className="px-2 py-0.5 text-xs rounded border border-border hover:bg-slate-50 text-secondary"
+    >
+      {label}
+    </button>
+  );
+}
+
+function HeaderDropdown({
+  label,
+  primary,
+  children,
+}: {
+  label: string;
+  primary?: boolean;
+  children: React.ReactNode;
+}): JSX.Element {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className={`px-2 py-0.5 text-xs rounded border ${primary ? 'border-teal bg-teal text-white hover:bg-teal-dark' : 'border-border text-secondary hover:bg-slate-50'}`}
+      >
+        {label}
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div
+            className="absolute top-full right-0 mt-1 z-50 bg-white border border-border rounded-lg shadow-lg w-56 py-1"
+            onClick={() => setOpen(false)}
+          >
+            {children}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function DropItem({
+  onClick,
+  children,
+}: {
+  onClick: () => void;
+  children: React.ReactNode;
+}): JSX.Element {
+  return (
+    <button
+      onClick={onClick}
+      className="block w-full text-left px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal"
+    >
+      {children}
+    </button>
   );
 }

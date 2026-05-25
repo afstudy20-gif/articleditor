@@ -183,79 +183,21 @@ export function ArticleEditor({
         >
           + Atıf ekle
         </button>
-        {onAIReview && (
+        {(onAIReview || onAIScore || onAIEnhance || onAISuggestCitation || onAIDetectGaps || onAICompare || onAIDeepResearch || onAIStructureCheck) && (
           <>
             <Sep />
-            <button
-              onClick={() => onAIReview()}
+            <AIMenu
               disabled={aiDisabled}
-              className="px-3 py-1 rounded-md bg-amber-500 text-white text-xs font-semibold hover:bg-amber-600 disabled:opacity-40 disabled:cursor-not-allowed"
-              title={aiDisabled ? 'AI servisi yapılandırılmamış (GEMINI_API_KEY env değişkeni eksik)' : 'Seçili metni (veya yoksa tüm paragrafı) AI ile eleştir.'}
-            >
-              🔍 AI Eleştir
-            </button>
+              onReview={onAIReview}
+              onScore={onAIScore}
+              onEnhance={onAIEnhance}
+              onSuggestCitation={onAISuggestCitation}
+              onDetectGaps={onAIDetectGaps}
+              onCompare={onAICompare}
+              onDeepResearch={onAIDeepResearch}
+              onStructureCheck={onAIStructureCheck}
+            />
           </>
-        )}
-        {onAIScore && (
-          <button
-            onClick={() => onAIScore()}
-            disabled={aiDisabled}
-            className="px-3 py-1 rounded-md bg-indigo-500 text-white text-xs font-semibold hover:bg-indigo-600 disabled:opacity-40 disabled:cursor-not-allowed"
-            title={aiDisabled ? 'AI servisi yapılandırılmamış' : 'Belge geneli akademik skor (clarity, coherence, tone).'}
-          >
-            📊 Skor
-          </button>
-        )}
-        {onAIEnhance && <EnhanceMenu onPick={onAIEnhance} disabled={aiDisabled} />}
-        {onAISuggestCitation && (
-          <button
-            onClick={() => onAISuggestCitation()}
-            disabled={aiDisabled}
-            className="px-3 py-1 rounded-md bg-emerald-500 text-white text-xs font-semibold hover:bg-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed"
-            title={aiDisabled ? 'AI servisi yapılandırılmamış' : 'Seçili metne uygun atıf önerileri'}
-          >
-            🎯 Atıf öner
-          </button>
-        )}
-        {onAIDetectGaps && (
-          <button
-            onClick={() => onAIDetectGaps()}
-            disabled={aiDisabled}
-            className="px-3 py-1 rounded-md bg-rose-500 text-white text-xs font-semibold hover:bg-rose-600 disabled:opacity-40 disabled:cursor-not-allowed"
-            title={aiDisabled ? 'AI servisi yapılandırılmamış' : 'Atıfsız iddiaları tespit et'}
-          >
-            🩹 Atıfsız iddialar
-          </button>
-        )}
-        {onAICompare && (
-          <button
-            onClick={() => onAICompare()}
-            disabled={aiDisabled}
-            className="px-3 py-1 rounded-md bg-cyan-600 text-white text-xs font-semibold hover:bg-cyan-700 disabled:opacity-40 disabled:cursor-not-allowed"
-            title={aiDisabled ? 'AI servisi yapılandırılmamış' : 'Kütüphandeki bir referansla makaleni karşılaştır'}
-          >
-            ⚖️ Karşılaştır
-          </button>
-        )}
-        {onAIDeepResearch && (
-          <button
-            onClick={() => onAIDeepResearch()}
-            disabled={aiDisabled}
-            className="px-3 py-1 rounded-md bg-sky-600 text-white text-xs font-semibold hover:bg-sky-700 disabled:opacity-40 disabled:cursor-not-allowed"
-            title={aiDisabled ? 'AI servisi yapılandırılmamış' : 'Related work haritası'}
-          >
-            🗺️ Related Work
-          </button>
-        )}
-        {onAIStructureCheck && (
-          <button
-            onClick={() => onAIStructureCheck()}
-            disabled={aiDisabled}
-            className="px-3 py-1 rounded-md bg-purple-600 text-white text-xs font-semibold hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed"
-            title={aiDisabled ? 'AI servisi yapılandırılmamış' : 'Tüm belgeyi yapı/akış açısından eleştir'}
-          >
-            🩹 Yapı kontrolü
-          </button>
         )}
       </div>
       <EditorContent
@@ -313,6 +255,134 @@ function EnhanceMenu({
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+type EnhanceMode = typeof ENHANCE_MODES[number]['key'];
+
+function AIMenu({
+  disabled,
+  onReview,
+  onScore,
+  onEnhance,
+  onSuggestCitation,
+  onDetectGaps,
+  onCompare,
+  onDeepResearch,
+  onStructureCheck,
+}: {
+  disabled?: boolean;
+  onReview?: () => void;
+  onScore?: () => void;
+  onEnhance?: (mode: EnhanceMode) => void;
+  onSuggestCitation?: () => void;
+  onDetectGaps?: () => void;
+  onCompare?: () => void;
+  onDeepResearch?: () => void;
+  onStructureCheck?: () => void;
+}): JSX.Element {
+  const [open, setOpen] = useState(false);
+  const [enhanceOpen, setEnhanceOpen] = useState(false);
+  function pick(fn?: () => void): void {
+    fn?.();
+    setOpen(false);
+    setEnhanceOpen(false);
+  }
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        disabled={disabled}
+        className="px-2.5 py-1 rounded-md bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white text-xs font-semibold hover:from-violet-600 hover:to-fuchsia-600 disabled:opacity-40 disabled:cursor-not-allowed"
+        title={disabled ? 'AI servisi yapılandırılmamış (sağ üstten anahtar gir)' : 'AI araçları menüsü'}
+      >
+        ✨ AI ▾
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute top-full right-0 mt-1 z-20 bg-white border border-border rounded-lg shadow-lg w-56 py-1">
+            <MenuGroup label="Metin" />
+            {onReview && (
+              <MenuItem icon="🔍" label="Eleştir (seçim)" onClick={() => pick(onReview)} />
+            )}
+            {onEnhance && (
+              <div
+                onMouseEnter={() => setEnhanceOpen(true)}
+                onMouseLeave={() => setEnhanceOpen(false)}
+                className="relative"
+              >
+                <button className="block w-full text-left px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal">
+                  ✏️ İyileştir ▸
+                </button>
+                {enhanceOpen && (
+                  <div className="absolute top-0 right-full mr-1 z-30 bg-white border border-border rounded-lg shadow-lg w-44 py-1">
+                    {ENHANCE_MODES.map((m) => (
+                      <button
+                        key={m.key}
+                        onClick={() => {
+                          onEnhance(m.key);
+                          setOpen(false);
+                          setEnhanceOpen(false);
+                        }}
+                        className="block w-full text-left px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal"
+                      >
+                        {m.icon} {m.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            {onScore && <MenuItem icon="📊" label="Skor (belge)" onClick={() => pick(onScore)} />}
+            <MenuGroup label="Atıf" />
+            {onSuggestCitation && (
+              <MenuItem icon="🎯" label="Atıf öner" onClick={() => pick(onSuggestCitation)} />
+            )}
+            {onDetectGaps && (
+              <MenuItem icon="🩹" label="Atıfsız iddialar" onClick={() => pick(onDetectGaps)} />
+            )}
+            <MenuGroup label="Belge" />
+            {onCompare && (
+              <MenuItem icon="⚖️" label="Karşılaştır" onClick={() => pick(onCompare)} />
+            )}
+            {onDeepResearch && (
+              <MenuItem icon="🗺️" label="Related Work" onClick={() => pick(onDeepResearch)} />
+            )}
+            {onStructureCheck && (
+              <MenuItem icon="🩺" label="Yapı kontrolü" onClick={() => pick(onStructureCheck)} />
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function MenuItem({
+  icon,
+  label,
+  onClick,
+}: {
+  icon: string;
+  label: string;
+  onClick: () => void;
+}): JSX.Element {
+  return (
+    <button
+      onClick={onClick}
+      className="block w-full text-left px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal"
+    >
+      {icon} {label}
+    </button>
+  );
+}
+
+function MenuGroup({ label }: { label: string }): JSX.Element {
+  return (
+    <div className="px-3 py-1 text-[10px] uppercase tracking-wider text-muted font-semibold">
+      {label}
     </div>
   );
 }
