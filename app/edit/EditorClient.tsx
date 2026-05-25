@@ -448,16 +448,49 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
     setRefs((prev) => prev.filter((r) => r.id !== id));
   }, []);
 
+  // After an insertCitation chain runs, briefly tint the new citation yellow
+  // so users can spot where it landed. We wait two animation frames so
+  // ProseMirror finishes painting the node before we look it up via nodeDOM,
+  // and resolve the inner .enr-citation span (nodeDOM returns the
+  // .react-renderer.node-citation wrapper, which doesn't match our CSS rule).
+  function flashCitationAt(ed: any, pos: number): void {
+    if (typeof window === 'undefined') return;
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        try {
+          const dom = ed.view.nodeDOM(pos);
+          if (!dom) return;
+          const inner: HTMLElement | null =
+            dom.classList && dom.classList.contains('enr-citation')
+              ? dom
+              : dom.querySelector && dom.querySelector('.enr-citation');
+          if (!inner) return;
+          inner.classList.add('enr-citation-fresh');
+          setTimeout(() => inner.classList.remove('enr-citation-fresh'), 3000);
+        } catch {
+          // ignore — DOM not ready
+        }
+      }),
+    );
+  }
+
+  function runInsertCitation(ed: any, refIds: string[]): void {
+    if (refIds.length === 0) return;
+    const fromPos = ed.state.selection.from;
+    const ok = ed.chain().focus().insertCitation(refIds).run();
+    if (ok) flashCitationAt(ed, fromPos);
+  }
+
   const insertCitation = useCallback((refId: string) => {
     const ed = editorInstance.current;
     if (!ed) return;
-    ed.chain().focus().insertCitation([refId]).run();
+    runInsertCitation(ed, [refId]);
   }, []);
 
   const insertCitationMulti = useCallback((refIds: string[]) => {
     const ed = editorInstance.current;
-    if (!ed || refIds.length === 0) return;
-    ed.chain().focus().insertCitation(refIds).run();
+    if (!ed) return;
+    runInsertCitation(ed, refIds);
   }, []);
 
   const insertFromLibrary = useCallback((): void => {
@@ -468,13 +501,8 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
       alert('Kütüphaneden checkbox ile bir veya daha fazla referans seç, sonra "+ Atıf ekle"ye tıkla. Cursor’un olduğu yere yerleşir.');
       return;
     }
-    // Preserve refs panel order
     const orderedIds = refs.filter((r) => librarySelectedIds.has(r.id)).map((r) => r.id);
-    if (orderedIds.length === 1) {
-      ed.chain().focus().insertCitation(orderedIds).run();
-    } else {
-      ed.chain().focus().insertCitation(orderedIds).run();
-    }
+    runInsertCitation(ed, orderedIds);
     setLibrarySelectedIds(new Set());
   }, [librarySelectedIds, refs]);
 
@@ -797,7 +825,7 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
     (refIds: string[]) => {
       const ed = editorInstance.current;
       if (!ed) return;
-      ed.chain().focus().insertCitation(refIds).run();
+      runInsertCitation(ed, refIds);
     },
     [],
   );
@@ -984,10 +1012,15 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
       return true;
     });
     if (endPos >= 0) {
-      ed.chain().focus().setTextSelection({ from: endPos, to: endPos }).insertCitation(refIds).run();
+      const ok = ed
+        .chain()
+        .focus()
+        .setTextSelection({ from: endPos, to: endPos })
+        .insertCitation(refIds)
+        .run();
+      if (ok) flashCitationAt(ed, endPos);
     } else {
-      // fallback: cursor position
-      ed.chain().focus().insertCitation(refIds).run();
+      runInsertCitation(ed, refIds);
     }
   }, []);
 

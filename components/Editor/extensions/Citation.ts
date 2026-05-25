@@ -61,35 +61,14 @@ export const Citation = Node.create({
     return {
       insertCitation:
         (refIds: string[]) =>
-        ({ chain, state, editor }) => {
-          const fromPos = state.selection.from;
-          const ok = chain()
+        ({ chain }) =>
+          chain()
             .insertContent({
               type: this.name,
               attrs: { refIds, insertedAt: Date.now() },
             })
             .scrollIntoView()
-            .run();
-          if (ok && typeof window !== 'undefined') {
-            // Flash the freshly-inserted citation directly via DOM class —
-            // bypasses React/NodeView state races. Wait two animation frames
-            // so ProseMirror finishes painting the new node before we look
-            // it up via nodeDOM.
-            const flash = (): void => {
-              try {
-                const dom = editor.view.nodeDOM(fromPos);
-                const el = dom instanceof HTMLElement ? dom : null;
-                if (!el) return;
-                el.classList.add('enr-citation-fresh');
-                setTimeout(() => el.classList.remove('enr-citation-fresh'), 3000);
-              } catch {
-                // ignore — DOM not ready or pos invalid
-              }
-            };
-            requestAnimationFrame(() => requestAnimationFrame(flash));
-          }
-          return ok;
-        },
+            .run(),
       updateCitationRefIds:
         (pos: number, refIds: string[]) =>
         ({ tr, state, dispatch }) => {
