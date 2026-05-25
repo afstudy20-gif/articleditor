@@ -61,14 +61,31 @@ export const Citation = Node.create({
     return {
       insertCitation:
         (refIds: string[]) =>
-        ({ chain }) =>
-          chain()
+        ({ chain, state }) => {
+          // Capture insertion position BEFORE mutating the doc. After insert,
+          // the new (atom) citation node occupies [fromPos, fromPos+1].
+          const fromPos = state.selection.from;
+          const ok = chain()
             .insertContent({
               type: this.name,
               attrs: { refIds, insertedAt: Date.now() },
             })
             .scrollIntoView()
-            .run(),
+            .run();
+          if (ok && typeof window !== 'undefined') {
+            window.__enrFreshCitationPos = fromPos;
+            window.dispatchEvent(
+              new CustomEvent('enr:fresh-citation', { detail: { pos: fromPos } }),
+            );
+            setTimeout(() => {
+              if (typeof window !== 'undefined' && window.__enrFreshCitationPos === fromPos) {
+                window.__enrFreshCitationPos = null;
+                window.dispatchEvent(new CustomEvent('enr:fresh-citation'));
+              }
+            }, 3000);
+          }
+          return ok;
+        },
       updateCitationRefIds:
         (pos: number, refIds: string[]) =>
         ({ tr, state, dispatch }) => {

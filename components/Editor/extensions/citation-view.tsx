@@ -16,45 +16,52 @@ declare global {
     __enrStyle?: CitationStyle;
     __enrHighlightRefId?: string | null;
     __enrOnCitationClick?: (pos: number, refIds: string[]) => void;
+    // Position of the most-recently-inserted citation; consumed by NodeView
+    // to flash a yellow tint for ~3s. Set by Citation extension command.
+    __enrFreshCitationPos?: number | null;
   }
 }
 
-// How long a freshly-inserted citation stays tinted yellow.
-const FRESH_HIGHLIGHT_MS = 3000;
-
 function CitationNodeView({ node, getPos }: any) {
   const refIds: string[] = node.attrs.refIds ?? [];
-  const insertedAt: number = node.attrs.insertedAt ?? 0;
   const [currentHighlight, setCurrentHighlight] = useState<string | null>(
     typeof window !== 'undefined' ? window.__enrHighlightRefId ?? null : null,
   );
   const [, setTick] = useState(0);
-  const [fresh, setFresh] = useState(
-    insertedAt > 0 && Date.now() - insertedAt < FRESH_HIGHLIGHT_MS,
-  );
+
+  // Fresh state driven by a global pos pointer set by Citation extension on
+  // insertion. NodeView checks if its own getPos() matches.
+  const computeFresh = (): boolean => {
+    if (typeof window === 'undefined') return false;
+    const target = window.__enrFreshCitationPos;
+    if (target == null) return false;
+    const myPos = typeof getPos === 'function' ? getPos() : -1;
+    return myPos === target;
+  };
+  const [fresh, setFresh] = useState(false);
 
   useEffect(() => {
+    // Check immediately on mount — covers the initial render after insert.
+    setFresh(computeFresh());
     function onHighlight(): void {
       setCurrentHighlight((typeof window !== 'undefined' && window.__enrHighlightRefId) || null);
     }
     function onRefresh(): void {
       setTick((t) => t + 1);
     }
+    function onFresh(): void {
+      setFresh(computeFresh());
+    }
     window.addEventListener('enr:highlight', onHighlight);
     window.addEventListener('enr:refresh', onRefresh);
+    window.addEventListener('enr:fresh-citation', onFresh);
     return () => {
       window.removeEventListener('enr:highlight', onHighlight);
       window.removeEventListener('enr:refresh', onRefresh);
+      window.removeEventListener('enr:fresh-citation', onFresh);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // Clear the fresh-insert tint after the cooldown.
-  useEffect(() => {
-    if (!fresh) return;
-    const remaining = Math.max(0, FRESH_HIGHLIGHT_MS - (Date.now() - insertedAt));
-    const timer = setTimeout(() => setFresh(false), remaining);
-    return () => clearTimeout(timer);
-  }, [fresh, insertedAt]);
 
   const highlighted: boolean =
     (currentHighlight != null && refIds.includes(currentHighlight)) || node.attrs.highlighted === true;
