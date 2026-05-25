@@ -20,7 +20,8 @@ import JSZip from 'jszip';
 import { CitationPopover } from '@/components/Editor/CitationPopover';
 import { FindReplace } from '@/components/Editor/FindReplace';
 import { IssuesPanel } from '@/components/AI/IssuesPanel';
-import type { ReviewIssueT } from '@/lib/ai/schemas';
+import { ScorePanel } from '@/components/AI/ScorePanel';
+import type { ReviewIssueT, ScoreResultT } from '@/lib/ai/schemas';
 
 type Props = {
   project: Project;
@@ -64,6 +65,12 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
     issues: ReviewIssueT[];
     summary: string | null;
   }>({ open: false, loading: false, error: null, issues: [], summary: null });
+  const [aiScore, setAiScore] = useState<{
+    open: boolean;
+    loading: boolean;
+    error: string | null;
+    result: ScoreResultT | null;
+  }>({ open: false, loading: false, error: null, result: null });
   const editorInstance = useRef<any>(null);
   const docxInputRef = useRef<HTMLInputElement>(null);
   const projectImportRef = useRef<HTMLInputElement>(null);
@@ -489,6 +496,64 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
     const text = sliceText(blockStart, blockEnd);
     return { text, context: text };
   }, [refOrder]);
+
+  // Whole-document plaintext with citation markers (uses same renderer as selection).
+  const extractFullDocWithCitations = useCallback((): string => {
+    const ed = editorInstance.current;
+    if (!ed) return '';
+    const { doc } = ed.state;
+    const order = refOrder;
+    const out: string[] = [];
+    const walk = (node: any): void => {
+      if (!node) return;
+      if (node.isText) {
+        out.push(node.text ?? '');
+        return;
+      }
+      if (node.type?.name === 'citation') {
+        const ids: string[] = node.attrs?.refIds ?? [];
+        const nums = ids
+          .map((id) => order.get(id) ?? 0)
+          .filter((n) => n > 0)
+          .sort((a, b) => a - b);
+        out.push(nums.length > 0 ? `[${nums.join(',')}]` : '[?]');
+        return;
+      }
+      if (node.type?.isBlock) {
+        if (node.content && node.content.forEach) node.content.forEach(walk);
+        out.push('\n\n');
+        return;
+      }
+      if (node.content && node.content.forEach) node.content.forEach(walk);
+    };
+    doc.content.forEach(walk);
+    return out.join('').replace(/\n{3,}/g, '\n\n').trim();
+  }, [refOrder]);
+
+  const runAIScore = useCallback(async () => {
+    const text = extractFullDocWithCitations();
+    if (text.length < 50) {
+      alert('Skor için en az 50 karakterlik metin gerekli.');
+      return;
+    }
+    setAiScore({ open: true, loading: true, error: null, result: null });
+    try {
+      const res = await fetch('/api/ai/score', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, scope: 'document', lang: 'tr' }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+        throw new Error(data.error || `HTTP ${res.status}`);
+      }
+      const result = (await res.json()) as ScoreResultT;
+      setAiScore({ open: true, loading: false, error: null, result });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setAiScore({ open: true, loading: false, error: msg, result: null });
+    }
+  }, [extractFullDocWithCitations]);
 
   const runAIReview = useCallback(async () => {
     const sel = extractSelectionWithCitations();
@@ -951,6 +1016,7 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
               }}
               onInsertRequest={insertFromLibrary}
               onAIReview={runAIReview}
+              onAIScore={runAIScore}
             />
           </div>
         </div>
@@ -1046,6 +1112,7 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
           }}
           onInsertRequest={insertFromLibrary}
           onAIReview={runAIReview}
+              onAIScore={runAIScore}
         />
         <RefsPanel
           refs={refs}
@@ -1118,6 +1185,18 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
             error={aiReview.error}
             onClose={() => setAiReview((s) => ({ ...s, open: false }))}
             onJumpTo={jumpToIssue}
+          />
+        </div>
+      )}
+
+      {aiScore.open && (
+        <div className="fixed right-4 top-20 bottom-4 w-[380px] z-30 shadow-xl">
+          <ScorePanel
+            result={aiScore.result}
+            loading={aiScore.loading}
+            error={aiScore.error}
+            onClose={() => setAiScore((s) => ({ ...s, open: false }))}
+            onRescore={runAIScore}
           />
         </div>
       )}

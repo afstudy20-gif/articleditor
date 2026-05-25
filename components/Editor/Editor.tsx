@@ -15,6 +15,7 @@ type Props = {
   onInsertRequest?: () => void;
   onReady?: (editor: any) => void;
   onAIReview?: () => void;
+  onAIScore?: () => void;
 };
 
 const SECTION_PRESETS: Array<{ label: string; level: 1 | 2 | 3 }> = [
@@ -53,7 +54,7 @@ function computeRefOrder(json: any, refIds: string[]): string[] {
   return seen;
 }
 
-export function ArticleEditor({ initialContent, refs, onChange, onInsertRequest, onReady, onAIReview }: Props) {
+export function ArticleEditor({ initialContent, refs, onChange, onInsertRequest, onReady, onAIReview, onAIScore }: Props) {
   const refsById = useMemo(() => {
     const m = new Map<string, Ref>();
     for (const r of refs) m.set(r.id, r);
@@ -171,6 +172,15 @@ export function ArticleEditor({ initialContent, refs, onChange, onInsertRequest,
               🔍 AI Eleştir
             </button>
           </>
+        )}
+        {onAIScore && (
+          <button
+            onClick={() => onAIScore()}
+            className="px-3 py-1 rounded-md bg-indigo-500 text-white text-xs font-semibold hover:bg-indigo-600"
+            title="Belge geneli akademik skor: clarity, coherence, academic tone (0-100) + iyileştirme önerileri."
+          >
+            📊 Skor
+          </button>
         )}
       </div>
       <EditorContent
