@@ -33,6 +33,13 @@ export const Citation = Node.create({
         default: false,
         rendered: false,
       },
+      // Timestamp (ms) of the most recent insertion. NodeView uses this to
+      // briefly tint the citation so users can spot where it landed.
+      insertedAt: {
+        default: 0,
+        parseHTML: () => 0,
+        renderHTML: () => ({}),
+      },
     };
   },
 
@@ -58,8 +65,9 @@ export const Citation = Node.create({
           chain()
             .insertContent({
               type: this.name,
-              attrs: { refIds },
+              attrs: { refIds, insertedAt: Date.now() },
             })
+            .scrollIntoView()
             .run(),
       updateCitationRefIds:
         (pos: number, refIds: string[]) =>
