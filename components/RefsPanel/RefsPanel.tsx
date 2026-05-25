@@ -3,6 +3,11 @@
 import { useRef, useState } from 'react';
 import type { Ref } from '@/store/types';
 import { importByAutoDetect, importByExtension, FORMAT_LABELS, type ImportFormat } from '@/lib/refs/import-auto';
+import {
+  HISTORY_LABELS,
+  formatHistoryTime,
+  type HistoryEntry,
+} from '@/lib/history';
 
 type Props = {
   refs: Ref[];
@@ -25,6 +30,9 @@ type Props = {
   onSelectedIdsChange?: (next: Set<string>) => void;
   onBulkDelete?: (ids: string[]) => void;
   onEnrichRefs?: (refs: Ref[]) => Promise<Ref[]>;
+  history?: HistoryEntry[];
+  onUndoHistory?: (id: string) => void;
+  onClearHistory?: () => void;
 };
 
 export function RefsPanel({
@@ -48,8 +56,11 @@ export function RefsPanel({
   onSelectedIdsChange,
   onBulkDelete,
   onEnrichRefs,
+  history,
+  onUndoHistory,
+  onClearHistory,
 }: Props) {
-  const [tab, setTab] = useState<'list' | 'add'>('list');
+  const [tab, setTab] = useState<'list' | 'add' | 'history'>('list');
   const [internalSelectedIds, setInternalSelectedIds] = useState<Set<string>>(new Set());
   const selectedIds = extSelectedIds ?? internalSelectedIds;
   const setSelectedIds = (next: Set<string>): void => {
@@ -78,20 +89,28 @@ export function RefsPanel({
     <div className="card flex flex-col h-full">
       <div className="flex border-b border-border">
         <button
-          className={`flex-1 px-3 py-2 text-sm font-semibold ${
+          className={`flex-1 px-2 py-2 text-xs font-semibold ${
             tab === 'list' ? 'bg-teal-bg text-teal border-b-2 border-teal' : 'text-muted'
           }`}
           onClick={() => setTab('list')}
         >
-          Atıf kütüphanesi ({refs.length})
+          Kütüphane ({refs.length})
         </button>
         <button
-          className={`flex-1 px-3 py-2 text-sm font-semibold ${
+          className={`flex-1 px-2 py-2 text-xs font-semibold ${
             tab === 'add' ? 'bg-teal-bg text-teal border-b-2 border-teal' : 'text-muted'
           }`}
           onClick={() => setTab('add')}
         >
           + Ekle
+        </button>
+        <button
+          className={`flex-1 px-2 py-2 text-xs font-semibold ${
+            tab === 'history' ? 'bg-teal-bg text-teal border-b-2 border-teal' : 'text-muted'
+          }`}
+          onClick={() => setTab('history')}
+        >
+          🕒 Geçmiş{history && history.length > 0 ? ` (${history.filter((h) => !h.undone).length})` : ''}
         </button>
       </div>
       {tab === 'list' && onLookupAll && refs.length > 0 && (
@@ -147,8 +166,14 @@ export function RefsPanel({
             highlightedId={selectedId}
             onHighlight={onSelectRef}
           />
-        ) : (
+        ) : tab === 'add' ? (
           <AddPanel onAddByDoi={onAddByDoi} onSearch={onSearch} onAddRef={onAddRef} onEnrichRefs={onEnrichRefs} />
+        ) : (
+          <HistoryPanel
+            history={history ?? []}
+            onUndo={onUndoHistory}
+            onClear={onClearHistory}
+          />
         )}
       </div>
     </div>
@@ -1164,6 +1189,87 @@ function AddPanel({
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function HistoryPanel({
+  history,
+  onUndo,
+  onClear,
+}: {
+  history: HistoryEntry[];
+  onUndo?: (id: string) => void;
+  onClear?: () => void;
+}): JSX.Element {
+  if (history.length === 0) {
+    return (
+      <p className="text-sm text-muted text-center py-8 leading-relaxed">
+        Henüz işlem yok. Atıf eklediğinde, referans eklediğinde veya sildiğinde burada listelenir ve <strong>Geri al</strong> ile geri alınabilir.
+      </p>
+    );
+  }
+  const ICONS: Record<string, string> = {
+    'insert-citation': '➕',
+    'delete-citation': '✂️',
+    'add-ref': '📚',
+    'delete-ref': '🗑️',
+    'bulk-delete-ref': '🧹',
+    'update-ref': '✏️',
+    'edit-ref': '✏️',
+  };
+  return (
+    <div className="space-y-2">
+      {onClear && (
+        <div className="flex justify-between items-center px-1 pb-1 border-b border-border">
+          <span className="text-xs text-muted">{history.length} işlem</span>
+          <button
+            onClick={onClear}
+            className="text-xs text-muted hover:text-red"
+            title="Geçmişi temizle (geri alınamaz)"
+          >
+            Listeyi temizle
+          </button>
+        </div>
+      )}
+      {history.map((h) => (
+        <div
+          key={h.id}
+          className={`border border-border rounded-lg p-2 text-xs ${
+            h.undone ? 'bg-slate-50 opacity-60' : 'bg-white'
+          }`}
+        >
+          <div className="flex items-start gap-2">
+            <span className="text-base shrink-0">{ICONS[h.type] ?? '•'}</span>
+            <div className="flex-1 min-w-0">
+              <div className="font-medium text-primary leading-snug">
+                {h.description}
+              </div>
+              <div className="text-muted mt-0.5 flex items-center gap-2">
+                <span>{formatHistoryTime(h.time)}</span>
+                <span className="text-faint">·</span>
+                <span className="bg-slate-100 px-1.5 py-0.5 rounded text-[10px]">
+                  {HISTORY_LABELS[h.type]}
+                </span>
+                {h.undone && (
+                  <span className="bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded text-[10px]">
+                    geri alındı
+                  </span>
+                )}
+              </div>
+            </div>
+            {!h.undone && onUndo && (
+              <button
+                onClick={() => onUndo(h.id)}
+                className="btn-secondary text-[11px] px-2 py-0.5 shrink-0"
+                title="Bu işlemi geri al"
+              >
+                ↶ Geri al
+              </button>
+            )}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

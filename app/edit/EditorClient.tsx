@@ -27,6 +27,11 @@ import { GapDetectPanel } from '@/components/AI/GapDetectPanel';
 import { CompareModal } from '@/components/AI/CompareModal';
 import { DeepResearchPanel } from '@/components/AI/DeepResearchPanel';
 import type { ReviewIssueT, ScoreResultT, EnhanceModeT, ClaimT } from '@/lib/ai/schemas';
+import {
+  newHistoryId,
+  type HistoryEntry,
+  type HistoryOpType,
+} from '@/lib/history';
 import { embedMissingRefs, embedTexts, embedInputFor } from '@/lib/ai/embed-refs';
 import { topK } from '@/lib/ai/cosine';
 import { aiHeaders } from '@/lib/ai/user-keys';
@@ -53,6 +58,34 @@ type ImportPreview = {
 export function EditorClient({ project, onExit, onSaved }: Props) {
   const [title, setTitle] = useState(project.title);
   const [refs, setRefs] = useState<Ref[]>(project.refs);
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
+
+  const addHistory = useCallback(
+    (type: HistoryOpType, description: string, undo: () => boolean | void): void => {
+      setHistory((prev) => [
+        { id: newHistoryId(), time: Date.now(), type, description, undo },
+        ...prev,
+      ].slice(0, 100)); // cap to last 100 ops
+    },
+    [],
+  );
+
+  const undoHistory = useCallback((id: string): void => {
+    setHistory((prev) => {
+      const entry = prev.find((h) => h.id === id);
+      if (!entry || entry.undone) return prev;
+      try {
+        entry.undo();
+      } catch {
+        // ignore; mark as undone anyway
+      }
+      return prev.map((h) => (h.id === id ? { ...h, undone: true } : h));
+    });
+  }, []);
+
+  const clearHistory = useCallback((): void => {
+    setHistory([]);
+  }, []);
   const [doc, setDoc] = useState<unknown>(project.doc);
   const [savedAt, setSavedAt] = useState<number>(project.updatedAt);
   const [savingState, setSavingState] = useState<'idle' | 'saving' | 'saved'>('idle');
@@ -450,19 +483,71 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
     return (data?.refs ?? []) as Ref[];
   }, []);
 
-  const addRef = useCallback((ref: Ref) => {
-    const r: Ref = { ...ref, id: newRefId() };
-    setRefs((prev) => [...prev, r]);
-  }, []);
+  const addRef = useCallback(
+    (ref: Ref) => {
+      const r: Ref = { ...ref, id: newRefId() };
+      setRefs((prev) => [...prev, r]);
+      addHistory(
+        'add-ref',
+        `Eklendi: ${truncate(r.title ?? r.raw ?? r.id, 60)}`,
+        () => {
+          setRefs((prev) => prev.filter((x) => x.id !== r.id));
+        },
+      );
+    },
+    [addHistory],
+  );
 
-  const updateRef = useCallback((id: string, patch: Partial<Ref>) => {
-    setRefs((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
-  }, []);
+  const updateRef = useCallback(
+    (id: string, patch: Partial<Ref>) => {
+      let snapshot: Ref | null = null;
+      setRefs((prev) => {
+        const target = prev.find((r) => r.id === id);
+        if (target) snapshot = { ...target };
+        return prev.map((r) => (r.id === id ? { ...r, ...patch } : r));
+      });
+      if (snapshot) {
+        const title = (snapshot as Ref).title ?? (snapshot as Ref).raw ?? id;
+        addHistory(
+          'update-ref',
+          `Güncellendi: ${truncate(title, 60)}`,
+          () => {
+            setRefs((prev) => prev.map((r) => (r.id === id ? (snapshot as Ref) : r)));
+          },
+        );
+      }
+    },
+    [addHistory],
+  );
 
-  const deleteRef = useCallback((id: string) => {
-    if (!confirm('Bu referansı silmek, makale içindeki atıfları boş bırakacak. Devam edilsin mi?')) return;
-    setRefs((prev) => prev.filter((r) => r.id !== id));
-  }, []);
+  const deleteRef = useCallback(
+    (id: string) => {
+      if (!confirm('Bu referansı silmek, makale içindeki atıfları boş bırakacak. Devam edilsin mi?')) return;
+      let snapshot: Ref | null = null;
+      let index = -1;
+      setRefs((prev) => {
+        index = prev.findIndex((r) => r.id === id);
+        if (index >= 0) snapshot = { ...prev[index] };
+        return prev.filter((r) => r.id !== id);
+      });
+      if (snapshot) {
+        const title = (snapshot as Ref).title ?? (snapshot as Ref).raw ?? id;
+        addHistory(
+          'delete-ref',
+          `Silindi: ${truncate(title, 60)}`,
+          () => {
+            setRefs((prev) => {
+              const next = [...prev];
+              const safeIndex = Math.min(index, next.length);
+              next.splice(safeIndex < 0 ? next.length : safeIndex, 0, snapshot as Ref);
+              return next;
+            });
+          },
+        );
+      }
+    },
+    [addHistory],
+  );
 
   // After an insertCitation chain runs, briefly tint the new citation yellow
   // so users can spot where it landed. We wait two animation frames so
@@ -494,7 +579,27 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
     if (refIds.length === 0) return;
     const fromPos = ed.state.selection.from;
     const ok = ed.chain().focus().insertCitation(refIds).run();
-    if (ok) flashCitationAt(ed, fromPos);
+    if (!ok) return;
+    flashCitationAt(ed, fromPos);
+    // Record op + undo. Atom citation occupies [fromPos, fromPos+1].
+    const refsMap = new Map(refs.map((r) => [r.id, r]));
+    const previewIds = refIds
+      .map((id) => {
+        const r = refsMap.get(id);
+        return r?.title ? truncate(r.title, 30) : id;
+      })
+      .slice(0, 3);
+    const desc =
+      refIds.length === 1
+        ? `Atıf eklendi: ${previewIds[0]}`
+        : `Atıf eklendi (${refIds.length}): ${previewIds.join(', ')}${refIds.length > 3 ? '…' : ''}`;
+    addHistory('insert-citation', desc, () => {
+      try {
+        ed.chain().focus().deleteCitationAt(fromPos).run();
+      } catch {
+        // ignore — node may have moved or already removed
+      }
+    });
   }
 
   const insertCitation = useCallback((refId: string) => {
@@ -522,9 +627,36 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
     setLibrarySelectedIds(new Set());
   }, [librarySelectedIds, refs]);
 
-  const bulkDeleteRefs = useCallback((ids: string[]) => {
-    setRefs((prev) => prev.filter((r) => !ids.includes(r.id)));
-  }, []);
+  const bulkDeleteRefs = useCallback(
+    (ids: string[]) => {
+      let snapshots: Array<{ ref: Ref; index: number }> = [];
+      setRefs((prev) => {
+        snapshots = ids
+          .map((id) => {
+            const i = prev.findIndex((r) => r.id === id);
+            return i >= 0 ? { ref: { ...prev[i] }, index: i } : null;
+          })
+          .filter((x): x is { ref: Ref; index: number } => x !== null)
+          .sort((a, b) => a.index - b.index);
+        return prev.filter((r) => !ids.includes(r.id));
+      });
+      addHistory(
+        'bulk-delete-ref',
+        `${ids.length} referans silindi`,
+        () => {
+          setRefs((prev) => {
+            const next = [...prev];
+            for (const s of snapshots) {
+              const idx = Math.min(s.index, next.length);
+              next.splice(idx, 0, s.ref);
+            }
+            return next;
+          });
+        },
+      );
+    },
+    [addHistory],
+  );
 
   // Enrich refs in-place (no add) — used by plaintext import to fetch DOI/PMID.
   const enrichRefs = useCallback(async (input: Ref[]): Promise<Ref[]> => {
@@ -1537,6 +1669,9 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
             onBulkDelete={bulkDeleteRefs}
             onExtractAspects={extractAspectsFor}
             onEnrichRefs={enrichRefs}
+            history={history}
+            onUndoHistory={undoHistory}
+            onClearHistory={clearHistory}
           />
           </div>
         </div>
@@ -1625,8 +1760,11 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
           selectedIds={librarySelectedIds}
           onSelectedIdsChange={setLibrarySelectedIds}
           onBulkDelete={bulkDeleteRefs}
-            onExtractAspects={extractAspectsFor}
+          onExtractAspects={extractAspectsFor}
           onEnrichRefs={enrichRefs}
+          history={history}
+          onUndoHistory={undoHistory}
+          onClearHistory={clearHistory}
         />
         <BibliographyPreview refs={refs} refOrder={refOrder} style={style} selectedId={highlightRefId} onSelect={selectRef} />
         <RefDetail
@@ -2043,4 +2181,8 @@ function DropItem({
       {children}
     </button>
   );
+}
+
+function truncate(s: string, n: number): string {
+  return s.length > n ? s.slice(0, n) + '…' : s;
 }
