@@ -1,11 +1,24 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { loadUserKeys, saveUserKeys, clearUserKeys, type UserKeys } from '@/lib/ai/user-keys';
+import { PROVIDERS, getProviderMeta, type ProviderId } from '@/lib/ai/registry';
 
 type Props = {
   onClose: () => void;
   onSaved?: () => void;
+};
+
+type FieldMap = {
+  [P in ProviderId]: { keyField: keyof UserKeys; modelField: keyof UserKeys };
+};
+
+const FIELDS: FieldMap = {
+  gemini: { keyField: 'geminiKey', modelField: 'geminiModel' },
+  anthropic: { keyField: 'anthropicKey', modelField: 'anthropicModel' },
+  openai: { keyField: 'openaiKey', modelField: 'openaiModel' },
+  deepseek: { keyField: 'deepseekKey', modelField: 'deepseekModel' },
+  nvidia: { keyField: 'nvidiaKey', modelField: 'nvidiaModel' },
 };
 
 export function SettingsModal({ onClose, onSaved }: Props): JSX.Element {
@@ -44,7 +57,6 @@ export function SettingsModal({ onClose, onSaved }: Props): JSX.Element {
     setTesting(true);
     setTestResult(null);
     try {
-      // Save first so test uses fresh headers
       saveUserKeys(keys);
       const { aiHeaders } = await import('@/lib/ai/user-keys');
       const res = await fetch('/api/ai/status', { headers: aiHeaders() });
@@ -61,10 +73,19 @@ export function SettingsModal({ onClose, onSaved }: Props): JSX.Element {
     }
   }
 
+  const preferredOptions = useMemo(
+    () =>
+      PROVIDERS.filter((p) => {
+        const f = FIELDS[p.id];
+        return Boolean(keys[f.keyField]);
+      }),
+    [keys],
+  );
+
   return (
     <>
       <div className="fixed inset-0 z-40 bg-black/40" onClick={onClose} />
-      <div className="fixed z-50 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-xl w-[min(640px,95vw)] max-h-[90vh] flex flex-col">
+      <div className="fixed z-50 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-xl w-[min(720px,95vw)] max-h-[90vh] flex flex-col">
         <div className="px-4 py-3 border-b border-border flex items-center justify-between">
           <div>
             <h3 className="font-semibold text-primary">⚙️ AI Sağlayıcı Ayarları</h3>
@@ -77,91 +98,59 @@ export function SettingsModal({ onClose, onSaved }: Props): JSX.Element {
           </button>
         </div>
 
-        <div className="flex-1 overflow-auto p-4 space-y-4 text-sm">
+        <div className="flex-1 overflow-auto p-4 space-y-3 text-sm">
           {serverStatus === 'configured' && (
             <div className="bg-teal-bg border border-teal/30 rounded-lg p-2 text-xs text-secondary">
               ℹ️ Server&apos;da bir varsayılan anahtar tanımlı. Aşağıda boş bırakırsan server defaultu kullanılır.
             </div>
           )}
 
-          <ProviderBlock
-            title="Google Gemini"
-            badge={serverStatus === 'configured' ? 'server fallback var' : null}
-            keyValue={keys.geminiKey ?? ''}
-            keyPlaceholder="AIzaSy..."
-            modelValue={keys.geminiModel ?? ''}
-            modelPlaceholder="gemini-2.5-flash"
-            visible={show.gemini}
-            onToggleVisible={() => setShow((s) => ({ ...s, gemini: !s.gemini }))}
-            onKey={(v) => patch({ geminiKey: v })}
-            onModel={(v) => patch({ geminiModel: v })}
-          />
-
-          <ProviderBlock
-            title="Anthropic Claude"
-            badge={serverStatus === 'configured' ? 'server fallback var' : null}
-            keyValue={keys.anthropicKey ?? ''}
-            keyPlaceholder="sk-ant-..."
-            modelValue={keys.anthropicModel ?? ''}
-            modelPlaceholder="claude-sonnet-4-5-20250929"
-            visible={show.anthropic}
-            onToggleVisible={() => setShow((s) => ({ ...s, anthropic: !s.anthropic }))}
-            onKey={(v) => patch({ anthropicKey: v })}
-            onModel={(v) => patch({ anthropicModel: v })}
-          />
-
-          <div className="border border-border rounded-lg p-3 space-y-2">
-            <div className="flex items-center justify-between">
-              <h4 className="font-semibold text-primary text-sm">OpenAI uyumlu</h4>
-              {serverStatus === 'configured' && (
-                <span className="text-[10px] bg-slate-100 text-muted px-1.5 py-0.5 rounded">
-                  server fallback var
-                </span>
-              )}
-            </div>
-            <KeyRow
-              label="API anahtarı"
-              value={keys.openaiKey ?? ''}
-              placeholder="sk-..."
-              visible={show.openai}
-              onToggleVisible={() => setShow((s) => ({ ...s, openai: !s.openai }))}
-              onChange={(v) => patch({ openaiKey: v })}
+          {PROVIDERS.map((meta) => (
+            <ProviderBlock
+              key={meta.id}
+              meta={meta}
+              keyValue={(keys[FIELDS[meta.id].keyField] as string) ?? ''}
+              modelValue={(keys[FIELDS[meta.id].modelField] as string) ?? ''}
+              visible={Boolean(show[meta.id])}
+              onToggleVisible={() => setShow((s) => ({ ...s, [meta.id]: !s[meta.id] }))}
+              onKey={(v) => patch({ [FIELDS[meta.id].keyField]: v } as Partial<UserKeys>)}
+              onModel={(v) => patch({ [FIELDS[meta.id].modelField]: v } as Partial<UserKeys>)}
+              serverFallback={serverStatus === 'configured'}
+              openaiBaseUrl={meta.id === 'openai' ? keys.openaiBaseUrl ?? '' : undefined}
+              onOpenaiBaseUrl={meta.id === 'openai' ? (v) => patch({ openaiBaseUrl: v }) : undefined}
             />
-            <div className="grid grid-cols-2 gap-2">
-              <TextRow
-                label="Model"
-                value={keys.openaiModel ?? ''}
-                placeholder="gpt-4o-mini"
-                onChange={(v) => patch({ openaiModel: v })}
-              />
-              <TextRow
-                label="Base URL (opsiyonel)"
-                value={keys.openaiBaseUrl ?? ''}
-                placeholder="https://api.openai.com/v1"
-                onChange={(v) => patch({ openaiBaseUrl: v })}
-              />
-            </div>
-          </div>
+          ))}
 
           <div>
             <label className="tool-label block mb-1">Tercih edilen sağlayıcı</label>
             <select
               value={keys.preferredProvider ?? ''}
               onChange={(e) =>
-                patch({ preferredProvider: (e.target.value || undefined) as UserKeys['preferredProvider'] })
+                patch({ preferredProvider: (e.target.value || undefined) as ProviderId | undefined })
               }
               className="w-full border border-border rounded px-2 py-1.5 outline-none focus:border-teal text-xs"
             >
-              <option value="">Otomatik (önce Gemini, sonra Anthropic, sonra OpenAI)</option>
-              <option value="gemini">Gemini</option>
-              <option value="anthropic">Anthropic</option>
-              <option value="openai">OpenAI</option>
+              <option value="">Otomatik — anahtarı olan ilk sağlayıcı</option>
+              {preferredOptions.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
             </select>
+            {keys.preferredProvider && !preferredOptions.find((p) => p.id === keys.preferredProvider) && (
+              <p className="text-xs text-amber-700 mt-1">
+                Bu sağlayıcı için anahtar yok. Otomatik fallback devreye girer.
+              </p>
+            )}
           </div>
 
           {testResult && (
             <div
-              className={`rounded-lg p-2 text-xs ${testResult.ok ? 'bg-teal-bg border border-teal/30 text-teal' : 'bg-red-50 border border-red-300 text-red-700'}`}
+              className={`rounded-lg p-2 text-xs ${
+                testResult.ok
+                  ? 'bg-teal-bg border border-teal/30 text-teal'
+                  : 'bg-red-50 border border-red-300 text-red-700'
+              }`}
             >
               {testResult.msg}
             </div>
@@ -194,45 +183,95 @@ export function SettingsModal({ onClose, onSaved }: Props): JSX.Element {
 }
 
 function ProviderBlock({
-  title,
-  badge,
+  meta,
   keyValue,
-  keyPlaceholder,
   modelValue,
-  modelPlaceholder,
   visible,
   onToggleVisible,
   onKey,
   onModel,
+  serverFallback,
+  openaiBaseUrl,
+  onOpenaiBaseUrl,
 }: {
-  title: string;
-  badge: string | null;
+  meta: ReturnType<typeof getProviderMeta>;
   keyValue: string;
-  keyPlaceholder: string;
   modelValue: string;
-  modelPlaceholder: string;
   visible: boolean;
   onToggleVisible: () => void;
   onKey: (v: string) => void;
   onModel: (v: string) => void;
+  serverFallback: boolean;
+  openaiBaseUrl?: string;
+  onOpenaiBaseUrl?: (v: string) => void;
 }): JSX.Element {
+  const hasKey = keyValue.trim().length > 0;
   return (
-    <div className="border border-border rounded-lg p-3 space-y-2">
-      <div className="flex items-center justify-between">
-        <h4 className="font-semibold text-primary text-sm">{title}</h4>
-        {badge && (
-          <span className="text-[10px] bg-slate-100 text-muted px-1.5 py-0.5 rounded">{badge}</span>
-        )}
+    <div
+      className={`border rounded-lg p-3 space-y-2 ${
+        hasKey ? 'border-teal/40 bg-teal-bg/20' : 'border-border'
+      }`}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <h4 className="font-semibold text-primary text-sm">{meta.name}</h4>
+          {hasKey && <span className="text-[10px] text-teal">●  aktif</span>}
+        </div>
+        <div className="flex items-center gap-2">
+          {serverFallback && (
+            <span className="text-[10px] bg-slate-100 text-muted px-1.5 py-0.5 rounded">
+              server fallback
+            </span>
+          )}
+          {meta.helpUrl && (
+            <a
+              href={meta.helpUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[10px] text-teal hover:underline"
+            >
+              anahtar al ↗
+            </a>
+          )}
+        </div>
       </div>
       <KeyRow
         label="API anahtarı"
         value={keyValue}
-        placeholder={keyPlaceholder}
+        placeholder={meta.keyPlaceholder ?? ''}
         visible={visible}
         onToggleVisible={onToggleVisible}
         onChange={onKey}
       />
-      <TextRow label="Model" value={modelValue} placeholder={modelPlaceholder} onChange={onModel} />
+      <div>
+        <label className="tool-label block mb-0.5">Model</label>
+        <select
+          value={modelValue || meta.defaultModel}
+          onChange={(e) => onModel(e.target.value)}
+          className="w-full border border-border rounded px-2 py-1.5 outline-none focus:border-teal text-xs"
+        >
+          {meta.models.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.name} {m.id === meta.defaultModel ? '(varsayılan)' : ''}
+            </option>
+          ))}
+        </select>
+      </div>
+      {onOpenaiBaseUrl && (
+        <div>
+          <label className="tool-label block mb-0.5">Base URL (opsiyonel)</label>
+          <input
+            value={openaiBaseUrl ?? ''}
+            onChange={(e) => onOpenaiBaseUrl(e.target.value)}
+            placeholder="https://api.openai.com/v1"
+            className="w-full border border-border rounded px-2 py-1.5 outline-none focus:border-teal text-xs font-mono"
+            spellCheck={false}
+          />
+          <p className="text-[10px] text-muted mt-0.5">
+            OpenAI-uyumlu özel endpoint kullanmıyorsan boş bırak.
+          </p>
+        </div>
+      )}
     </div>
   );
 }
@@ -274,30 +313,6 @@ function KeyRow({
           {visible ? '🙈' : '👁'}
         </button>
       </div>
-    </div>
-  );
-}
-
-function TextRow({
-  label,
-  value,
-  placeholder,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  placeholder: string;
-  onChange: (v: string) => void;
-}): JSX.Element {
-  return (
-    <div>
-      <label className="tool-label block mb-0.5">{label}</label>
-      <input
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="w-full border border-border rounded px-2 py-1.5 outline-none focus:border-teal text-xs"
-      />
     </div>
   );
 }

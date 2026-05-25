@@ -1,22 +1,24 @@
-// Unified AI provider interface. Gemini default; Anthropic + OpenAI fallback.
-// Add new providers by implementing the AIProvider interface and registering in `getProvider()`.
+// Unified AI provider interface. Gemini default; Anthropic + OpenAI + DeepSeek + NVIDIA fallback.
+// DeepSeek + NVIDIA use the openai-sdk transport with a vendor-specific baseUrl.
 //
 // Configuration precedence per request:
-//   1. ProviderConfig passed explicitly (parsed from X-AI-* request headers)
+//   1. ProviderConfig parsed from X-AI-* request headers
 //   2. process.env (server-side fallback for self-hosted instances)
-// This enables BYO-key mode without sacrificing server-side env defaults.
 
 import { z } from 'zod';
 import { generateTextGemini, streamTextGemini, embedBatchGemini } from './gemini';
 import { generateTextAnthropic, streamTextAnthropic } from './anthropic';
 import { generateTextOpenAI, streamTextOpenAI, embedBatchOpenAI } from './openai';
+import { PROVIDERS, getProviderMeta, type ProviderId } from './registry';
 
-export type ProviderName = 'gemini' | 'anthropic' | 'openai';
+export type ProviderName = ProviderId;
 
 export type ProviderConfig = {
   gemini?: { apiKey?: string; model?: string; embedModel?: string };
   anthropic?: { apiKey?: string; model?: string };
   openai?: { apiKey?: string; baseUrl?: string; model?: string; embedModel?: string };
+  deepseek?: { apiKey?: string; model?: string };
+  nvidia?: { apiKey?: string; model?: string };
   preferred?: ProviderName;
 };
 
@@ -45,18 +47,16 @@ export class AIError extends Error {
   }
 }
 
-// Read X-AI-* headers from an incoming request into a ProviderConfig.
-// Empty/whitespace values are ignored so the env fallback applies.
 export function configFromHeaders(headers: Headers): ProviderConfig {
   const get = (name: string): string | undefined => {
     const v = headers.get(name);
     return v && v.trim() ? v.trim() : undefined;
   };
   const preferredRaw = get('X-AI-Preferred-Provider');
-  const preferred: ProviderName | undefined =
-    preferredRaw === 'gemini' || preferredRaw === 'anthropic' || preferredRaw === 'openai'
-      ? preferredRaw
-      : undefined;
+  const valid = PROVIDERS.map((p) => p.id);
+  const preferred = valid.includes(preferredRaw as ProviderId)
+    ? (preferredRaw as ProviderName)
+    : undefined;
   return {
     gemini: {
       apiKey: get('X-AI-Gemini-Key'),
@@ -73,34 +73,58 @@ export function configFromHeaders(headers: Headers): ProviderConfig {
       model: get('X-AI-OpenAI-Model'),
       embedModel: get('X-AI-OpenAI-Embed-Model'),
     },
+    deepseek: {
+      apiKey: get('X-AI-DeepSeek-Key'),
+      model: get('X-AI-DeepSeek-Model'),
+    },
+    nvidia: {
+      apiKey: get('X-AI-NVIDIA-Key'),
+      model: get('X-AI-NVIDIA-Model'),
+    },
     preferred,
   };
 }
 
-// Resolve effective config: per-request overrides + env fallback.
-export function resolveConfig(cfg?: ProviderConfig): {
+export type ResolvedConfig = {
   gemini: { apiKey?: string; model: string; embedModel: string };
   anthropic: { apiKey?: string; model: string };
   openai: { apiKey?: string; baseUrl?: string; model: string; embedModel: string };
+  deepseek: { apiKey?: string; model: string; baseUrl: string };
+  nvidia: { apiKey?: string; model: string; baseUrl: string };
   preferred?: ProviderName;
-} {
+};
+
+export function resolveConfig(cfg?: ProviderConfig): ResolvedConfig {
+  const deepseekMeta = getProviderMeta('deepseek');
+  const nvidiaMeta = getProviderMeta('nvidia');
   return {
     gemini: {
       apiKey: cfg?.gemini?.apiKey || process.env.GEMINI_API_KEY,
-      model: cfg?.gemini?.model || process.env.GEMINI_MODEL || 'gemini-2.5-flash',
+      model: cfg?.gemini?.model || process.env.GEMINI_MODEL || getProviderMeta('gemini').defaultModel,
       embedModel:
         cfg?.gemini?.embedModel || process.env.GEMINI_EMBED_MODEL || 'text-embedding-004',
     },
     anthropic: {
       apiKey: cfg?.anthropic?.apiKey || process.env.ANTHROPIC_API_KEY,
-      model: cfg?.anthropic?.model || process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-5-20250929',
+      model:
+        cfg?.anthropic?.model || process.env.ANTHROPIC_MODEL || getProviderMeta('anthropic').defaultModel,
     },
     openai: {
       apiKey: cfg?.openai?.apiKey || process.env.OPENAI_API_KEY,
       baseUrl: cfg?.openai?.baseUrl || process.env.OPENAI_BASE_URL,
-      model: cfg?.openai?.model || process.env.OPENAI_MODEL || 'gpt-4o-mini',
+      model: cfg?.openai?.model || process.env.OPENAI_MODEL || getProviderMeta('openai').defaultModel,
       embedModel:
         cfg?.openai?.embedModel || process.env.OPENAI_EMBED_MODEL || 'text-embedding-3-small',
+    },
+    deepseek: {
+      apiKey: cfg?.deepseek?.apiKey || process.env.DEEPSEEK_API_KEY,
+      model: cfg?.deepseek?.model || process.env.DEEPSEEK_MODEL || deepseekMeta.defaultModel,
+      baseUrl: deepseekMeta.baseUrl!,
+    },
+    nvidia: {
+      apiKey: cfg?.nvidia?.apiKey || process.env.NVIDIA_API_KEY,
+      model: cfg?.nvidia?.model || process.env.NVIDIA_MODEL || nvidiaMeta.defaultModel,
+      baseUrl: nvidiaMeta.baseUrl!,
     },
     preferred: cfg?.preferred,
   };
@@ -109,15 +133,17 @@ export function resolveConfig(cfg?: ProviderConfig): {
 export function getDefaultProvider(cfg?: ProviderConfig): ProviderName {
   const r = resolveConfig(cfg);
   if (r.preferred && r[r.preferred].apiKey) return r.preferred;
-  if (r.gemini.apiKey) return 'gemini';
-  if (r.anthropic.apiKey) return 'anthropic';
-  if (r.openai.apiKey) return 'openai';
+  // Priority order — Gemini first since most-tested.
+  const order: ProviderName[] = ['gemini', 'anthropic', 'openai', 'deepseek', 'nvidia'];
+  for (const p of order) if (r[p].apiKey) return p;
   return 'gemini';
 }
 
 export function isAIConfigured(cfg?: ProviderConfig): boolean {
   const r = resolveConfig(cfg);
-  return Boolean(r.gemini.apiKey || r.anthropic.apiKey || r.openai.apiKey);
+  return Boolean(
+    r.gemini.apiKey || r.anthropic.apiKey || r.openai.apiKey || r.deepseek.apiKey || r.nvidia.apiKey,
+  );
 }
 
 export function getProvider(name?: ProviderName, cfg?: ProviderConfig): AIProvider {
@@ -144,12 +170,49 @@ export function getProvider(name?: ProviderName, cfg?: ProviderConfig): AIProvid
         streamText: (p, o) => streamTextOpenAI(p, o, r.openai),
         embedBatch: (t) => embedBatchOpenAI(t, r.openai),
       };
+    case 'deepseek':
+      // OpenAI-compatible; reuse openai adapter with vendor-specific baseUrl.
+      return {
+        name: 'deepseek',
+        generateText: (p, o) =>
+          generateTextOpenAI(p, o, {
+            apiKey: r.deepseek.apiKey,
+            baseUrl: r.deepseek.baseUrl,
+            model: r.deepseek.model,
+            embedModel: '',
+          }),
+        streamText: (p, o) =>
+          streamTextOpenAI(p, o, {
+            apiKey: r.deepseek.apiKey,
+            baseUrl: r.deepseek.baseUrl,
+            model: r.deepseek.model,
+            embedModel: '',
+          }),
+      };
+    case 'nvidia':
+      return {
+        name: 'nvidia',
+        generateText: (p, o) =>
+          generateTextOpenAI(p, o, {
+            apiKey: r.nvidia.apiKey,
+            baseUrl: r.nvidia.baseUrl,
+            model: r.nvidia.model,
+            embedModel: '',
+          }),
+        streamText: (p, o) =>
+          streamTextOpenAI(p, o, {
+            apiKey: r.nvidia.apiKey,
+            baseUrl: r.nvidia.baseUrl,
+            model: r.nvidia.model,
+            embedModel: '',
+          }),
+      };
     default:
       throw new AIError(provider, 'config', `Unknown provider: ${provider}`);
   }
 }
 
-// Helper: generate JSON-validated output with one retry on schema parse failure.
+// JSON-validated structured output with one retry on schema parse failure.
 export async function generateStructured<T>(
   prompt: string,
   schema: z.ZodType<T>,

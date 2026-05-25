@@ -2,6 +2,8 @@
 // Keys are stored in localStorage (plain), sent via X-AI-* headers on AI calls.
 // Server prefers headers over env (lib/ai/provider.ts).
 
+import type { ProviderId } from './registry';
+
 export type UserKeys = {
   geminiKey?: string;
   geminiModel?: string;
@@ -10,7 +12,11 @@ export type UserKeys = {
   openaiKey?: string;
   openaiBaseUrl?: string;
   openaiModel?: string;
-  preferredProvider?: 'gemini' | 'anthropic' | 'openai';
+  deepseekKey?: string;
+  deepseekModel?: string;
+  nvidiaKey?: string;
+  nvidiaModel?: string;
+  preferredProvider?: ProviderId;
 };
 
 const STORAGE_KEY = 'enr_ai_keys_v1';
@@ -40,7 +46,13 @@ export function clearUserKeys(): void {
 }
 
 export function hasAnyKey(keys: UserKeys = loadUserKeys()): boolean {
-  return Boolean(keys.geminiKey || keys.anthropicKey || keys.openaiKey);
+  return Boolean(
+    keys.geminiKey ||
+      keys.anthropicKey ||
+      keys.openaiKey ||
+      keys.deepseekKey ||
+      keys.nvidiaKey,
+  );
 }
 
 // Build headers attached to every AI fetch request.
@@ -54,6 +66,10 @@ export function aiHeaders(extra: Record<string, string> = {}): Record<string, st
   if (k.openaiKey) h['X-AI-OpenAI-Key'] = k.openaiKey;
   if (k.openaiBaseUrl) h['X-AI-OpenAI-BaseURL'] = k.openaiBaseUrl;
   if (k.openaiModel) h['X-AI-OpenAI-Model'] = k.openaiModel;
+  if (k.deepseekKey) h['X-AI-DeepSeek-Key'] = k.deepseekKey;
+  if (k.deepseekModel) h['X-AI-DeepSeek-Model'] = k.deepseekModel;
+  if (k.nvidiaKey) h['X-AI-NVIDIA-Key'] = k.nvidiaKey;
+  if (k.nvidiaModel) h['X-AI-NVIDIA-Model'] = k.nvidiaModel;
   if (k.preferredProvider) h['X-AI-Preferred-Provider'] = k.preferredProvider;
   return h;
 }
