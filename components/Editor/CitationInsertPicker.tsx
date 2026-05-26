@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Ref } from '@/store/types';
+import { useLang } from '@/lib/i18n/hooks';
 
 type Props = {
   allRefs: Ref[];
@@ -11,6 +12,7 @@ type Props = {
 };
 
 export function CitationInsertPicker({ allRefs, refOrder, onClose, onInsert }: Props): JSX.Element {
+  const { t } = useLang();
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const inputRef = useRef<HTMLInputElement>(null);
@@ -74,7 +76,7 @@ export function CitationInsertPicker({ allRefs, refOrder, onClose, onInsert }: P
       <div className="fixed inset-0 z-40 bg-black/30" onClick={onClose} />
       <div className="fixed z-50 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-surface border border-border rounded-xl shadow-xl w-[600px] max-h-[80vh] flex flex-col overflow-hidden">
         <div className="px-4 py-3 border-b border-border flex items-center justify-between gap-2">
-          <h2 className="font-bold text-primary text-sm">Kütüphaneden atıf yerleştir</h2>
+          <h2 className="font-bold text-primary text-sm">{t('cite_insert_title')}</h2>
           <button onClick={onClose} className="text-muted hover:text-primary text-xl leading-none">
             ×
           </button>
@@ -95,7 +97,7 @@ export function CitationInsertPicker({ allRefs, refOrder, onClose, onInsert }: P
 
         <ul className="flex-1 overflow-auto p-2 space-y-1.5">
           {filtered.length === 0 && (
-            <li className="text-sm text-muted text-center py-8">Eşleşen referans yok.</li>
+            <li className="text-sm text-muted text-center py-8">{t('cite_no_matches')}</li>
           )}
           {filtered.map((r) => {
             const n = refOrder.get(r.id);
@@ -153,7 +155,7 @@ export function CitationInsertPicker({ allRefs, refOrder, onClose, onInsert }: P
           </span>
           <div className="flex gap-2">
             <button onClick={onClose} className="btn-secondary text-xs">
-              İptal
+              {t('cite_insert_cancel')}
             </button>
             <button
               onClick={insertSelected}

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { diffWords } from '@/lib/ai/diff';
 import type { EnhanceModeT } from '@/lib/ai/schemas';
+import { useLang } from '@/lib/i18n/hooks';
 
 export type EnhanceState =
   | { status: 'idle' }
@@ -24,17 +25,18 @@ type Props = {
   onRetry: () => void;
 };
 
-const MODE_LABELS: Record<EnhanceModeT, string> = {
-  expand: 'Genişlet',
-  shorten: 'Kısalt',
-  rephrase: 'Yeniden Yaz',
-  'tone-academic': 'Akademik Ton',
-  clarity: 'Açıklık',
-  concision: 'Sadelik',
-  grammar: 'Dilbilgisi',
+const MODE_KEY: Record<EnhanceModeT, string> = {
+  expand: 'ai_mode_expand',
+  shorten: 'ai_mode_shorten',
+  rephrase: 'ai_mode_rephrase',
+  'tone-academic': 'ai_mode_tone_academic',
+  clarity: 'ai_mode_clarity',
+  concision: 'ai_mode_concision',
+  grammar: 'ai_mode_grammar',
 };
 
 export function EnhanceModal({ state, mode, onAccept, onClose, onRetry }: Props): JSX.Element | null {
+  const { t } = useLang();
   if (state.status === 'idle') return null;
 
   const before = state.before;
@@ -63,7 +65,7 @@ export function EnhanceModal({ state, mode, onAccept, onClose, onRetry }: Props)
       >
         <div className="px-4 py-3 border-b border-border flex items-center justify-between">
           <h3 className="font-semibold text-primary">
-            ✏️ AI {mode ? MODE_LABELS[mode] : 'İyileştir'}
+            ✏️ AI {mode ? t(MODE_KEY[mode] as Parameters<typeof t>[0]) : t('ai_enhance_default')}
           </h3>
           <button onClick={onClose} className="text-muted hover:text-primary text-lg leading-none">
             ×
@@ -72,7 +74,7 @@ export function EnhanceModal({ state, mode, onAccept, onClose, onRetry }: Props)
 
         <div className="flex-1 overflow-auto p-4 space-y-3 text-sm">
           {state.status === 'loading' && (
-            <p className="text-muted text-xs italic">İyileştiriliyor…</p>
+            <p className="text-muted text-xs italic">{t('ai_enhance_loading')}</p>
           )}
           {state.status === 'error' && (
             <p className="text-red text-xs">Hata: {state.error}</p>
@@ -82,25 +84,25 @@ export function EnhanceModal({ state, mode, onAccept, onClose, onRetry }: Props)
             <>
               {state.rationale && (
                 <div className="bg-teal-bg border border-teal/30 rounded-lg px-3 py-2 text-xs text-secondary">
-                  <span className="tool-label">Gerekçe</span>
+                  <span className="tool-label">{t('ai_enhance_rationale')}</span>
                   <p className="mt-0.5">{state.rationale}</p>
                 </div>
               )}
 
               {citationWarn && (
                 <div className="bg-red-bg border border-red/30 rounded-lg px-3 py-2 text-xs text-red">
-                  <strong>Atıf uyarısı:</strong>{' '}
+                  <strong>{t('ai_enhance_citation_warning')}</strong>{' '}
                   {citationCheck!.missing.length > 0 &&
-                    `${citationCheck!.missing.length} atıf eksik`}
+                    `${citationCheck!.missing.length} missing`}
                   {citationCheck!.missing.length > 0 && citationCheck!.extras.length > 0 && ' · '}
                   {citationCheck!.extras.length > 0 &&
-                    `${citationCheck!.extras.length} fazla atıf eklendi`}
-                  . Yeniden dene veya iptal et.
+                    `${citationCheck!.extras.length} extra`}
+                  {t('ai_enhance_citation_error')}
                 </div>
               )}
 
               <div>
-                <div className="tool-label mb-1">Diff (kelime bazında)</div>
+                <div className="tool-label mb-1">{t('ai_enhance_diff_label')}</div>
                 <div className="border border-border rounded-lg p-3 text-sm leading-relaxed whitespace-pre-wrap font-serif">
                   {diff.map((seg, i) => {
                     if (seg.type === 'add') {
@@ -124,13 +126,13 @@ export function EnhanceModal({ state, mode, onAccept, onClose, onRetry }: Props)
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <div className="tool-label mb-1">Önce</div>
+                  <div className="tool-label mb-1">{t('ai_enhance_before')}</div>
                   <div className="border border-border rounded-lg p-2 text-xs whitespace-pre-wrap bg-slate-50 max-h-[200px] overflow-auto leading-relaxed">
                     {before}
                   </div>
                 </div>
                 <div>
-                  <div className="tool-label mb-1">Sonra</div>
+                  <div className="tool-label mb-1">{t('ai_enhance_after')}</div>
                   <div className="border border-teal/40 rounded-lg p-2 text-xs whitespace-pre-wrap bg-teal-bg/30 max-h-[200px] overflow-auto leading-relaxed">
                     {after}
                   </div>
@@ -142,18 +144,18 @@ export function EnhanceModal({ state, mode, onAccept, onClose, onRetry }: Props)
 
         <div className="px-4 py-3 border-t border-border flex justify-between items-center">
           <button onClick={onRetry} className="text-xs text-secondary hover:text-teal">
-            🔄 Tekrar dene
+            🔄 {t('ai_enhance_retry')}
           </button>
           <div className="flex gap-2">
             <button onClick={onClose} className="text-muted hover:text-primary text-sm px-3 py-1.5">
-              İptal
+              {t('ai_enhance_cancel')}
             </button>
             <button
               onClick={onAccept}
               disabled={state.status !== 'ready'}
               className="btn-primary text-sm px-4 py-1.5 disabled:opacity-50"
             >
-              ✓ Uygula
+              ✓ {t('ai_enhance_apply')}
             </button>
           </div>
         </div>

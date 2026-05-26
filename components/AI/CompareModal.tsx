@@ -4,6 +4,7 @@ import { useState } from 'react';
 import type { CompareResultT } from '@/lib/ai/schemas';
 import type { Ref } from '@/store/types';
 import { aiHeaders } from '@/lib/ai/user-keys';
+import { useLang } from '@/lib/i18n/hooks';
 
 type Props = {
   myAbstract: string;
@@ -14,6 +15,7 @@ type Props = {
 };
 
 export function CompareModal({ myAbstract: initialAbstract, refs, onClose, onInsertSnippet, onExtractAspects }: Props): JSX.Element {
+  const { t } = useLang();
   const [abstract, setAbstract] = useState(initialAbstract);
   const [targetId, setTargetId] = useState<string>(refs[0]?.id ?? '');
   const [loading, setLoading] = useState(false);
@@ -26,7 +28,7 @@ export function CompareModal({ myAbstract: initialAbstract, refs, onClose, onIns
   async function run(): Promise<void> {
     if (!target) return;
     if (abstract.trim().length < 50) {
-      setError('Özet en az 50 karakter olmalı.');
+      setError(t('ai_compare_abstract_min'));
       return;
     }
     setLoading(true);
@@ -80,7 +82,7 @@ export function CompareModal({ myAbstract: initialAbstract, refs, onClose, onIns
       <div className="fixed inset-0 z-40 bg-black/40" onClick={onClose} />
       <div className="fixed z-50 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-xl w-[min(900px,95vw)] max-h-[90vh] flex flex-col">
         <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-          <h3 className="font-semibold text-primary">⚖️ Çalışmamla karşılaştır</h3>
+          <h3 className="font-semibold text-primary">⚖️ {t('ai_compare_title')}</h3>
           <button onClick={onClose} className="text-muted hover:text-primary text-lg leading-none">
             ×
           </button>
@@ -88,7 +90,7 @@ export function CompareModal({ myAbstract: initialAbstract, refs, onClose, onIns
 
         <div className="flex-1 overflow-auto p-4 space-y-3 text-sm">
           <div>
-            <label className="tool-label block mb-1">Hedef makale</label>
+            <label className="tool-label block mb-1">{t('ai_compare_target_label')}</label>
             <select
               value={targetId}
               onChange={(e) => {
@@ -99,25 +101,25 @@ export function CompareModal({ myAbstract: initialAbstract, refs, onClose, onIns
             >
               {refs.map((r) => (
                 <option key={r.id} value={r.id}>
-                  {r.title?.slice(0, 100) ?? '(Başlıksız)'} · {r.year ?? '?'}
+                  {r.title?.slice(0, 100) ?? t('rp_no_title')} · {r.year ?? '?'}
                 </option>
               ))}
             </select>
             {target && !target.abstract && (
               <p className="text-xs text-amber-700 mt-1">
-                Bu referansın özeti yok — karşılaştırma kalitesi düşük olabilir. Önce &ldquo;Özet/DOI tara&rdquo; çalıştır.
+                {t('ai_compare_no_abstract')}
               </p>
             )}
           </div>
 
           <div>
-            <label className="tool-label block mb-1">Kendi özetin</label>
+            <label className="tool-label block mb-1">{t('ai_compare_your_abstract')}</label>
             <textarea
               value={abstract}
               onChange={(e) => setAbstract(e.target.value)}
               rows={4}
               className="w-full border border-border rounded px-2 py-1.5 outline-none focus:border-teal text-xs"
-              placeholder="Çalışmanın abstract veya özetini yapıştır…"
+              placeholder={t('ai_compare_abstract_placeholder')}
             />
           </div>
 
@@ -126,7 +128,7 @@ export function CompareModal({ myAbstract: initialAbstract, refs, onClose, onIns
             disabled={loading || !target}
             className="btn-primary text-sm px-4 py-1.5 disabled:opacity-50"
           >
-            {loading ? (extracting ? 'Aspect çıkarılıyor…' : 'Karşılaştırılıyor…') : '⚖️ Karşılaştır'}
+            {loading ? (extracting ? t('ai_compare_extracting') : t('ai_compare_comparing')) : `⚖️ ${t('ai_compare_btn')}`}
           </button>
 
           {error && <p className="text-red text-xs">{error}</p>}
@@ -134,13 +136,13 @@ export function CompareModal({ myAbstract: initialAbstract, refs, onClose, onIns
           {result && (
             <div className="space-y-3 pt-3 border-t border-border">
               <div>
-                <div className="tool-label mb-1">Örtüşmeler</div>
+                <div className="tool-label mb-1">{t('ai_compare_overlaps')}</div>
                 <table className="w-full text-xs border border-border">
                   <thead>
                     <tr className="bg-slate-50 text-left">
-                      <th className="px-2 py-1 border-b border-border">Yön</th>
-                      <th className="px-2 py-1 border-b border-border">Benim</th>
-                      <th className="px-2 py-1 border-b border-border">Hedef</th>
+                      <th className="px-2 py-1 border-b border-border">{t('ai_compare_aspect')}</th>
+                      <th className="px-2 py-1 border-b border-border">{t('ai_compare_mine')}</th>
+                      <th className="px-2 py-1 border-b border-border">{t('ai_compare_theirs')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -157,7 +159,7 @@ export function CompareModal({ myAbstract: initialAbstract, refs, onClose, onIns
 
               {result.gaps.length > 0 && (
                 <div>
-                  <div className="tool-label mb-1">Boşluklar (hedefte var, sende yok)</div>
+                  <div className="tool-label mb-1">{t('ai_compare_gaps')}</div>
                   <ul className="list-disc list-inside text-xs space-y-1">
                     {result.gaps.map((g, i) => (
                       <li key={i} className="text-secondary">{g}</li>
@@ -168,7 +170,7 @@ export function CompareModal({ myAbstract: initialAbstract, refs, onClose, onIns
 
               {result.differentiators.length > 0 && (
                 <div>
-                  <div className="tool-label mb-1">Seni farklılaştıran noktalar</div>
+                  <div className="tool-label mb-1">{t('ai_compare_differentiators')}</div>
                   <ul className="list-disc list-inside text-xs space-y-1">
                     {result.differentiators.map((d, i) => (
                       <li key={i} className="text-teal">{d}</li>
@@ -179,13 +181,13 @@ export function CompareModal({ myAbstract: initialAbstract, refs, onClose, onIns
 
               {result.citation_snippet && (
                 <div className="bg-teal-bg border border-teal/30 rounded-lg p-2">
-                  <div className="tool-label mb-1">Atıf cümlesi</div>
+                  <div className="tool-label mb-1">{t('ai_compare_citation')}</div>
                   <p className="text-xs text-secondary mb-2 leading-relaxed">{result.citation_snippet}</p>
                   <button
                     onClick={() => onInsertSnippet(result.citation_snippet!)}
                     className="text-xs text-teal hover:underline"
                   >
-                    📋 Cursor konumuna ekle
+                    {t('ai_compare_insert')}
                   </button>
                 </div>
               )}
@@ -195,7 +197,7 @@ export function CompareModal({ myAbstract: initialAbstract, refs, onClose, onIns
 
         <div className="px-4 py-3 border-t border-border flex justify-end">
           <button onClick={onClose} className="text-muted hover:text-primary text-sm px-3 py-1.5">
-            Kapat
+            {t('ai_compare_close')}
           </button>
         </div>
       </div>

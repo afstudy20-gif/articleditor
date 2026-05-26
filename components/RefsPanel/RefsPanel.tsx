@@ -1,7 +1,8 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import type { Ref } from '@/store/types';
+import type { Ref, RefType } from '@/store/types';
+import { useLang } from '@/lib/i18n/hooks';
 import { importByAutoDetect, importByExtension, FORMAT_LABELS, type ImportFormat } from '@/lib/refs/import-auto';
 import {
   HISTORY_LABELS,
@@ -13,6 +14,7 @@ type Props = {
   refs: Ref[];
   refOrder: Map<string, number>;
   onAddByDoi: (doi: string) => Promise<void>;
+  onLookupDoi?: (doi: string) => Promise<Ref | null>;
   onSearch: (query: string, opts?: { fromYear?: number; toYear?: number }) => Promise<Ref[]>;
   onAddRef: (ref: Ref) => void;
   onInsertCitation: (refId: string) => void;
@@ -39,6 +41,7 @@ export function RefsPanel({
   refs,
   refOrder,
   onAddByDoi,
+  onLookupDoi,
   onSearch,
   onAddRef,
   onInsertCitation,
@@ -60,6 +63,7 @@ export function RefsPanel({
   onUndoHistory,
   onClearHistory,
 }: Props) {
+  const { t } = useLang();
   const [tab, setTab] = useState<'list' | 'add' | 'history'>('list');
   const [internalSelectedIds, setInternalSelectedIds] = useState<Set<string>>(new Set());
   const selectedIds = extSelectedIds ?? internalSelectedIds;
@@ -80,7 +84,7 @@ export function RefsPanel({
   function bulkDelete(): void {
     if (selectedIds.size === 0) return;
     const ids = Array.from(selectedIds);
-    const msg = `${ids.length} referans silinecek. Devam edilsin mi? Makale içindeki atıflar boş kalır.`;
+    const msg = `${ids.length} ${t('rp_bulk_delete_confirm')}`;
     if (!confirm(msg)) return;
     if (onBulkDelete) onBulkDelete(ids);
     clearSelection();
@@ -94,7 +98,7 @@ export function RefsPanel({
           }`}
           onClick={() => setTab('list')}
         >
-          Kütüphane ({refs.length})
+          {t('rp_tab_library')} ({refs.length})
         </button>
         <button
           className={`flex-1 px-2 py-2 text-xs font-semibold ${
@@ -102,7 +106,7 @@ export function RefsPanel({
           }`}
           onClick={() => setTab('add')}
         >
-          + Ekle
+          {t('rp_tab_add')}
         </button>
         <button
           className={`flex-1 px-2 py-2 text-xs font-semibold ${
@@ -110,21 +114,21 @@ export function RefsPanel({
           }`}
           onClick={() => setTab('history')}
         >
-          🕒 Geçmiş{history && history.length > 0 ? ` (${history.filter((h) => !h.undone).length})` : ''}
+          🕒 {t('rp_tab_history')}{history && history.length > 0 ? ` (${history.filter((h) => !h.undone).length})` : ''}
         </button>
       </div>
       {tab === 'list' && onLookupAll && refs.length > 0 && (
         <div className="px-3 py-2 border-b border-border flex items-center justify-between gap-2">
           <span className="text-xs text-muted">
-            {refs.filter((r) => r.doi).length}/{refs.length} ref DOI'li · {refs.filter((r) => r.abstract).length}{' '}
-            özetli
+            {refs.filter((r) => r.doi).length}/{refs.length} {t('rp_doi_with_count')} · {refs.filter((r) => r.abstract).length}{' '}
+            {t('rp_abstract_count')}
           </span>
           <button
             onClick={onLookupAll}
             disabled={lookupAllBusy}
             className="btn-secondary text-xs px-2 py-1"
           >
-            {lookupAllBusy ? 'Taranıyor…' : 'Tümünü DOI tara'}
+            {lookupAllBusy ? t('rp_scanning') : t('rp_scan_all')}
           </button>
         </div>
       )}
@@ -132,19 +136,19 @@ export function RefsPanel({
       {tab === 'list' && selectedIds.size > 0 && (
         <div className="px-3 py-2 border-b border-border bg-teal-bg flex items-center justify-between gap-2">
           <span className="text-xs text-teal font-semibold">
-            {selectedIds.size} ref seçili — toolbar &quot;+ Atıf ekle&quot; ile yerleştir
+            {selectedIds.size} {t('rp_selected_hint')}
           </span>
           <div className="flex gap-2">
             <button onClick={clearSelection} className="text-xs text-muted hover:text-primary">
-              İptal
+              {t('rp_cancel')}
             </button>
             {onBulkDelete && (
               <button
                 onClick={bulkDelete}
                 className="btn-danger text-xs px-2 py-1"
-                title="Seçili referansları kütüphaneden sil"
+                title={t('rp_context_delete')}
               >
-                🗑️ Sil ({selectedIds.size})
+                🗑️ {t('rp_context_delete')} ({selectedIds.size})
               </button>
             )}
           </div>
@@ -165,14 +169,16 @@ export function RefsPanel({
             onToggleSelect={toggleSelect}
             highlightedId={selectedId}
             onHighlight={onSelectRef}
+            t={t}
           />
         ) : tab === 'add' ? (
-          <AddPanel onAddByDoi={onAddByDoi} onSearch={onSearch} onAddRef={onAddRef} onEnrichRefs={onEnrichRefs} />
+          <AddPanel onAddByDoi={onAddByDoi} onLookupDoi={onLookupDoi} onSearch={onSearch} onAddRef={onAddRef} onEnrichRefs={onEnrichRefs} t={t} />
         ) : (
           <HistoryPanel
             history={history ?? []}
             onUndo={onUndoHistory}
             onClear={onClearHistory}
+            t={t}
           />
         )}
       </div>
@@ -199,6 +205,7 @@ function RefList({
   highlightedId,
   onHighlight,
   onUpdate,
+  t,
 }: {
   refs: Ref[];
   refOrder: Map<string, number>;
@@ -212,6 +219,7 @@ function RefList({
   onToggleSelect?: (id: string) => void;
   highlightedId?: string | null;
   onHighlight?: (id: string) => void;
+  t: (k: string) => string;
 }): JSX.Element {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
@@ -236,7 +244,7 @@ function RefList({
   if (refs.length === 0)
     return (
       <p className="text-sm text-muted text-center py-8">
-        Henüz referans yok. <strong>+ Ekle</strong> sekmesinden DOI veya başlık ile referans ekle.
+        — <strong>{t('rp_tab_add')}</strong>
       </p>
     );
   return (
@@ -265,7 +273,7 @@ function RefList({
                   checked={isSelected}
                   onChange={() => onToggleSelect(r.id)}
                   className="mt-1.5 shrink-0 accent-teal cursor-pointer"
-                  title="Birlikte yerleştirmek için seç"
+                  title={t('rp_select_for_multi')}
                 />
               )}
               <span
@@ -284,7 +292,7 @@ function RefList({
                     else toggleExpand(r.id);
                   }}
                 >
-                  {r.title || r.raw?.slice(0, 60) || '(Başlıksız)'}
+                  {r.title || r.raw?.slice(0, 60) || t('rp_no_title')}
                 </div>
                 <div className="text-xs text-muted truncate">
                   {r.authors[0]?.family || r.authors[0]?.literal || '—'}
@@ -323,19 +331,19 @@ function RefList({
                     </a>
                   )}
                   {r.abstract && (
-                    <span className="bg-slate-100 text-muted px-1.5 py-0.5 rounded">özet</span>
+                    <span className="bg-slate-100 text-muted px-1.5 py-0.5 rounded">{t('rp_doi_abstract')}</span>
                   )}
                   {r.userNote && (
-                    <span className="bg-teal-bg text-teal px-1.5 py-0.5 rounded" title="Manuel notunuz var">
-                      📝 not
+                    <span className="bg-teal-bg text-teal px-1.5 py-0.5 rounded" title={t('rp_edit_note')}>
+                      📝 {t('rp_edit_note')}
                     </span>
                   )}
                   <button
                     onClick={() => toggleExpand(r.id)}
                     className="text-muted hover:text-teal ml-auto"
-                    title="Detay / özet"
+                    title={t('rp_doi_abstract')}
                   >
-                    {expandedId === r.id ? '▼ detay' : '▶ detay'}
+                    {expandedId === r.id ? '▼' : '▶'}
                   </button>
                   {onLookup && (
                     <button
@@ -343,14 +351,14 @@ function RefList({
                       disabled={lookupBusyId === r.id}
                       className="text-teal hover:underline"
                     >
-                      {lookupBusyId === r.id ? 'Aranıyor…' : 'DOI tara'}
+                      {lookupBusyId === r.id ? t('rp_looking_up') : t('rp_lookup_doi')}
                     </button>
                   )}
                   <button onClick={() => onInsert(r.id)} className="text-teal font-semibold hover:underline">
-                    Yerleştir →
+                    {t('rp_insert_citation')} →
                   </button>
                   <button onClick={() => onDelete(r.id)} className="text-red hover:underline">
-                    Sil
+                    {t('rp_context_delete')}
                   </button>
                 </div>
 
@@ -358,7 +366,7 @@ function RefList({
                   <div className="mt-2 pt-2 border-t border-border space-y-2 text-xs">
                     {r.authors.length > 0 && (
                       <div>
-                        <div className="tool-label">Yazarlar</div>
+                        <div className="tool-label">{t('rp_edit_authors')}</div>
                         <div className="text-secondary leading-relaxed">
                           {r.authors
                             .map((a) => {
@@ -373,19 +381,19 @@ function RefList({
                       <div className="flex gap-3 text-muted">
                         {r.volume && (
                           <span>
-                            <span className="tool-label inline">Cilt</span>{' '}
+                            <span className="tool-label inline">{t('rp_edit_volume')}</span>{' '}
                             <span className="text-primary font-semibold">{r.volume}</span>
                           </span>
                         )}
                         {r.issue && (
                           <span>
-                            <span className="tool-label inline">Sayı</span>{' '}
+                            <span className="tool-label inline">{t('rp_edit_issue')}</span>{' '}
                             <span className="text-primary font-semibold">{r.issue}</span>
                           </span>
                         )}
                         {r.pages && (
                           <span>
-                            <span className="tool-label inline">Sayfa</span>{' '}
+                            <span className="tool-label inline">{t('rp_edit_pages')}</span>{' '}
                             <span className="text-primary font-semibold">{r.pages}</span>
                           </span>
                         )}
@@ -393,14 +401,14 @@ function RefList({
                     )}
                     {r.abstract ? (
                       <div>
-                        <div className="tool-label mb-1">Özet</div>
+                        <div className="tool-label mb-1">{t('rp_doi_abstract')}</div>
                         <p className="text-secondary leading-relaxed whitespace-pre-wrap max-h-[200px] overflow-auto">
                           {r.abstract}
                         </p>
                       </div>
                     ) : (
                       <p className="text-faint italic">
-                        Özet yok. <strong>DOI tara</strong> ile CrossRef/OpenAlex/PubMed taransın.
+                        — <strong>{t('rp_lookup_doi')}</strong>
                       </p>
                     )}
                   </div>
@@ -443,6 +451,7 @@ function RefList({
             setEditingId(ctxRef.id);
             closeContext();
           }}
+          t={t}
         />
       )}
       {editingId && (() => {
@@ -456,6 +465,7 @@ function RefList({
               onUpdate(target.id, patch);
               setEditingId(null);
             }}
+            t={t}
           />
         );
       })()}
@@ -467,10 +477,12 @@ function RefEditModal({
   reference: r,
   onClose,
   onSave,
+  t,
 }: {
   reference: Ref;
   onClose: () => void;
   onSave: (patch: Partial<Ref>) => void;
+  t: (k: string) => string;
 }): JSX.Element {
   const authorsToText = (rr: Ref): string =>
     rr.authors
@@ -535,13 +547,13 @@ function RefEditModal({
         onContextMenu={(e) => e.preventDefault()}
       >
         <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-          <h3 className="font-semibold text-primary">Referansı düzelt</h3>
+          <h3 className="font-semibold text-primary">{t('rp_edit')}</h3>
           <button onClick={onClose} className="text-muted hover:text-primary text-lg leading-none">
             ×
           </button>
         </div>
         <div className="flex-1 overflow-auto px-4 py-3 space-y-3 text-sm">
-          <Field label="Başlık">
+          <Field label={t('rp_edit_title')}>
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
@@ -549,8 +561,8 @@ function RefEditModal({
             />
           </Field>
           <Field
-            label="Yazarlar"
-            hint='Format: "Family, Given" — birden fazla için ; ile ayır. Örn: Smith, John A; Doe, Jane B'
+            label={t('rp_edit_authors')}
+            hint='Format: "Family, Given" — Smith, John A; Doe, Jane B'
           >
             <textarea
               value={authorsText}
@@ -560,7 +572,7 @@ function RefEditModal({
             />
           </Field>
           <div className="grid grid-cols-3 gap-2">
-            <Field label="Yıl">
+            <Field label={t('rp_edit_year')}>
               <input
                 value={year}
                 onChange={(e) => setYear(e.target.value.replace(/\D/g, ''))}
@@ -568,23 +580,23 @@ function RefEditModal({
                 className="w-full border border-border rounded px-2 py-1.5 outline-none focus:border-teal"
               />
             </Field>
-            <Field label="Tür">
+            <Field label={t('rp_manual_type')}>
               <select
                 value={type}
                 onChange={(e) => setType(e.target.value)}
                 className="w-full border border-border rounded px-2 py-1.5 outline-none focus:border-teal"
               >
-                <option value="journal-article">Makale</option>
-                <option value="book">Kitap</option>
-                <option value="book-chapter">Kitap bölümü</option>
-                <option value="conference-paper">Konferans</option>
-                <option value="thesis">Tez</option>
-                <option value="webpage">Web sayfası</option>
-                <option value="report">Rapor</option>
-                <option value="other">Diğer</option>
+                <option value="journal-article">{t('rp_type_journal')}</option>
+                <option value="book">{t('rp_type_book')}</option>
+                <option value="book-chapter">{t('rp_type_chapter')}</option>
+                <option value="conference-paper">{t('rp_type_conference')}</option>
+                <option value="thesis">{t('rp_type_thesis')}</option>
+                <option value="webpage">{t('rp_type_webpage')}</option>
+                <option value="report">{t('rp_type_report')}</option>
+                <option value="other">{t('rp_type_other')}</option>
               </select>
             </Field>
-            <Field label="DOI">
+            <Field label={t('rp_edit_doi')}>
               <input
                 value={doi}
                 onChange={(e) => setDoi(e.target.value)}
@@ -592,7 +604,7 @@ function RefEditModal({
               />
             </Field>
           </div>
-          <Field label="Dergi / kaynak">
+          <Field label={t('rp_edit_journal')}>
             <input
               value={container}
               onChange={(e) => setContainer(e.target.value)}
@@ -600,28 +612,28 @@ function RefEditModal({
             />
           </Field>
           <div className="grid grid-cols-4 gap-2">
-            <Field label="Cilt">
+            <Field label={t('rp_edit_volume')}>
               <input
                 value={volume}
                 onChange={(e) => setVolume(e.target.value)}
                 className="w-full border border-border rounded px-2 py-1.5 outline-none focus:border-teal"
               />
             </Field>
-            <Field label="Sayı">
+            <Field label={t('rp_edit_issue')}>
               <input
                 value={issue}
                 onChange={(e) => setIssue(e.target.value)}
                 className="w-full border border-border rounded px-2 py-1.5 outline-none focus:border-teal"
               />
             </Field>
-            <Field label="Sayfa">
+            <Field label={t('rp_edit_pages')}>
               <input
                 value={pages}
                 onChange={(e) => setPages(e.target.value)}
                 className="w-full border border-border rounded px-2 py-1.5 outline-none focus:border-teal"
               />
             </Field>
-            <Field label="PMID">
+            <Field label={t('rp_edit_pmid')}>
               <input
                 value={pmid}
                 onChange={(e) => setPmid(e.target.value)}
@@ -629,14 +641,14 @@ function RefEditModal({
               />
             </Field>
           </div>
-          <Field label="URL">
+          <Field label={t('rp_edit_url')}>
             <input
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               className="w-full border border-border rounded px-2 py-1.5 outline-none focus:border-teal font-mono text-xs"
             />
           </Field>
-          <Field label="Özet">
+          <Field label={t('rp_doi_abstract')}>
             <textarea
               value={abstractText}
               onChange={(e) => setAbstractText(e.target.value)}
@@ -647,10 +659,10 @@ function RefEditModal({
         </div>
         <div className="px-4 py-3 border-t border-border flex justify-end gap-2">
           <button onClick={onClose} className="text-muted hover:text-primary text-sm px-3 py-1.5">
-            İptal
+            {t('rp_edit_cancel')}
           </button>
           <button onClick={handleSave} className="btn-primary text-sm px-4 py-1.5">
-            Kaydet
+            {t('rp_edit_save')}
           </button>
         </div>
       </div>
@@ -688,6 +700,7 @@ function ContextMenu({
   onSaveNote,
   onEdit,
   onExtractAspects,
+  t,
 }: {
   reference: Ref;
   x: number;
@@ -700,6 +713,7 @@ function ContextMenu({
   onSaveNote?: (note: string) => void;
   onEdit?: () => void;
   onExtractAspects?: () => void;
+  t: (k: string) => string;
 }): JSX.Element {
   const [noteEdit, setNoteEdit] = useState(false);
   const [noteValue, setNoteValue] = useState(r.userNote ?? '');
@@ -722,7 +736,7 @@ function ContextMenu({
       >
         <div className="px-3 py-2 border-b border-border shrink-0">
           <div className="font-semibold text-primary text-sm leading-tight">
-            {r.title || '(Başlıksız)'}
+            {r.title || t('rp_no_title')}
           </div>
           <div className="text-xs text-muted mt-0.5">
             {r.authors[0]?.family || '—'}
@@ -734,7 +748,7 @@ function ContextMenu({
         <div className="overflow-auto flex-1 min-h-0">
           {r.abstract && (
             <div className="px-3 py-2 border-b border-border text-xs text-secondary leading-relaxed">
-              <div className="tool-label mb-1">Özet</div>
+              <div className="tool-label mb-1">{t('rp_doi_abstract')}</div>
               <p className="whitespace-pre-wrap">{r.abstract}</p>
             </div>
           )}
@@ -743,24 +757,24 @@ function ContextMenu({
               onClick={onLookup}
               className="block w-full text-left px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal border-b border-border"
             >
-              🔍 Özet/DOI tara
+              🔍 {t('rp_doi_abstract')}/{t('rp_lookup_doi')}
             </button>
           )}
 
           {r.aspects && (
             <div className="px-3 py-2 border-b border-border text-xs">
-              <div className="tool-label mb-1">AI aspect çıkarımı</div>
+              <div className="tool-label mb-1">{t('rp_extract_aspects')}</div>
               {(['goals', 'methods', 'datasets', 'eval_protocols', 'limitations', 'contributions', 'findings'] as const).map((k) => {
                 const items = r.aspects?.[k];
                 if (!items || items.length === 0) return null;
                 const label: Record<string, string> = {
-                  goals: 'Hedefler',
-                  methods: 'Yöntem',
-                  datasets: 'Veri',
-                  eval_protocols: 'Değerlendirme',
-                  limitations: 'Kısıtlılık',
-                  contributions: 'Katkı',
-                  findings: 'Bulgu',
+                  goals: t('rp_aspects_goals'),
+                  methods: t('rp_aspects_methods'),
+                  datasets: t('rp_aspects_datasets'),
+                  eval_protocols: t('rp_aspects_eval'),
+                  limitations: t('rp_aspects_limitations'),
+                  contributions: t('rp_aspects_contributions'),
+                  findings: t('rp_aspects_findings'),
                 };
                 return (
                   <div key={k} className="mb-1">
@@ -779,13 +793,13 @@ function ContextMenu({
           {/* Manual note section */}
           <div className="px-3 py-2 border-b border-border">
             <div className="flex items-center justify-between mb-1">
-              <span className="tool-label">Manuel not</span>
+              <span className="tool-label">{t('rp_edit_note')}</span>
               {!noteEdit && (
                 <button
                   onClick={() => setNoteEdit(true)}
                   className="text-xs text-teal hover:underline"
                 >
-                  {r.userNote ? 'Düzenle' : '+ Not ekle'}
+                  {r.userNote ? t('rp_edit') : `+ ${t('rp_edit_note')}`}
                 </button>
               )}
             </div>
@@ -794,7 +808,7 @@ function ContextMenu({
                 <textarea
                   value={noteValue}
                   onChange={(e) => setNoteValue(e.target.value)}
-                  placeholder="Bu makale hakkında notların…"
+                  placeholder={t('rp_edit_note')}
                   className="w-full min-h-[100px] text-xs border border-border rounded p-2 outline-none focus:border-teal resize-y"
                   autoFocus
                 />
@@ -806,7 +820,7 @@ function ContextMenu({
                     }}
                     className="btn-primary text-xs px-2.5 py-1"
                   >
-                    Kaydet
+                    {t('rp_edit_save')}
                   </button>
                   <button
                     onClick={() => {
@@ -815,7 +829,7 @@ function ContextMenu({
                     }}
                     className="text-xs text-muted hover:text-primary"
                   >
-                    İptal
+                    {t('rp_edit_cancel')}
                   </button>
                 </div>
               </>
@@ -824,7 +838,7 @@ function ContextMenu({
                 {r.userNote}
               </p>
             ) : (
-              <p className="text-xs text-faint italic">Henüz not yok.</p>
+              <p className="text-xs text-faint italic">—</p>
             )}
           </div>
 
@@ -833,7 +847,7 @@ function ContextMenu({
               onClick={onShowAbstract}
               className="block w-full text-left px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal"
             >
-              📄 Detayı sağda göster
+              📄 {t('rp_extract_aspects')}
             </button>
           )}
 
@@ -845,7 +859,7 @@ function ContextMenu({
               onClick={onClose}
               className="block px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal"
             >
-              🔗 Full text aç ({r.doi ? 'DOI' : 'URL'}) ↗
+              🔗 {t('rp_fulltext')} ({r.doi ? 'DOI' : 'URL'}) ↗
             </a>
           )}
           {r.doi && (
@@ -856,7 +870,7 @@ function ContextMenu({
               onClick={onClose}
               className="block px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal"
             >
-              🔓 Sci-Hub'da aç ↗
+              🔓 Sci-Hub ↗
             </a>
           )}
           {pubmedUrl && (
@@ -867,7 +881,7 @@ function ContextMenu({
               onClick={onClose}
               className="block px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal"
             >
-              🔗 PubMed'de aç ↗
+              🔗 PubMed ↗
             </a>
           )}
           {r.doi && (
@@ -878,7 +892,7 @@ function ContextMenu({
               onClick={onClose}
               className="block px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal"
             >
-              🎓 Google Scholar'da aç ↗
+              🎓 Google Scholar ↗
             </a>
           )}
         </div>
@@ -888,14 +902,14 @@ function ContextMenu({
             onClick={onInsert}
             className="block w-full text-left px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal font-semibold"
           >
-            ➕ Metne yerleştir
+            ➕ {t('rp_insert_citation')}
           </button>
           {onEdit && (
             <button
               onClick={onEdit}
               className="block w-full text-left px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal"
             >
-              ✏️ Düzelt
+              ✏️ {t('rp_edit')}
             </button>
           )}
           {onLookup && r.abstract && (
@@ -903,23 +917,23 @@ function ContextMenu({
               onClick={onLookup}
               className="block w-full text-left px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal"
             >
-              🔄 Tekrar DOI tara
+              🔄 {t('rp_lookup_doi')}
             </button>
           )}
           {onExtractAspects && (
             <button
               onClick={onExtractAspects}
               className="block w-full text-left px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal"
-              title="Özetten yapısal alanları çıkar: hedef, yöntem, veri, kısıtlılık, katkı, bulgu"
+              title={t('rp_extract_aspects')}
             >
-              🔬 AI ile aspect çıkar
+              🔬 {t('rp_extract_aspects')}
             </button>
           )}
           <button
             onClick={onDelete}
             className="block w-full text-left px-3 py-1.5 text-xs hover:bg-red-bg hover:text-red text-red"
           >
-            🗑️ Sil
+            🗑️ {t('rp_context_delete')}
           </button>
         </div>
       </div>
@@ -929,14 +943,18 @@ function ContextMenu({
 
 function AddPanel({
   onAddByDoi,
+  onLookupDoi,
   onSearch,
   onAddRef,
   onEnrichRefs,
+  t,
 }: {
   onAddByDoi: (doi: string) => Promise<void>;
+  onLookupDoi?: (doi: string) => Promise<Ref | null>;
   onSearch: (q: string, opts?: { fromYear?: number; toYear?: number }) => Promise<Ref[]>;
   onAddRef: (ref: Ref) => void;
   onEnrichRefs?: (refs: Ref[]) => Promise<Ref[]>;
+  t: (k: string) => string;
 }): JSX.Element {
   const [doi, setDoi] = useState('');
   const [q, setQ] = useState('');
@@ -949,10 +967,12 @@ function AddPanel({
   const [importBusy, setImportBusy] = useState(false);
   const [detectedFormat, setDetectedFormat] = useState<ImportFormat | null>(null);
   const importFileRef = useRef<HTMLInputElement>(null);
+  const [doiPreview, setDoiPreview] = useState<Ref | null>(null);
+  const [doiError, setDoiError] = useState<string | null>(null);
 
   async function commitImport(refs: Ref[], format: ImportFormat): Promise<void> {
     if (refs.length === 0) {
-      setImportMsg(`Hiç referans bulunamadı (${FORMAT_LABELS[format]}). Format farklı olabilir.`);
+      setImportMsg(t('rp_import_no_refs').replace('{format}', FORMAT_LABELS[format]));
       return;
     }
     setImportBusy(true);
@@ -962,7 +982,7 @@ function AddPanel({
       if (format === 'plaintext' && onEnrichRefs) {
         const needLookup = refs.filter((r) => !r.doi && !r.pmid);
         if (needLookup.length > 0) {
-          setImportMsg(`${refs.length} referans algılandı, DOI/PMID için aranıyor…`);
+          setImportMsg(t('rp_import_enriching').replace('{count}', String(refs.length)));
           try {
             const enriched = await onEnrichRefs(needLookup);
             const byRaw = new Map(enriched.map((r) => [r.raw ?? r.title ?? '', r]));
@@ -976,8 +996,8 @@ function AddPanel({
       const withDoi = toAdd.filter((r) => r.doi || r.pmid).length;
       setImportMsg(
         format === 'plaintext'
-          ? `${toAdd.length} referans eklendi (düz metin). ${withDoi}/${toAdd.length} için DOI veya PMID bulundu.`
-          : `${toAdd.length} referans eklendi (${FORMAT_LABELS[format]}).`,
+          ? t('rp_import_success_plain').replace('{total}', String(toAdd.length)).replace('{found}', String(withDoi))
+          : t('rp_import_success').replace('{total}', String(toAdd.length)).replace('{format}', FORMAT_LABELS[format]),
       );
       setImportText('');
       setDetectedFormat(null);
@@ -994,7 +1014,7 @@ function AddPanel({
       await commitImport(refs, format);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
-      setImportMsg(`İçe aktarma hatası: ${msg}`);
+      setImportMsg(t('rp_import_error').replace('{msg}', msg));
     }
   }
 
@@ -1005,7 +1025,7 @@ function AddPanel({
       await commitImport(refs, format);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
-      setImportMsg(`Dosya açılamadı: ${msg}`);
+      setImportMsg(t('rp_import_file_error').replace('{msg}', msg));
     }
   }
 
@@ -1021,13 +1041,38 @@ function AddPanel({
 
   async function doDoi(): Promise<void> {
     if (!doi.trim()) return;
+    setDoiError(null);
+    setDoiPreview(null);
     setBusy(true);
     try {
-      await onAddByDoi(doi.trim());
-      setDoi('');
+      if (onLookupDoi) {
+        const ref = await onLookupDoi(doi.trim());
+        if (ref) {
+          setDoiPreview(ref);
+        } else {
+          setDoiError(t('rp_doi_not_found'));
+        }
+      } else {
+        await onAddByDoi(doi.trim());
+        setDoi('');
+      }
+    } catch (err) {
+      setDoiError(err instanceof Error ? err.message : String(err));
     } finally {
       setBusy(false);
     }
+  }
+
+  function confirmDoiAdd(): void {
+    if (!doiPreview) return;
+    onAddRef(doiPreview);
+    setDoiPreview(null);
+    setDoi('');
+  }
+
+  function cancelDoiPreview(): void {
+    setDoiPreview(null);
+    setDoiError(null);
   }
 
   async function doSearch(): Promise<void> {
@@ -1046,37 +1091,74 @@ function AddPanel({
   return (
     <div className="space-y-4">
       <div>
-        <label className="tool-label block mb-1">DOI veya PMID</label>
+        <label className="tool-label block mb-1">{t('rp_doi_label')}</label>
         <div className="flex gap-2">
           <input
             value={doi}
-            onChange={(e) => setDoi(e.target.value)}
-            placeholder="10.1056/NEJMoa..."
+            onChange={(e) => { setDoi(e.target.value); setDoiError(null); }}
+            placeholder={t('rp_doi_placeholder')}
             className="flex-1 border border-border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-teal"
-            onKeyDown={(e) => e.key === 'Enter' && doDoi()}
+            onKeyDown={(e) => e.key === 'Enter' && !doiPreview && doDoi()}
+            disabled={!!doiPreview}
           />
-          <button onClick={doDoi} disabled={busy} className="btn-primary text-xs px-3 py-1.5">
-            Ekle
-          </button>
+          {!doiPreview ? (
+            <button onClick={doDoi} disabled={busy || !doi.trim()} className="btn-primary text-xs px-3 py-1.5">
+              {busy ? t('rp_doi_searching') : t('rp_doi_search')}
+            </button>
+          ) : (
+            <button onClick={cancelDoiPreview} className="text-xs text-muted hover:text-red px-2 py-1.5">
+              ✕
+            </button>
+          )}
         </div>
+        {doiError && (
+          <p className="text-xs text-red-600 mt-1">{doiError}</p>
+        )}
+        {doiPreview && (
+          <div className="mt-2 border border-teal/40 bg-teal-bg/30 rounded-lg p-3 space-y-1.5">
+            <div className="font-medium text-primary text-sm leading-snug">{doiPreview.title || t('rp_no_title')}</div>
+            <div className="text-xs text-muted">
+              {doiPreview.authors?.[0]?.family || '—'}
+              {(doiPreview.authors?.length ?? 0) > 1 ? ' et al.' : ''} · {doiPreview.year ?? '?'} · {doiPreview.containerTitle ?? ''}
+            </div>
+            <div className="flex items-center gap-2 flex-wrap text-xs">
+              {doiPreview.doi && <span className="text-teal">{doiPreview.doi}</span>}
+              {doiPreview.pmid && <span className="bg-teal-bg text-teal px-1.5 py-0.5 rounded">PMID {doiPreview.pmid}</span>}
+            </div>
+            {doiPreview.abstract && (
+              <details className="text-xs text-secondary">
+                <summary className="cursor-pointer text-muted hover:text-primary">{t('rp_doi_abstract')}</summary>
+                <p className="mt-1 leading-relaxed">{doiPreview.abstract}</p>
+              </details>
+            )}
+            <div className="flex justify-end gap-2 pt-1">
+              <button onClick={cancelDoiPreview} className="text-xs text-muted hover:text-primary px-2 py-1">
+                {t('rp_doi_cancel')}
+              </button>
+              <button onClick={confirmDoiAdd} className="btn-primary text-xs px-3 py-1">
+                {t('rp_doi_add_to_lib')}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       <div>
-        <label className="tool-label block mb-1">Başlık / yazar ile ara</label>
+        <label className="tool-label block mb-1">{t('rp_search_label')}</label>
         <div className="flex gap-2">
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Kardiyak biyomarkerler"
+            placeholder={t('rp_search_placeholder')}
             className="flex-1 border border-border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-teal"
             onKeyDown={(e) => e.key === 'Enter' && doSearch()}
           />
           <button onClick={doSearch} disabled={busy} className="btn-secondary text-xs px-3 py-1.5">
-            {busy ? 'Aranıyor…' : 'Ara'}
+            {busy ? t('rp_search_busy') : t('rp_search_btn')}
           </button>
         </div>
         <div className="mt-1.5 flex items-center gap-2">
-          <span className="text-xs text-muted">Yıl:</span>
+          <span className="text-xs text-muted">{t('rp_search_year')}</span>
           <input
             value={fromYear}
             onChange={(e) => setFromYear(e.target.value.replace(/\D/g, '').slice(0, 4))}
@@ -1103,9 +1185,9 @@ function AddPanel({
                 setToYear('');
               }}
               className="text-xs text-muted hover:text-red ml-auto"
-              title="Yıl filtresini temizle"
+              title={t('rp_search_clear_year')}
             >
-              temizle
+              {t('rp_search_clear_year')}
             </button>
           )}
         </div>
@@ -1113,7 +1195,7 @@ function AddPanel({
 
       {results.length > 0 && (
         <div className="space-y-1.5 max-h-[400px] overflow-auto">
-          <div className="text-xs text-muted px-1">{results.length} sonuç — &quot;+ Ekle&quot; ile kütüphaneye al</div>
+          <div className="text-xs text-muted px-1">{results.length} {t('rp_search_results')} — {t('rp_search_add_hint')}</div>
           <ul className="space-y-1.5">
             {results.map((r) => (
               <li
@@ -1139,9 +1221,9 @@ function AddPanel({
                       setResults(results.filter((x) => x.id !== r.id));
                     }}
                     className="btn-primary text-xs px-3 py-1"
-                    title="Bu referansı kütüphaneye ekle"
+                    title={t('rp_doi_add_to_lib')}
                   >
-                    + Kütüphaneye ekle
+                    {t('rp_doi_add_to_lib')}
                   </button>
                 </div>
               </li>
@@ -1150,14 +1232,16 @@ function AddPanel({
         </div>
       )}
 
+      <ManualAddSection onAddRef={onAddRef} t={t} />
+
       <div className="pt-3 border-t border-border">
         <div className="flex items-center justify-between mb-1">
-          <label className="tool-label">Dosya / metin içe aktar</label>
+          <label className="tool-label">{t('rp_import_label')}</label>
           <button
             onClick={() => importFileRef.current?.click()}
             className="text-xs text-teal hover:underline"
           >
-            Dosya seç…
+            {t('rp_import_file')}
           </button>
           <input
             ref={importFileRef}
@@ -1172,20 +1256,19 @@ function AddPanel({
           />
         </div>
         <p className="text-xs text-muted mb-1.5">
-          Destek: RIS, EndNote .enw, EndNote XML, BibTeX, düz metin (Vancouver/APA gibi). Format otomatik algılanır.
-          Düz metinde DOI/PMID yoksa CrossRef + PubMed üzerinden aranır.
+          {t('rp_import_support')}
         </p>
         <textarea
           value={importText}
           onChange={(e) => onTextChange(e.target.value)}
-          placeholder={`EndNote XML, RIS, .enw veya BibTeX metnini yapıştır.\n\nÖrnek RIS:\nTY  - JOUR\nAU  - Smith J\nTI  - Title…\nER  -\n\nÖrnek BibTeX:\n@article{key, author = {Smith, J}, ...}`}
+          placeholder={t('rp_import_placeholder')}
           className="w-full min-h-[120px] font-mono text-xs border border-border rounded-lg p-2 outline-none focus:border-teal"
         />
         {detectedFormat && detectedFormat !== 'unknown' && (
-          <p className="text-xs text-teal mt-1">Algılanan format: {FORMAT_LABELS[detectedFormat]}</p>
+          <p className="text-xs text-teal mt-1">{t('rp_import_detected')} {FORMAT_LABELS[detectedFormat]}</p>
         )}
         {detectedFormat === 'unknown' && importText.trim().length > 20 && (
-          <p className="text-xs text-red mt-1">Format tanınmadı.</p>
+          <p className="text-xs text-red mt-1">{t('rp_import_unknown')}</p>
         )}
         <div className="mt-2 flex items-center justify-between gap-2">
           {importMsg && <span className="text-xs text-teal flex-1">{importMsg}</span>}
@@ -1196,7 +1279,7 @@ function AddPanel({
             }
             className="btn-primary text-xs px-3 py-1.5 ml-auto disabled:opacity-50"
           >
-            {importBusy ? 'İşleniyor…' : 'İçe aktar'}
+            {importBusy ? t('rp_import_busy') : t('rp_import_btn')}
           </button>
         </div>
       </div>
@@ -1204,19 +1287,188 @@ function AddPanel({
   );
 }
 
+function ManualAddSection({
+  onAddRef,
+  t,
+}: {
+  onAddRef: (ref: Ref) => void;
+  t: (k: string) => string;
+}): JSX.Element {
+  const [mType, setMType] = useState<RefType>('journal-article');
+  const [mTitle, setMTitle] = useState('');
+  const [mAuthors, setMAuthors] = useState('');
+  const [mContainer, setMContainer] = useState('');
+  const [mYear, setMYear] = useState('');
+  const [mVolume, setMVolume] = useState('');
+  const [mIssue, setMIssue] = useState('');
+  const [mPages, setMPages] = useState('');
+  const [mDoi, setMDoi] = useState('');
+  const [mPmid, setMPmid] = useState('');
+
+  function parseAuthors(text: string): Ref['authors'] {
+    return text
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .map((entry) => {
+        const parts = entry.split(/\s+/);
+        if (parts.length >= 2) {
+          const family = parts[parts.length - 1];
+          const given = parts.slice(0, -1).join(' ');
+          return { family, given };
+        }
+        return { literal: entry };
+      });
+  }
+
+  function handleAdd(): void {
+    const ref: Ref = {
+      id: crypto.randomUUID?.() ?? String(Date.now()),
+      type: mType,
+      title: mTitle.trim() || undefined,
+      authors: parseAuthors(mAuthors),
+      containerTitle: mContainer.trim() || undefined,
+      year: mYear.trim() ? parseInt(mYear, 10) : undefined,
+      volume: mVolume.trim() || undefined,
+      issue: mIssue.trim() || undefined,
+      pages: mPages.trim() || undefined,
+      doi: mDoi.trim() || undefined,
+      pmid: mPmid.trim() || undefined,
+    };
+    onAddRef(ref);
+    setMType('journal-article');
+    setMTitle('');
+    setMAuthors('');
+    setMContainer('');
+    setMYear('');
+    setMVolume('');
+    setMIssue('');
+    setMPages('');
+    setMDoi('');
+    setMPmid('');
+  }
+
+  return (
+    <details className="pt-3 border-t border-border group">
+      <summary className="tool-label cursor-pointer select-none list-none flex items-center gap-1">
+        <span className="text-muted group-open:rotate-90 transition-transform inline-block">▶</span>
+        {t('rp_manual_title')}
+      </summary>
+      <div className="mt-2 space-y-2">
+        <Field label={t('rp_manual_type')}>
+          <select
+            value={mType}
+            onChange={(e) => setMType(e.target.value as RefType)}
+            className="w-full border border-border rounded px-2 py-1.5 text-sm outline-none focus:border-teal"
+          >
+            <option value="journal-article">{t('rp_type_journal')}</option>
+            <option value="book">{t('rp_type_book')}</option>
+            <option value="book-chapter">{t('rp_type_chapter')}</option>
+            <option value="conference-paper">{t('rp_type_conference')}</option>
+            <option value="thesis">{t('rp_type_thesis')}</option>
+            <option value="webpage">{t('rp_type_webpage')}</option>
+            <option value="report">{t('rp_type_report')}</option>
+            <option value="other">{t('rp_type_other')}</option>
+          </select>
+        </Field>
+        <Field label={t('rp_edit_title')}>
+          <input
+            value={mTitle}
+            onChange={(e) => setMTitle(e.target.value)}
+            className="w-full border border-border rounded px-2 py-1.5 text-sm outline-none focus:border-teal"
+          />
+        </Field>
+        <Field label={t('rp_edit_authors')} hint="Family Given, Family Given">
+          <input
+            value={mAuthors}
+            onChange={(e) => setMAuthors(e.target.value)}
+            className="w-full border border-border rounded px-2 py-1.5 text-sm outline-none focus:border-teal"
+          />
+        </Field>
+        <Field label={t('rp_edit_journal')}>
+          <input
+            value={mContainer}
+            onChange={(e) => setMContainer(e.target.value)}
+            className="w-full border border-border rounded px-2 py-1.5 text-sm outline-none focus:border-teal"
+          />
+        </Field>
+        <div className="grid grid-cols-4 gap-2">
+          <Field label={t('rp_edit_year')}>
+            <input
+              value={mYear}
+              onChange={(e) => setMYear(e.target.value.replace(/\D/g, '').slice(0, 4))}
+              maxLength={4}
+              inputMode="numeric"
+              className="w-full border border-border rounded px-2 py-1.5 text-sm outline-none focus:border-teal"
+            />
+          </Field>
+          <Field label={t('rp_edit_volume')}>
+            <input
+              value={mVolume}
+              onChange={(e) => setMVolume(e.target.value)}
+              className="w-full border border-border rounded px-2 py-1.5 text-sm outline-none focus:border-teal"
+            />
+          </Field>
+          <Field label={t('rp_edit_issue')}>
+            <input
+              value={mIssue}
+              onChange={(e) => setMIssue(e.target.value)}
+              className="w-full border border-border rounded px-2 py-1.5 text-sm outline-none focus:border-teal"
+            />
+          </Field>
+          <Field label={t('rp_edit_pages')}>
+            <input
+              value={mPages}
+              onChange={(e) => setMPages(e.target.value)}
+              className="w-full border border-border rounded px-2 py-1.5 text-sm outline-none focus:border-teal"
+            />
+          </Field>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <Field label={t('rp_edit_doi')}>
+            <input
+              value={mDoi}
+              onChange={(e) => setMDoi(e.target.value)}
+              className="w-full border border-border rounded px-2 py-1.5 text-sm font-mono outline-none focus:border-teal"
+            />
+          </Field>
+          <Field label={t('rp_edit_pmid')}>
+            <input
+              value={mPmid}
+              onChange={(e) => setMPmid(e.target.value)}
+              className="w-full border border-border rounded px-2 py-1.5 text-sm outline-none focus:border-teal"
+            />
+          </Field>
+        </div>
+        <div className="flex justify-end pt-1">
+          <button
+            onClick={handleAdd}
+            disabled={!mTitle.trim()}
+            className="btn-primary text-xs px-3 py-1.5 disabled:opacity-50"
+          >
+            {t('rp_manual_add')}
+          </button>
+        </div>
+      </div>
+    </details>
+  );
+}
+
 function HistoryPanel({
   history,
   onUndo,
   onClear,
+  t,
 }: {
   history: HistoryEntry[];
   onUndo?: (id: string) => void;
   onClear?: () => void;
+  t: (k: string) => string;
 }): JSX.Element {
   if (history.length === 0) {
     return (
       <p className="text-sm text-muted text-center py-8 leading-relaxed">
-        Henüz işlem yok. Atıf eklediğinde, referans eklediğinde veya sildiğinde burada listelenir ve <strong>Geri al</strong> ile geri alınabilir.
+        {t('rp_history_empty')}
       </p>
     );
   }
@@ -1233,13 +1485,13 @@ function HistoryPanel({
     <div className="space-y-2">
       {onClear && (
         <div className="flex justify-between items-center px-1 pb-1 border-b border-border">
-          <span className="text-xs text-muted">{history.length} işlem</span>
+          <span className="text-xs text-muted">{t('rp_history_actions').replace('{count}', String(history.length))}</span>
           <button
             onClick={onClear}
             className="text-xs text-muted hover:text-red"
-            title="Geçmişi temizle (geri alınamaz)"
+            title={t('rp_history_clear')}
           >
-            Listeyi temizle
+            {t('rp_history_clear')}
           </button>
         </div>
       )}
@@ -1264,7 +1516,7 @@ function HistoryPanel({
                 </span>
                 {h.undone && (
                   <span className="bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded text-[10px]">
-                    geri alındı
+                    {t('rp_history_undone')}
                   </span>
                 )}
               </div>
@@ -1273,9 +1525,9 @@ function HistoryPanel({
               <button
                 onClick={() => onUndo(h.id)}
                 className="btn-secondary text-[11px] px-2 py-0.5 shrink-0"
-                title="Bu işlemi geri al"
+                title={t('rp_history_undo')}
               >
-                ↶ Geri al
+                ↶ {t('rp_history_undo')}
               </button>
             )}
           </div>

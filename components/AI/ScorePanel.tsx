@@ -1,6 +1,7 @@
 'use client';
 
 import type { ScoreResultT } from '@/lib/ai/schemas';
+import { useLang } from '@/lib/i18n/hooks';
 
 type Props = {
   result: ScoreResultT | null;
@@ -29,17 +30,18 @@ function ScoreBadge({ label, score }: { label: string; score: number }): JSX.Ele
 }
 
 export function ScorePanel({ result, loading, error, onClose, onRescore }: Props): JSX.Element {
+  const { t } = useLang();
   return (
     <div className="card flex flex-col h-full">
       <div className="flex items-center justify-between border-b border-border px-3 py-2">
-        <h3 className="font-semibold text-primary text-sm">📊 Manuskript Skoru</h3>
+        <h3 className="font-semibold text-primary text-sm">📊 {t('ai_score_title')}</h3>
         <div className="flex items-center gap-2">
           <button
             onClick={onRescore}
             disabled={loading}
             className="text-xs text-teal hover:underline disabled:opacity-50"
           >
-            🔄 Yeniden hesapla
+            🔄 {t('ai_score_recalculate')}
           </button>
           <button onClick={onClose} className="text-muted hover:text-primary text-lg leading-none">
             ×
@@ -48,20 +50,20 @@ export function ScorePanel({ result, loading, error, onClose, onRescore }: Props
       </div>
 
       <div className="flex-1 overflow-auto p-3 space-y-3 text-sm">
-        {loading && <p className="text-muted text-xs italic">Skor hesaplanıyor…</p>}
+        {loading && <p className="text-muted text-xs italic">{t('ai_score_loading')}</p>}
         {error && <p className="text-red text-xs">{error}</p>}
         {!loading && !error && result && (
           <>
             <div className="grid grid-cols-4 gap-2 py-2 border-b border-border">
-              <ScoreBadge label="Genel" score={result.overall} />
-              <ScoreBadge label="Açıklık" score={result.clarity} />
-              <ScoreBadge label="Tutarlılık" score={result.coherence} />
-              <ScoreBadge label="Akademik ton" score={result.academic_tone} />
+              <ScoreBadge label={t('ai_score_overall')} score={result.overall} />
+              <ScoreBadge label={t('ai_score_clarity')} score={result.clarity} />
+              <ScoreBadge label={t('ai_score_coherence')} score={result.coherence} />
+              <ScoreBadge label={t('ai_score_academic')} score={result.academic_tone} />
             </div>
 
             {result.breakdown.length > 0 && (
               <div>
-                <div className="tool-label mb-1">Detay</div>
+                <div className="tool-label mb-1">{t('ai_score_detail')}</div>
                 <ul className="space-y-1.5">
                   {result.breakdown.map((b, i) => (
                     <li key={i} className="flex items-start gap-2 text-xs">
@@ -82,7 +84,7 @@ export function ScorePanel({ result, loading, error, onClose, onRescore }: Props
 
             {result.recommendations && result.recommendations.length > 0 && (
               <div>
-                <div className="tool-label mb-1">Öneriler</div>
+                <div className="tool-label mb-1">{t('ai_score_suggestions')}</div>
                 <ol className="space-y-1 text-xs text-secondary list-decimal list-inside">
                   {result.recommendations.map((rec, i) => (
                     <li key={i} className="leading-snug">{rec}</li>

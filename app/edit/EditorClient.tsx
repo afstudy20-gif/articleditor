@@ -42,6 +42,7 @@ import {
   encodedToPreview,
   type CitationNodeJSON,
 } from '@/lib/editor/mixed-content';
+import { useLang } from '@/lib/i18n/hooks';
 
 type Props = {
   project: Project;
@@ -56,6 +57,7 @@ type ImportPreview = {
 } | null;
 
 export function EditorClient({ project, onExit, onSaved }: Props) {
+  const { t } = useLang();
   const [title, setTitle] = useState(project.title);
   const [refs, setRefs] = useState<Ref[]>(project.refs);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
@@ -450,6 +452,25 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
     return data.ref ?? null;
   }
 
+  const lookupDoi = useCallback(async (doi: string): Promise<Ref | null> => {
+    try {
+      const res = await fetch('/api/lookup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'doi', doi }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.ref) {
+        const msg = data?.error || t('ed_lookup_not_found').replace('{status}', String(res.status));
+        throw new Error(msg);
+      }
+      const enriched: Ref = (await callLookup(data.ref as Ref).catch(() => data.ref as Ref)) ?? (data.ref as Ref);
+      return enriched;
+    } catch (err) {
+      throw err instanceof Error ? err : new Error(String(err));
+    }
+  }, [t]);
+
   const addByDoi = useCallback(async (doi: string) => {
     try {
       const res = await fetch('/api/lookup', {
@@ -459,7 +480,7 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data?.ref) {
-        const msg = data?.error || `Bulunamadı (HTTP ${res.status}). DOI veya PMID doğru mu?`;
+        const msg = data?.error || t('ed_lookup_not_found').replace('{status}', String(res.status));
         alert(msg);
         return;
       }
@@ -468,15 +489,15 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
       setRefs((prev) => [...prev, r]);
       addHistory(
         'add-ref',
-        `Eklendi (DOI/PMID): ${truncate(r.title ?? r.doi ?? r.pmid ?? doi, 60)}`,
+        t('ed_ref_added_doi').replace('{title}', truncate(r.title ?? r.doi ?? r.pmid ?? doi, 60)),
         () => {
           setRefs((prev) => prev.filter((x) => x.id !== r.id));
         },
       );
     } catch (err) {
-      alert(`Lookup hatası: ${err instanceof Error ? err.message : String(err)}`);
+      alert(t('ed_lookup_error').replace('{msg}', err instanceof Error ? err.message : String(err)));
     }
-  }, [addHistory]);
+  }, [addHistory, t]);
 
   const search = useCallback(async (
     query: string,
@@ -502,13 +523,13 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
       setRefs((prev) => [...prev, r]);
       addHistory(
         'add-ref',
-        `Eklendi: ${truncate(r.title ?? r.raw ?? r.id, 60)}`,
+        t('ed_ref_added').replace('{title}', truncate(r.title ?? r.raw ?? r.id, 60)),
         () => {
           setRefs((prev) => prev.filter((x) => x.id !== r.id));
         },
       );
     },
-    [addHistory],
+    [addHistory, t],
   );
 
   const updateRef = useCallback(
@@ -520,22 +541,22 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
         return prev.map((r) => (r.id === id ? { ...r, ...patch } : r));
       });
       if (snapshot) {
-        const title = (snapshot as Ref).title ?? (snapshot as Ref).raw ?? id;
+        const refTitle = (snapshot as Ref).title ?? (snapshot as Ref).raw ?? id;
         addHistory(
           'update-ref',
-          `Güncellendi: ${truncate(title, 60)}`,
+          t('ed_ref_updated').replace('{title}', truncate(refTitle, 60)),
           () => {
             setRefs((prev) => prev.map((r) => (r.id === id ? (snapshot as Ref) : r)));
           },
         );
       }
     },
-    [addHistory],
+    [addHistory, t],
   );
 
   const deleteRef = useCallback(
     (id: string) => {
-      if (!confirm('Bu referansı silmek, makale içindeki atıfları boş bırakacak. Devam edilsin mi?')) return;
+      if (!confirm(t('ed_delete_ref_confirm'))) return;
       let snapshot: Ref | null = null;
       let index = -1;
       setRefs((prev) => {
@@ -544,10 +565,10 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
         return prev.filter((r) => r.id !== id);
       });
       if (snapshot) {
-        const title = (snapshot as Ref).title ?? (snapshot as Ref).raw ?? id;
+        const refTitle = (snapshot as Ref).title ?? (snapshot as Ref).raw ?? id;
         addHistory(
           'delete-ref',
-          `Silindi: ${truncate(title, 60)}`,
+          t('ed_ref_deleted').replace('{title}', truncate(refTitle, 60)),
           () => {
             setRefs((prev) => {
               const next = [...prev];
@@ -559,7 +580,7 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
         );
       }
     },
-    [addHistory],
+    [addHistory, t],
   );
 
   // After an insertCitation chain runs, briefly tint the new citation yellow
@@ -604,8 +625,8 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
       .slice(0, 3);
     const desc =
       refIds.length === 1
-        ? `Atıf eklendi: ${previewIds[0]}`
-        : `Atıf eklendi (${refIds.length}): ${previewIds.join(', ')}${refIds.length > 3 ? '…' : ''}`;
+        ? t('ed_citation_added').replace('{title}', previewIds[0])
+        : t('ed_citation_added_multi').replace('{count}', String(refIds.length));
     addHistory('insert-citation', desc, () => {
       try {
         ed.chain().focus().deleteCitationAt(fromPos).run();
@@ -632,7 +653,7 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
     if (!ed) return;
     const ids = Array.from(librarySelectedIds);
     if (ids.length === 0) {
-      alert('Kütüphaneden checkbox ile bir veya daha fazla referans seç, sonra "+ Atıf ekle"ye tıkla. Cursor’un olduğu yere yerleşir.');
+      alert(t('ed_citation_picker_hint'));
       return;
     }
     const orderedIds = refs.filter((r) => librarySelectedIds.has(r.id)).map((r) => r.id);
@@ -1436,7 +1457,7 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
       setImportError(null);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
-      setImportError(`Yedek yüklenemedi: ${msg}`);
+      setImportError(t('ed_import_error').replace('{msg}', msg));
     }
   }
 
@@ -1448,7 +1469,7 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
       processImportText(plainText);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
-      setImportError(`.docx açılamadı: ${msg}`);
+      setImportError(t('ed_import_error').replace('{msg}', msg));
     }
   }
 
@@ -1486,7 +1507,7 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
         <div className="w-full px-4 sm:px-6 py-3 flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-3 flex-1 min-w-0">
             <button onClick={onExit} className="text-sm text-teal hover:underline shrink-0">
-              ← Projelerim
+              ← {t('app_my_projects')}
             </button>
             <input
               value={title}
@@ -1522,7 +1543,7 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
               title="Atıfları yeniden numaralandır + orphan'ları temizle"
               label="↻"
             />
-            <HeaderDropdown label="📥 Proje ▾">
+            <HeaderDropdown label={`📥 ${t('ed_import')} ▾`}>
               <DropItem
                 onClick={() => {
                   setShowImportModal(true);
@@ -1531,10 +1552,10 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
                   setImportPasteText('');
                 }}
               >
-                📄 İçeri aktar (docx, RIS…)
+                📄 {t('ed_import_docx')}
               </DropItem>
               <DropItem onClick={exportProjectJson}>💾 Projeyi indir (.json)</DropItem>
-              <DropItem onClick={() => projectImportRef.current?.click()}>📂 Proje yükle (.json)</DropItem>
+              <DropItem onClick={() => projectImportRef.current?.click()}>📂 {t('ed_import_json')}</DropItem>
             </HeaderDropdown>
             <input
               ref={projectImportRef}
@@ -1547,11 +1568,11 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
                 if (f) await importProjectJson(f);
               }}
             />
-            <HeaderDropdown label="📤 Dışa aktar ▾" primary>
-              <DropItem onClick={() => exportDocx('active')}>📝 Aktif EndNote .docx</DropItem>
-              <DropItem onClick={() => exportDocx('placeholder')}>📝 Placeholder .docx</DropItem>
-              <DropItem onClick={exportRis}>🗂️ .ris</DropItem>
-              <DropItem onClick={exportLatex}>📐 LaTeX (.zip)</DropItem>
+            <HeaderDropdown label={`📤 ${t('ed_export')} ▾`} primary>
+              <DropItem onClick={() => exportDocx('active')}>📝 {t('ed_export_docx_active')}</DropItem>
+              <DropItem onClick={() => exportDocx('placeholder')}>📝 {t('ed_export_docx_placeholder')}</DropItem>
+              <DropItem onClick={exportRis}>🗂️ {t('ed_export_ris')}</DropItem>
+              <DropItem onClick={exportLatex}>📐 {t('ed_export_latex')}</DropItem>
             </HeaderDropdown>
             <button
               onClick={() => setSettingsOpen(true)}
@@ -1569,7 +1590,7 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
           <div className="card bg-red-bg border-red-200 text-red text-sm p-3 flex items-center justify-between">
             <span>{importError}</span>
             <button className="text-red hover:underline text-xs" onClick={() => setImportError(null)}>
-              kapat
+              {t('app_close')}
             </button>
           </div>
         </div>
@@ -1665,6 +1686,7 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
             refs={refs}
             refOrder={refOrder}
             onAddByDoi={addByDoi}
+            onLookupDoi={lookupDoi}
             onSearch={search}
             onAddRef={addRef}
             onInsertCitation={insertCitation}
@@ -1758,6 +1780,7 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
           refs={refs}
           refOrder={refOrder}
           onAddByDoi={addByDoi}
+          onLookupDoi={lookupDoi}
           onSearch={search}
           onAddRef={addRef}
           onInsertCitation={insertCitation}

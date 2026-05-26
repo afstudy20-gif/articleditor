@@ -3,6 +3,7 @@
 import type { ClaimT } from '@/lib/ai/schemas';
 import type { Suggestion } from './CitationSuggestionsPanel';
 import type { Ref } from '@/store/types';
+import { useLang } from '@/lib/i18n/hooks';
 
 type ClaimSuggestions = {
   claim: ClaimT;
@@ -39,11 +40,12 @@ export function GapDetectPanel({
   onLoadSuggestions,
   refOrder,
 }: Props): JSX.Element {
+  const { t } = useLang();
   return (
     <div className="card flex flex-col h-full">
       <div className="flex items-center justify-between border-b border-border px-3 py-2">
         <div>
-          <h3 className="font-semibold text-primary text-sm">🩹 Atıfsız iddialar</h3>
+          <h3 className="font-semibold text-primary text-sm">🩹 {t('ai_gaps_title')}</h3>
           {!loading && !error && (
             <p className="text-xs text-muted">{claims.length} aday cümle</p>
           )}
@@ -57,11 +59,12 @@ export function GapDetectPanel({
         {loading && <p className="text-muted text-xs italic">Metin taranıyor…</p>}
         {error && <p className="text-red text-xs">{error}</p>}
         {!loading && !error && claims.length === 0 && (
-          <p className="text-muted text-xs italic">Atıfsız iddia bulunamadı.</p>
+          <p className="text-muted text-xs italic">{t('ai_gaps_empty')}</p>
         )}
         {claims.map((cs, i) => (
           <ClaimCard
             key={i}
+            t={t}
             cs={cs}
             onJumpTo={onJumpTo}
             onInsertCitation={onInsertCitation}
@@ -75,12 +78,14 @@ export function GapDetectPanel({
 }
 
 function ClaimCard({
+  t,
   cs,
   onJumpTo,
   onInsertCitation,
   onLoadSuggestions,
   refOrder,
 }: {
+  t: (k: string) => string;
   cs: ClaimSuggestions;
   onJumpTo: (claim: ClaimT) => void;
   onInsertCitation: (claim: ClaimT, refIds: string[]) => void;
@@ -108,7 +113,7 @@ function ClaimCard({
           onClick={() => onLoadSuggestions(cs.claim)}
           className="text-xs text-teal hover:underline"
         >
-          🎯 Uygun atıf öner
+          🎯 {t('ai_gaps_suggest')}
         </button>
       )}
       {cs.loadingSuggestions && (
@@ -137,7 +142,7 @@ function ClaimCard({
                   className="text-[10px] text-teal hover:underline shrink-0"
                   title="Bu cümlenin sonuna atıf ekle"
                 >
-                  + Ekle
+                  {t('ai_gaps_add')}
                 </button>
               </div>
             );

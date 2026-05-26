@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { loadUserKeys, saveUserKeys, clearUserKeys, type UserKeys } from '@/lib/ai/user-keys';
 import { PROVIDERS, getProviderMeta, type ProviderId } from '@/lib/ai/registry';
+import { useLang } from '@/lib/i18n/hooks';
 
 type Props = {
   onClose: () => void;
@@ -22,6 +23,7 @@ const FIELDS: FieldMap = {
 };
 
 export function SettingsModal({ onClose, onSaved }: Props): JSX.Element {
+  const { t } = useLang();
   const [keys, setKeys] = useState<UserKeys>({});
   const [show, setShow] = useState<Record<string, boolean>>({});
   const [serverStatus, setServerStatus] = useState<'unknown' | 'configured' | 'not-configured'>('unknown');
@@ -78,7 +80,7 @@ export function SettingsModal({ onClose, onSaved }: Props): JSX.Element {
   }
 
   function reset(): void {
-    if (!confirm('Tüm AI anahtarları cihazından silinecek. Devam edilsin mi?')) return;
+    if (!confirm(t('ai_settings_reset_confirm'))) return;
     clearUserKeys();
     setKeys({});
     onSaved?.();
@@ -99,9 +101,9 @@ export function SettingsModal({ onClose, onSaved }: Props): JSX.Element {
       <div className="fixed z-50 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-xl w-[min(720px,95vw)] max-h-[90vh] flex flex-col">
         <div className="px-4 py-3 border-b border-border flex items-center justify-between">
           <div>
-            <h3 className="font-semibold text-primary">⚙️ AI Sağlayıcı Ayarları</h3>
+            <h3 className="font-semibold text-primary">⚙️ {t('ai_settings_title')}</h3>
             <p className="text-xs text-muted">
-              Anahtarlar bu tarayıcıda localStorage&apos;da saklanır. Server&apos;a sadece istek başlığı olarak gönderilir, kalıcı kayıt yapılmaz.
+              {t('ai_settings_desc')}
             </p>
           </div>
           <button onClick={onClose} className="text-muted hover:text-primary text-lg leading-none">
@@ -112,13 +114,14 @@ export function SettingsModal({ onClose, onSaved }: Props): JSX.Element {
         <div className="flex-1 overflow-auto p-4 space-y-3 text-sm">
           {serverStatus === 'configured' && (
             <div className="bg-teal-bg border border-teal/30 rounded-lg p-2 text-xs text-secondary">
-              ℹ️ Server&apos;da bir varsayılan anahtar tanımlı. Aşağıda boş bırakırsan server defaultu kullanılır.
+              ℹ️ {t('ai_settings_server_hint')}
             </div>
           )}
 
           {PROVIDERS.map((meta) => (
             <ProviderBlock
               key={meta.id}
+              t={t}
               meta={meta}
               keyValue={(keys[FIELDS[meta.id].keyField] as string) ?? ''}
               modelValue={(keys[FIELDS[meta.id].modelField] as string) ?? ''}
@@ -135,7 +138,7 @@ export function SettingsModal({ onClose, onSaved }: Props): JSX.Element {
           ))}
 
           <div>
-            <label className="tool-label block mb-1">Tercih edilen sağlayıcı</label>
+            <label className="tool-label block mb-1">{t('ai_settings_preferred')}</label>
             <select
               value={keys.preferredProvider ?? ''}
               onChange={(e) =>
@@ -143,7 +146,7 @@ export function SettingsModal({ onClose, onSaved }: Props): JSX.Element {
               }
               className="w-full border border-border rounded px-2 py-1.5 outline-none focus:border-teal text-xs"
             >
-              <option value="">Otomatik — anahtarı olan ilk sağlayıcı</option>
+              <option value="">{t('ai_settings_preferred_auto')}</option>
               {preferredOptions.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
@@ -152,7 +155,7 @@ export function SettingsModal({ onClose, onSaved }: Props): JSX.Element {
             </select>
             {keys.preferredProvider && !preferredOptions.find((p) => p.id === keys.preferredProvider) && (
               <p className="text-xs text-amber-700 mt-1">
-                Bu sağlayıcı için anahtar yok. Otomatik fallback devreye girer.
+                {t('ai_settings_no_key_warn')}
               </p>
             )}
           </div>
@@ -161,14 +164,14 @@ export function SettingsModal({ onClose, onSaved }: Props): JSX.Element {
 
         <div className="px-4 py-3 border-t border-border flex items-center justify-between">
           <button onClick={reset} className="text-xs text-red-600 hover:underline">
-            Tüm anahtarları sil
+            {t('ai_settings_reset_btn')}
           </button>
           <div className="flex gap-2">
             <button onClick={onClose} className="text-sm text-muted hover:text-primary px-3 py-1.5">
-              İptal
+              {t('ai_settings_cancel')}
             </button>
             <button onClick={save} className="btn-primary text-sm px-4 py-1.5">
-              Kaydet
+              {t('ai_settings_save')}
             </button>
           </div>
         </div>
@@ -177,7 +180,10 @@ export function SettingsModal({ onClose, onSaved }: Props): JSX.Element {
   );
 }
 
+type TFn = (k: string) => string;
+
 function ProviderBlock({
+  t,
   meta,
   keyValue,
   modelValue,
@@ -191,6 +197,7 @@ function ProviderBlock({
   test,
   onTest,
 }: {
+  t: TFn;
   meta: ReturnType<typeof getProviderMeta>;
   keyValue: string;
   modelValue: string;
@@ -214,12 +221,12 @@ function ProviderBlock({
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <h4 className="font-semibold text-primary text-sm">{meta.name}</h4>
-          {hasKey && <span className="text-[10px] text-teal">●  aktif</span>}
+          {hasKey && <span className="text-[10px] text-teal">●  {t('ai_settings_active')}</span>}
         </div>
         <div className="flex items-center gap-2">
           {serverFallback && (
             <span className="text-[10px] bg-slate-100 text-muted px-1.5 py-0.5 rounded">
-              server fallback
+              {t('ai_settings_fallback')}
             </span>
           )}
           {meta.helpUrl && (
@@ -229,13 +236,14 @@ function ProviderBlock({
               rel="noopener noreferrer"
               className="text-[10px] text-teal hover:underline"
             >
-              anahtar al ↗
+              {t('ai_settings_get_key')} ↗
             </a>
           )}
         </div>
       </div>
       <KeyRow
-        label="API anahtarı"
+        t={t}
+        label={t('ai_settings_api_key')}
         value={keyValue}
         placeholder={meta.keyPlaceholder ?? ''}
         visible={visible}
@@ -243,7 +251,7 @@ function ProviderBlock({
         onChange={onKey}
       />
       <div>
-        <label className="tool-label block mb-0.5">Model</label>
+        <label className="tool-label block mb-0.5">{t('ai_settings_model')}</label>
         <select
           value={modelValue || meta.defaultModel}
           onChange={(e) => onModel(e.target.value)}
@@ -251,14 +259,14 @@ function ProviderBlock({
         >
           {meta.models.map((m) => (
             <option key={m.id} value={m.id}>
-              {m.name} {m.id === meta.defaultModel ? '(varsayılan)' : ''}
+              {m.name} {m.id === meta.defaultModel ? `(${t('ai_settings_default')})` : ''}
             </option>
           ))}
         </select>
       </div>
       {onOpenaiBaseUrl && (
         <div>
-          <label className="tool-label block mb-0.5">Base URL (opsiyonel)</label>
+          <label className="tool-label block mb-0.5">{t('ai_settings_base_url')}</label>
           <input
             value={openaiBaseUrl ?? ''}
             onChange={(e) => onOpenaiBaseUrl(e.target.value)}
@@ -267,7 +275,7 @@ function ProviderBlock({
             spellCheck={false}
           />
           <p className="text-[10px] text-muted mt-0.5">
-            OpenAI-uyumlu özel endpoint kullanmıyorsan boş bırak.
+            {t('ai_settings_base_url_hint')}
           </p>
         </div>
       )}
@@ -278,9 +286,9 @@ function ProviderBlock({
             onClick={onTest}
             disabled={test?.busy || (!keyValue && !serverFallback)}
             className="text-xs border border-border rounded px-2.5 py-1 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
-            title={!keyValue && !serverFallback ? 'Önce anahtar gir' : 'Bu sağlayıcıyı tek seferlik bir istekle test et'}
+            title={!keyValue && !serverFallback ? t('ai_settings_test_hint_no_key') : t('ai_settings_test_hint')}
           >
-            {test?.busy ? 'Test ediliyor…' : '🧪 Test et'}
+            {test?.busy ? t('ai_settings_testing') : `🧪 ${t('ai_settings_test')}`}
           </button>
           {test?.msg && !test.busy && (
             <span
@@ -302,6 +310,7 @@ function ProviderBlock({
 }
 
 function KeyRow({
+  t,
   label,
   value,
   placeholder,
@@ -309,6 +318,7 @@ function KeyRow({
   onToggleVisible,
   onChange,
 }: {
+  t: TFn;
   label: string;
   value: string;
   placeholder: string;
@@ -333,7 +343,7 @@ function KeyRow({
           type="button"
           onClick={onToggleVisible}
           className="text-xs text-muted hover:text-primary px-2"
-          title={visible ? 'Gizle' : 'Göster'}
+          title={visible ? t('ai_settings_hide') : t('ai_settings_show')}
         >
           {visible ? '🙈' : '👁'}
         </button>

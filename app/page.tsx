@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { SiteHeader, SiteFooter } from '@/components/SiteChrome';
 import { useLang } from '@/lib/i18n/hooks';
@@ -70,7 +71,33 @@ export default function HomePage(): JSX.Element {
         </section>
       </main>
 
+      <MapMyVisitors />
+
       <SiteFooter />
+    </div>
+  );
+}
+
+function MapMyVisitors(): JSX.Element {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || el.querySelector('script')) return;
+    const s = document.createElement('script');
+    s.type = 'text/javascript';
+    s.id = 'mapmyvisitors';
+    s.src = '//mapmyvisitors.com/map.js?d=CVIP5gbhDp6cxKGQwjlOmnvT5EWEGc1Y72AJVD5BHa8&cl=ffffff&w=a';
+    el.appendChild(s);
+  }, []);
+
+  return (
+    <div className="flex justify-center py-4">
+      <div
+        ref={containerRef}
+        className="opacity-60 hover:opacity-100 transition-opacity"
+        style={{ transform: 'scale(0.6)', transformOrigin: 'center' }}
+      />
     </div>
   );
 }

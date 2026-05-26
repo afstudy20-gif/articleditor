@@ -2,6 +2,7 @@
 
 import type { Ref } from '@/store/types';
 import { formatBibEntry, orderRefsForBib, type CitationStyle } from '@/lib/refs/styles';
+import { useLang } from '@/lib/i18n/hooks';
 
 type Props = {
   refs: Ref[];
@@ -18,6 +19,7 @@ export function BibliographyPreview({
   selectedId,
   onSelect,
 }: Props): JSX.Element {
+  const { t } = useLang();
   // Use the cited-order map; refs not cited go to the end in their array order.
   const cited = refs
     .filter((r) => refOrder.get(r.id) != null)
@@ -28,14 +30,14 @@ export function BibliographyPreview({
   return (
     <div className="card flex flex-col h-full min-h-0">
       <div className="flex items-center justify-between px-4 py-2 border-b border-border">
-        <h3 className="text-sm font-bold text-primary">Kaynakça</h3>
+        <h3 className="text-sm font-bold text-primary">{t('bib_title')}</h3>
         <span className="text-xs text-muted">
-          {cited.length} atıf yapılan · {uncited.length} atıf yapılmayan
+          {t('bib_cited_count').replace('{cited}', String(cited.length)).replace('{uncited}', String(uncited.length))}
         </span>
       </div>
       <div className="flex-1 overflow-auto p-3 text-sm leading-relaxed">
         {refs.length === 0 ? (
-          <p className="text-muted text-center py-6">Henüz referans yok.</p>
+          <p className="text-muted text-center py-6">{t('bib_no_refs')}</p>
         ) : (
           <>
             {orderedForBib.length > 0 ? (
@@ -58,13 +60,13 @@ export function BibliographyPreview({
                 })}
               </ol>
             ) : (
-              <p className="text-muted italic text-xs">Henüz metne atıf yerleştirilmemiş.</p>
+              <p className="text-muted italic text-xs">{t('bib_no_citations')}</p>
             )}
 
             {uncited.length > 0 && (
               <div className="mt-4 pt-3 border-t border-border">
                 <div className="text-xs font-semibold text-muted uppercase tracking-wider mb-2">
-                  Atıf yapılmayan
+                  {t('bib_uncited')}
                 </div>
                 <ul className="space-y-1.5 opacity-70">
                   {uncited.map((r) => {
@@ -77,7 +79,7 @@ export function BibliographyPreview({
                           isSelected ? 'bg-teal-bg text-primary font-medium' : 'hover:bg-slate-50'
                         }`}
                       >
-                        {r.title || r.raw?.slice(0, 80) || '(başlıksız)'} —{' '}
+                        {r.title || r.raw?.slice(0, 80) || t('rp_no_title')} —{' '}
                         <span className="text-faint text-xs">
                           {r.authors[0]?.family ?? '—'}
                           {r.year ? `, ${r.year}` : ''}

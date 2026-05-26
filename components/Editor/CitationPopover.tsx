@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import type { Ref } from '@/store/types';
+import { useLang } from '@/lib/i18n/hooks';
 
 type Props = {
   pos: number;
@@ -13,6 +14,7 @@ type Props = {
 };
 
 export function CitationPopover({ pos, refIds, allRefs, onClose, onReplace, onDelete }: Props): JSX.Element {
+  const { t } = useLang();
   const [mode, setMode] = useState<'view' | 'replace' | 'add'>('view');
   const [query, setQuery] = useState('');
   const refsById = useMemo(() => new Map(allRefs.map((r) => [r.id, r])), [allRefs]);
@@ -64,7 +66,7 @@ export function CitationPopover({ pos, refIds, allRefs, onClose, onReplace, onDe
       <div className="fixed inset-0 z-40 bg-black/10" onClick={onClose} />
       <div className="fixed z-50 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-white border border-border rounded-xl shadow-xl w-[520px] max-h-[80vh] flex flex-col overflow-hidden">
         <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-          <h3 className="font-bold text-primary text-sm">Atıf düzenle</h3>
+          <h3 className="font-bold text-primary text-sm">{t('cite_edit_title')}</h3>
           <button onClick={onClose} className="text-muted hover:text-primary text-xl leading-none">
             ×
           </button>
@@ -73,7 +75,7 @@ export function CitationPopover({ pos, refIds, allRefs, onClose, onReplace, onDe
         {mode === 'view' && (
           <>
             <div className="p-4 space-y-2 overflow-auto flex-1">
-              <div className="tool-label">Mevcut atıf ({cited.length} ref)</div>
+              <div className="tool-label">{t('cite_current_refs').replace('{count}', String(cited.length))}</div>
               {cited.length === 0 && <p className="text-sm text-faint italic">Bu citation kütüphane ile eşleşmiyor.</p>}
               <ul className="space-y-2">
                 {cited.map((r) => (
@@ -111,13 +113,13 @@ export function CitationPopover({ pos, refIds, allRefs, onClose, onReplace, onDe
             </div>
             <div className="px-4 py-3 border-t border-border flex gap-2 flex-wrap">
               <button onClick={() => setMode('replace')} className="btn-secondary text-xs">
-                Değiştir
+                {t('cite_replace')}
               </button>
               <button onClick={() => setMode('add')} className="btn-secondary text-xs">
                 + Ref ekle
               </button>
               <button onClick={() => onDelete(pos)} className="btn-danger text-xs ml-auto">
-                Atıfı sil
+                {t('cite_delete')}
               </button>
             </div>
           </>

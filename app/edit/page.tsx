@@ -9,16 +9,18 @@ import { createProject, listProjects, saveProject, deleteProject } from '@/store
 import { backupFilename, backupToBlob, buildBackup, parseBackup } from '@/lib/projects/backup';
 import { Dropzone } from '@/components/Convert/Dropzone';
 import { PasteBox } from '@/components/Convert/PasteBox';
+import { useLang } from '@/lib/i18n/hooks';
 import { parseDocx } from '@/lib/docx/parse';
 import { splitBodyAndBiblio, parseBiblioLines } from '@/lib/refs/parse-biblio';
 import { detectMarkers } from '@/lib/markers/detect';
 
 const EditorClient = dynamic(() => import('./EditorClient').then((m) => m.EditorClient), {
   ssr: false,
-  loading: () => <div className="text-muted p-8">Yükleniyor…</div>,
+  loading: () => <div className="text-muted p-8">Loading…</div>,
 });
 
 function EditPageInner() {
+  const { t } = useLang();
   const searchParams = useSearchParams();
   const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
@@ -181,7 +183,7 @@ function EditPageInner() {
 
   if (!loaded) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-muted">Projeler yükleniyor…</div>
+      <div className="min-h-screen flex items-center justify-center text-muted">{t('app_loading')}</div>
     );
   }
 
@@ -196,14 +198,14 @@ function EditPageInner() {
           <section className="card p-5 mb-6">
             <div className="flex items-center justify-between gap-2 flex-wrap mb-3">
               <div>
-                <h2 className="text-lg font-bold text-primary">Yeni proje başlat</h2>
+                <h2 className="text-lg font-bold text-primary">{t('app_new_project')}</h2>
                 <p className="text-xs text-muted mt-0.5">
                   Word belgesi yükle veya metin yapıştır → kaynakça otomatik algılanır, editöre düşer. Veya boş projeyle
                   başla.
                 </p>
               </div>
               <button className="btn-primary text-sm" onClick={newProject}>
-                + Boş proje
+                {t('app_empty_project')}
               </button>
             </div>
             <div className="flex gap-1 bg-slate-100 p-1 rounded-lg w-fit mb-3">
@@ -213,7 +215,7 @@ function EditPageInner() {
                   convTab === 'upload' ? 'bg-white shadow-card' : 'text-muted'
                 }`}
               >
-                Yükle
+                {t('app_upload_tab')}
               </button>
               <button
                 onClick={() => setConvTab('paste')}
@@ -221,7 +223,7 @@ function EditPageInner() {
                   convTab === 'paste' ? 'bg-white shadow-card' : 'text-muted'
                 }`}
               >
-                Yapıştır
+                {t('app_paste_tab')}
               </button>
             </div>
             {convTab === 'upload' ? (
@@ -229,7 +231,7 @@ function EditPageInner() {
             ) : (
               <PasteBox onSubmit={handleConvertText} />
             )}
-            {conversionBusy && <p className="text-muted text-sm mt-3">İşleniyor, lütfen bekle…</p>}
+            {conversionBusy && <p className="text-muted text-sm mt-3">{t('app_processing')}</p>}
             {conversionError && (
               <div className="mt-3 card bg-red-bg border-red-200 text-red text-sm p-3">{conversionError}</div>
             )}
@@ -238,14 +240,14 @@ function EditPageInner() {
           {/* Project list section */}
           <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
             <h2 className="text-lg font-bold text-primary">
-              Projelerim {projects.length > 0 && <span className="text-muted text-sm">({projects.length})</span>}
+              {t('app_my_projects')} {projects.length > 0 && <span className="text-muted text-sm">({projects.length})</span>}
             </h2>
             <div className="flex gap-2 flex-wrap">
               <button className="btn-secondary text-xs" onClick={exportAll} disabled={projects.length === 0}>
-                Tümünü JSON olarak indir
+                {t('app_export_all')}
               </button>
               <button className="btn-secondary text-xs" onClick={() => backupInputRef.current?.click()}>
-                JSON yedek yükle
+                {t('app_import_backup')}
               </button>
               <input
                 ref={backupInputRef}
@@ -265,14 +267,14 @@ function EditPageInner() {
             <div className="card text-sm text-secondary p-3 mb-4 border-teal bg-teal-bg/40 flex items-center justify-between">
               <span>{importMsg}</span>
               <button className="text-teal hover:underline text-xs" onClick={() => setImportMsg(null)}>
-                kapat
+                {t('app_close')}
               </button>
             </div>
           )}
 
           {projects.length === 0 ? (
             <div className="card p-8 text-center">
-              <p className="text-muted text-sm">Henüz proje yok. Yukarıdan başla.</p>
+              <p className="text-muted text-sm">{t('app_no_projects')}</p>
             </div>
           ) : (
             <ul className="space-y-2">
@@ -287,13 +289,13 @@ function EditPageInner() {
                   <button
                     className="btn-danger text-xs"
                     onClick={async () => {
-                      if (confirm('Bu projeyi silmek istediğine emin misin?')) {
+                      if (confirm(t('app_delete_confirm'))) {
                         await deleteProject(p.id);
                         await refreshList();
                       }
                     }}
                   >
-                    Sil
+                    {t('app_delete')}
                   </button>
                 </li>
               ))}
@@ -309,7 +311,7 @@ function EditPageInner() {
 
 export default function EditPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-muted">Yükleniyor…</div>}>
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-muted">Loading…</div>}>
       <EditPageInner />
     </Suspense>
   );

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { findPluginKey } from './extensions/find-plugin';
+import { useLang } from '@/lib/i18n/hooks';
 
 type Props = {
   editor: any;
@@ -9,6 +10,7 @@ type Props = {
 };
 
 export function FindReplace({ editor, onClose }: Props): JSX.Element {
+  const { t } = useLang();
   const [query, setQuery] = useState('');
   const [replaceText, setReplaceText] = useState('');
   const [caseSensitive, setCaseSensitive] = useState(false);
@@ -139,20 +141,20 @@ export function FindReplace({ editor, onClose }: Props): JSX.Element {
     <div className="fixed top-16 right-4 z-50 bg-surface border border-border rounded-lg shadow-xl w-[380px] p-3">
       <div className="flex items-center justify-between mb-2">
         <h3 className="text-sm font-bold text-primary">
-          {showReplace ? 'Bul ve Değiştir' : 'Bul'}
+          {showReplace ? t('find_replace_title') : t('find_title')}
         </h3>
         <div className="flex items-center gap-1">
           <button
             onClick={() => setShowReplace((v) => !v)}
             className="text-xs text-teal hover:underline px-1"
-            title="Değiştir kısmını aç/kapat"
+            title={t('find_replace_toggle')}
           >
-            {showReplace ? 'Sadece bul' : 'Değiştir'}
+            {showReplace ? t('find_find_only') : t('find_replace_mode')}
           </button>
           <button
             onClick={onClose}
             className="text-muted hover:text-primary text-lg leading-none px-1"
-            title="Kapat (ESC)"
+            title={t('find_close')}
           >
             ×
           </button>
@@ -167,7 +169,7 @@ export function FindReplace({ editor, onClose }: Props): JSX.Element {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKey}
-            placeholder="Aranan metin"
+            placeholder={t('find_placeholder')}
             className="flex-1 border border-border rounded-md px-2 py-1 text-sm focus:outline-none focus:border-teal"
           />
           <span className="text-xs text-muted px-1.5 min-w-[60px] text-center">
@@ -177,7 +179,7 @@ export function FindReplace({ editor, onClose }: Props): JSX.Element {
             onClick={prev}
             disabled={matchCount === 0}
             className="px-2 py-1 border border-border rounded hover:bg-slate-100 disabled:opacity-40"
-            title="Önceki (Shift+Enter)"
+            title={t('find_previous')}
           >
             ↑
           </button>
@@ -185,7 +187,7 @@ export function FindReplace({ editor, onClose }: Props): JSX.Element {
             onClick={next}
             disabled={matchCount === 0}
             className="px-2 py-1 border border-border rounded hover:bg-slate-100 disabled:opacity-40"
-            title="Sonraki (Enter)"
+            title={t('find_next')}
           >
             ↓
           </button>
@@ -200,24 +202,24 @@ export function FindReplace({ editor, onClose }: Props): JSX.Element {
               onKeyDown={(e) => {
                 if (e.key === 'Escape') onClose();
               }}
-              placeholder="Yeni metin"
+              placeholder={t('find_replace_placeholder')}
               className="flex-1 border border-border rounded-md px-2 py-1 text-sm focus:outline-none focus:border-teal"
             />
             <button
               onClick={replaceOne}
               disabled={matchCount === 0}
               className="px-2 py-1 border border-border rounded text-xs hover:bg-teal-bg hover:text-teal disabled:opacity-40"
-              title="Bunu değiştir"
+              title={t('find_replace_one')}
             >
-              Değiştir
+              {t('find_replace_one')}
             </button>
             <button
               onClick={replaceAll}
               disabled={matchCount === 0}
               className="px-2 py-1 border border-border rounded text-xs hover:bg-teal-bg hover:text-teal disabled:opacity-40"
-              title="Tümünü değiştir"
+              title={t('find_replace_all_title')}
             >
-              Tümü
+              {t('find_replace_all')}
             </button>
           </div>
         )}
@@ -230,7 +232,7 @@ export function FindReplace({ editor, onClose }: Props): JSX.Element {
               onChange={(e) => setCaseSensitive(e.target.checked)}
               className="accent-teal"
             />
-            Aa (büyük/küçük)
+            {t('find_case_sensitive')}
           </label>
           <label className="flex items-center gap-1 cursor-pointer">
             <input
@@ -239,7 +241,7 @@ export function FindReplace({ editor, onClose }: Props): JSX.Element {
               onChange={(e) => setWholeWord(e.target.checked)}
               className="accent-teal"
             />
-            Tam kelime
+            {t('find_whole_word')}
           </label>
         </div>
       </div>

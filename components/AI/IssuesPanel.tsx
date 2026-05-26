@@ -1,6 +1,7 @@
 'use client';
 
 import type { ReviewIssueT } from '@/lib/ai/schemas';
+import { useLang } from '@/lib/i18n/hooks';
 
 type Props = {
   issues: ReviewIssueT[];
@@ -11,14 +12,12 @@ type Props = {
   onJumpTo?: (issue: ReviewIssueT) => void;
 };
 
-const CATEGORY_LABELS: Record<string, string> = {
-  clarity: 'Açıklık',
-  tone: 'Ton',
-  structure: 'Yapı',
-  evidence: 'Kanıt',
-  grammar: 'Dilbilgisi',
-  consistency: 'Tutarlılık',
-  flow: 'Akış',
+const CATEGORY_KEY: Record<string, string> = {
+  clarity: 'ai_issues_clarity',
+  tone: 'ai_issues_tone',
+  structure: 'ai_issues_structure',
+  evidence: 'ai_issues_evidence',
+  grammar: 'ai_issues_grammar',
 };
 
 const SEVERITY_STYLES: Record<string, string> = {
@@ -27,21 +26,22 @@ const SEVERITY_STYLES: Record<string, string> = {
   low: 'bg-slate-100 text-secondary border-border',
 };
 
-const SEVERITY_LABEL: Record<string, string> = {
-  high: 'Yüksek',
-  med: 'Orta',
-  low: 'Düşük',
+const SEVERITY_KEY: Record<string, string> = {
+  high: 'ai_severity_high',
+  med: 'ai_severity_med',
+  low: 'ai_severity_low',
 };
 
 export function IssuesPanel({ issues, summary, loading, error, onClose, onJumpTo }: Props): JSX.Element {
+  const { t } = useLang();
   return (
     <div className="card flex flex-col h-full">
       <div className="flex items-center justify-between border-b border-border px-3 py-2">
         <div>
-          <h3 className="font-semibold text-primary text-sm">🔍 AI Eleştirisi</h3>
+          <h3 className="font-semibold text-primary text-sm">🔍 {t('ai_issues_title')}</h3>
           {!loading && !error && (
             <p className="text-xs text-muted">
-              {issues.length} sorun {summary ? '·' : ''}
+              {t('ai_issues_count').replace('{count}', String(issues.length))} {summary ? '·' : ''}
             </p>
           )}
         </div>
@@ -51,16 +51,16 @@ export function IssuesPanel({ issues, summary, loading, error, onClose, onJumpTo
       </div>
 
       <div className="flex-1 overflow-auto p-3 space-y-2 text-sm">
-        {loading && <p className="text-muted text-xs italic">Analiz ediliyor…</p>}
+        {loading && <p className="text-muted text-xs italic">{t('ai_issues_loading')}</p>}
         {error && <p className="text-red text-xs">{error}</p>}
         {!loading && !error && summary && (
           <div className="bg-teal-bg border border-teal/30 rounded-lg px-3 py-2 text-xs text-secondary leading-relaxed">
-            <span className="tool-label">Genel</span>
+            <span className="tool-label">{t('ai_issues_overall')}</span>
             <p className="mt-0.5">{summary}</p>
           </div>
         )}
         {!loading && !error && issues.length === 0 && (
-          <p className="text-muted text-xs italic">Önemli bir sorun bulunamadı.</p>
+          <p className="text-muted text-xs italic">{t('ai_issues_empty')}</p>
         )}
         {issues.map((issue, i) => (
           <div
@@ -74,10 +74,10 @@ export function IssuesPanel({ issues, summary, loading, error, onClose, onJumpTo
                   SEVERITY_STYLES[issue.severity] ?? SEVERITY_STYLES.low
                 }`}
               >
-                {SEVERITY_LABEL[issue.severity] ?? issue.severity}
+                {SEVERITY_KEY[issue.severity] ? t(SEVERITY_KEY[issue.severity] as Parameters<typeof t>[0]) : issue.severity}
               </span>
               <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-secondary">
-                {CATEGORY_LABELS[issue.category] ?? issue.category}
+                {CATEGORY_KEY[issue.category] ? t(CATEGORY_KEY[issue.category] as Parameters<typeof t>[0]) : issue.category}
               </span>
             </div>
             {issue.quote && (
@@ -86,7 +86,7 @@ export function IssuesPanel({ issues, summary, loading, error, onClose, onJumpTo
             <p className="text-primary leading-snug">{issue.comment}</p>
             {issue.suggestion && (
               <div className="mt-1.5 pt-1.5 border-t border-border">
-                <span className="tool-label">Öneri</span>
+                <span className="tool-label">{t('ai_issues_suggestion')}</span>
                 <p className="text-teal mt-0.5 leading-snug">{issue.suggestion}</p>
               </div>
             )}

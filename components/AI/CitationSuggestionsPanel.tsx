@@ -1,6 +1,7 @@
 'use client';
 
 import type { Ref } from '@/store/types';
+import { useLang } from '@/lib/i18n/hooks';
 
 export type Suggestion = {
   ref: Ref;
@@ -26,12 +27,13 @@ export function CitationSuggestionsPanel({
   onInsert,
   refOrder,
 }: Props): JSX.Element {
+  const { t } = useLang();
   return (
     <div className="card flex flex-col h-full">
       <div className="flex items-center justify-between border-b border-border px-3 py-2">
         <div>
-          <h3 className="font-semibold text-primary text-sm">🎯 Atıf önerileri</h3>
-          <p className="text-xs text-muted">Kütüphaneden semantik eşleşme</p>
+          <h3 className="font-semibold text-primary text-sm">🎯 {t('ai_suggestions_title')}</h3>
+          <p className="text-xs text-muted">{t('ai_suggestions_desc')}</p>
         </div>
         <button onClick={onClose} className="text-muted hover:text-primary text-lg leading-none">
           ×
@@ -39,16 +41,16 @@ export function CitationSuggestionsPanel({
       </div>
 
       <div className="px-3 py-2 border-b border-border bg-slate-50">
-        <div className="tool-label mb-1">Sorgu</div>
+        <div className="tool-label mb-1">{t('ai_suggestions_query')}</div>
         <p className="text-xs text-secondary italic line-clamp-3 leading-snug">{query}</p>
       </div>
 
       <div className="flex-1 overflow-auto p-3 space-y-2 text-sm">
-        {loading && <p className="text-muted text-xs italic">Eşleşmeler aranıyor…</p>}
+        {loading && <p className="text-muted text-xs italic">{t('ai_suggestions_loading')}</p>}
         {error && <p className="text-red text-xs">{error}</p>}
         {!loading && !error && suggestions.length === 0 && (
           <p className="text-muted text-xs italic">
-            Eşleşme yok. Önce kütüphanedeki referansları gömdüğünden emin ol (RefsPanel &gt; AI gömme).
+            {t('ai_suggestions_empty')}
           </p>
         )}
         {suggestions.map(({ ref, score }) => {
@@ -65,7 +67,7 @@ export function CitationSuggestionsPanel({
                 <div className="flex-1 min-w-0">
                   <div className="font-semibold text-primary leading-snug">
                     {n ? `[${n}] ` : ''}
-                    {ref.title || '(Başlıksız)'}
+                    {ref.title || t('rp_no_title')}
                   </div>
                   <div className="text-muted truncate">
                     {ref.authors[0]?.family || '—'}
@@ -76,9 +78,9 @@ export function CitationSuggestionsPanel({
                 <button
                   onClick={() => onInsert([ref.id])}
                   className="btn-primary text-[11px] px-2 py-0.5 shrink-0"
-                  title="Cursor konumuna bu atıfı ekle"
+                  title={t('ai_suggestions_insert_hint')}
                 >
-                  + Ekle
+                  {t('ai_suggestions_add')}
                 </button>
               </div>
             </div>

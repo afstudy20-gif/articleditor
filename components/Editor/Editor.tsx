@@ -7,6 +7,7 @@ import Placeholder from '@tiptap/extension-placeholder';
 import Link from '@tiptap/extension-link';
 import { CitationWithView } from './extensions/citation-view';
 import type { Ref } from '@/store/types';
+import { useLang } from '@/lib/i18n/hooks';
 
 type Props = {
   initialContent?: unknown;
@@ -77,6 +78,7 @@ export function ArticleEditor({
   onAIStructureCheck,
   aiDisabled,
 }: Props) {
+  const { t } = useLang();
   const refsById = useMemo(() => {
     const m = new Map<string, Ref>();
     for (const r of refs) m.set(r.id, r);
@@ -181,7 +183,7 @@ export function ArticleEditor({
           className="px-3 py-1 rounded-md bg-teal text-white text-xs font-semibold hover:bg-teal-dark"
           title="Sağdan kütüphaneden checkbox ile seçili referansları cursor konumuna ekle. Birden fazla seçilirse birleşik atıf (örn. [1,2,3]) yerleşir."
         >
-          + Atıf ekle
+          {t('ed_insert_citation')}
         </button>
         {(onAIReview || onAIScore || onAIEnhance || onAISuggestCitation || onAIDetectGaps || onAICompare || onAIDeepResearch || onAIStructureCheck) && (
           <>
@@ -196,6 +198,7 @@ export function ArticleEditor({
               onCompare={onAICompare}
               onDeepResearch={onAIDeepResearch}
               onStructureCheck={onAIStructureCheck}
+              t={t}
             />
           </>
         )}
@@ -208,22 +211,24 @@ export function ArticleEditor({
   );
 }
 
-const ENHANCE_MODES: Array<{ key: 'expand' | 'shorten' | 'rephrase' | 'tone-academic' | 'clarity' | 'concision' | 'grammar'; label: string; icon: string }> = [
-  { key: 'rephrase', label: 'Yeniden yaz', icon: '🔁' },
-  { key: 'expand', label: 'Genişlet', icon: '➕' },
-  { key: 'shorten', label: 'Kısalt', icon: '➖' },
-  { key: 'tone-academic', label: 'Akademik ton', icon: '🎓' },
-  { key: 'clarity', label: 'Açıklık', icon: '💡' },
-  { key: 'concision', label: 'Sadelik', icon: '✂️' },
-  { key: 'grammar', label: 'Dilbilgisi', icon: '📝' },
+const ENHANCE_MODES: Array<{ key: 'expand' | 'shorten' | 'rephrase' | 'tone-academic' | 'clarity' | 'concision' | 'grammar'; i18nKey: 'ed_ai_rephrase' | 'ed_ai_expand' | 'ed_ai_shorten' | 'ed_ai_academic' | 'ed_ai_clarity' | 'ed_ai_concision' | 'ed_ai_grammar'; icon: string }> = [
+  { key: 'rephrase', i18nKey: 'ed_ai_rephrase', icon: '🔁' },
+  { key: 'expand', i18nKey: 'ed_ai_expand', icon: '➕' },
+  { key: 'shorten', i18nKey: 'ed_ai_shorten', icon: '➖' },
+  { key: 'tone-academic', i18nKey: 'ed_ai_academic', icon: '🎓' },
+  { key: 'clarity', i18nKey: 'ed_ai_clarity', icon: '💡' },
+  { key: 'concision', i18nKey: 'ed_ai_concision', icon: '✂️' },
+  { key: 'grammar', i18nKey: 'ed_ai_grammar', icon: '📝' },
 ];
 
 function EnhanceMenu({
   onPick,
   disabled,
+  t,
 }: {
   onPick: (mode: typeof ENHANCE_MODES[number]['key']) => void;
   disabled?: boolean;
+  t: (k: string) => string;
 }): JSX.Element {
   const [open, setOpen] = useState(false);
   return (
@@ -232,9 +237,9 @@ function EnhanceMenu({
         onClick={() => setOpen((v) => !v)}
         disabled={disabled}
         className="px-3 py-1 rounded-md bg-violet-500 text-white text-xs font-semibold hover:bg-violet-600 disabled:opacity-40 disabled:cursor-not-allowed"
-        title={disabled ? 'AI servisi yapılandırılmamış (GEMINI_API_KEY env değişkeni eksik)' : 'Seçili metni AI ile iyileştir'}
+        title={disabled ? t('ed_ai_disabled') : t('ed_ai_enhance')}
       >
-        ✏️ İyileştir ▾
+        ✏️ {t('ed_ai_enhance')} ▾
       </button>
       {open && (
         <>
@@ -249,7 +254,7 @@ function EnhanceMenu({
                 }}
                 className="block w-full text-left px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal"
               >
-                {m.icon} {m.label}
+                {m.icon} {t(m.i18nKey)}
               </button>
             ))}
           </div>
@@ -271,6 +276,7 @@ function AIMenu({
   onCompare,
   onDeepResearch,
   onStructureCheck,
+  t,
 }: {
   disabled?: boolean;
   onReview?: () => void;
@@ -281,6 +287,7 @@ function AIMenu({
   onCompare?: () => void;
   onDeepResearch?: () => void;
   onStructureCheck?: () => void;
+  t: (k: string) => string;
 }): JSX.Element {
   const [open, setOpen] = useState(false);
   const [enhanceOpen, setEnhanceOpen] = useState(false);
@@ -295,7 +302,7 @@ function AIMenu({
         onClick={() => setOpen((v) => !v)}
         disabled={disabled}
         className="px-2.5 py-1 rounded-md bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white text-xs font-semibold hover:from-violet-600 hover:to-fuchsia-600 disabled:opacity-40 disabled:cursor-not-allowed"
-        title={disabled ? 'AI servisi yapılandırılmamış (sağ üstten anahtar gir)' : 'AI araçları menüsü'}
+        title={disabled ? t('ed_ai_disabled') : 'AI'}
       >
         ✨ AI ▾
       </button>
@@ -305,7 +312,7 @@ function AIMenu({
           <div className="absolute top-full right-0 mt-1 z-20 bg-white border border-border rounded-lg shadow-lg w-56 py-1">
             <MenuGroup label="Metin" />
             {onReview && (
-              <MenuItem icon="🔍" label="Eleştir (seçim)" onClick={() => pick(onReview)} />
+              <MenuItem icon="🔍" label={t('ed_ai_review')} onClick={() => pick(onReview)} />
             )}
             {onEnhance && (
               <div
@@ -314,7 +321,7 @@ function AIMenu({
                 className="relative"
               >
                 <button className="block w-full text-left px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal">
-                  ✏️ İyileştir ▸
+                  ✏️ {t('ed_ai_enhance')} ▸
                 </button>
                 {enhanceOpen && (
                   <div className="absolute top-0 right-full mr-1 z-30 bg-white border border-border rounded-lg shadow-lg w-44 py-1">
@@ -328,30 +335,30 @@ function AIMenu({
                         }}
                         className="block w-full text-left px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal"
                       >
-                        {m.icon} {m.label}
+                        {m.icon} {t(m.i18nKey)}
                       </button>
                     ))}
                   </div>
                 )}
               </div>
             )}
-            {onScore && <MenuItem icon="📊" label="Skor (belge)" onClick={() => pick(onScore)} />}
+            {onScore && <MenuItem icon="📊" label={t('ed_ai_score')} onClick={() => pick(onScore)} />}
             <MenuGroup label="Atıf" />
             {onSuggestCitation && (
-              <MenuItem icon="🎯" label="Atıf öner" onClick={() => pick(onSuggestCitation)} />
+              <MenuItem icon="🎯" label={t('ed_ai_suggest_citation')} onClick={() => pick(onSuggestCitation)} />
             )}
             {onDetectGaps && (
-              <MenuItem icon="🩹" label="Atıfsız iddialar" onClick={() => pick(onDetectGaps)} />
+              <MenuItem icon="🩹" label={t('ed_ai_gap_detect')} onClick={() => pick(onDetectGaps)} />
             )}
             <MenuGroup label="Belge" />
             {onCompare && (
-              <MenuItem icon="⚖️" label="Karşılaştır" onClick={() => pick(onCompare)} />
+              <MenuItem icon="⚖️" label={t('ed_ai_compare')} onClick={() => pick(onCompare)} />
             )}
             {onDeepResearch && (
-              <MenuItem icon="🗺️" label="Related Work" onClick={() => pick(onDeepResearch)} />
+              <MenuItem icon="🗺️" label={t('ed_ai_deep_research')} onClick={() => pick(onDeepResearch)} />
             )}
             {onStructureCheck && (
-              <MenuItem icon="🩺" label="Yapı kontrolü" onClick={() => pick(onStructureCheck)} />
+              <MenuItem icon="🩺" label={t('ed_ai_structure_check')} onClick={() => pick(onStructureCheck)} />
             )}
           </div>
         </>
