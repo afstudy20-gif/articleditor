@@ -25,8 +25,39 @@ export function SettingsModal({ onClose, onSaved }: Props): JSX.Element {
   const [keys, setKeys] = useState<UserKeys>({});
   const [show, setShow] = useState<Record<string, boolean>>({});
   const [serverStatus, setServerStatus] = useState<'unknown' | 'configured' | 'not-configured'>('unknown');
-  const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null);
-  const [testing, setTesting] = useState(false);
+  // Per-provider test state.
+  type TestState = { busy?: boolean; ok?: boolean; msg?: string; latencyMs?: number };
+  const [tests, setTests] = useState<Record<ProviderId, TestState>>({} as Record<ProviderId, TestState>);
+
+  async function testProvider(provider: ProviderId): Promise<void> {
+    // Persist keys first so headers reflect the current input.
+    saveUserKeys(keys);
+    setTests((t) => ({ ...t, [provider]: { busy: true } }));
+    try {
+      const { aiHeaders } = await import('@/lib/ai/user-keys');
+      const res = await fetch(`/api/ai/test?provider=${provider}`, {
+        method: 'POST',
+        headers: aiHeaders(),
+      });
+      const data = await res.json();
+      if (data?.ok) {
+        setTests((t) => ({
+          ...t,
+          [provider]: { ok: true, msg: `OK — yanıt: "${data.reply}"`, latencyMs: data.latencyMs },
+        }));
+      } else {
+        setTests((t) => ({
+          ...t,
+          [provider]: { ok: false, msg: data?.error || `HTTP ${res.status}`, latencyMs: data?.latencyMs },
+        }));
+      }
+    } catch (e) {
+      setTests((t) => ({
+        ...t,
+        [provider]: { ok: false, msg: e instanceof Error ? e.message : String(e) },
+      }));
+    }
+  }
 
   useEffect(() => {
     setKeys(loadUserKeys());
@@ -51,26 +82,6 @@ export function SettingsModal({ onClose, onSaved }: Props): JSX.Element {
     clearUserKeys();
     setKeys({});
     onSaved?.();
-  }
-
-  async function test(): Promise<void> {
-    setTesting(true);
-    setTestResult(null);
-    try {
-      saveUserKeys(keys);
-      const { aiHeaders } = await import('@/lib/ai/user-keys');
-      const res = await fetch('/api/ai/status', { headers: aiHeaders() });
-      const data = await res.json();
-      if (data?.configured) {
-        setTestResult({ ok: true, msg: `OK — aktif sağlayıcı: ${data.provider}` });
-      } else {
-        setTestResult({ ok: false, msg: 'Hiç anahtar tanınmadı. Boş alanları doldur.' });
-      }
-    } catch (e) {
-      setTestResult({ ok: false, msg: e instanceof Error ? e.message : String(e) });
-    } finally {
-      setTesting(false);
-    }
   }
 
   const preferredOptions = useMemo(
@@ -118,6 +129,8 @@ export function SettingsModal({ onClose, onSaved }: Props): JSX.Element {
               serverFallback={serverStatus === 'configured'}
               openaiBaseUrl={meta.id === 'openai' ? keys.openaiBaseUrl ?? '' : undefined}
               onOpenaiBaseUrl={meta.id === 'openai' ? (v) => patch({ openaiBaseUrl: v }) : undefined}
+              test={tests[meta.id]}
+              onTest={() => testProvider(meta.id)}
             />
           ))}
 
@@ -144,17 +157,6 @@ export function SettingsModal({ onClose, onSaved }: Props): JSX.Element {
             )}
           </div>
 
-          {testResult && (
-            <div
-              className={`rounded-lg p-2 text-xs ${
-                testResult.ok
-                  ? 'bg-teal-bg border border-teal/30 text-teal'
-                  : 'bg-red-50 border border-red-300 text-red-700'
-              }`}
-            >
-              {testResult.msg}
-            </div>
-          )}
         </div>
 
         <div className="px-4 py-3 border-t border-border flex items-center justify-between">
@@ -162,13 +164,6 @@ export function SettingsModal({ onClose, onSaved }: Props): JSX.Element {
             Tüm anahtarları sil
           </button>
           <div className="flex gap-2">
-            <button
-              onClick={test}
-              disabled={testing}
-              className="text-sm border border-border rounded px-3 py-1.5 hover:bg-slate-50 disabled:opacity-50"
-            >
-              {testing ? 'Test ediliyor…' : 'Test et'}
-            </button>
             <button onClick={onClose} className="text-sm text-muted hover:text-primary px-3 py-1.5">
               İptal
             </button>
@@ -193,6 +188,8 @@ function ProviderBlock({
   serverFallback,
   openaiBaseUrl,
   onOpenaiBaseUrl,
+  test,
+  onTest,
 }: {
   meta: ReturnType<typeof getProviderMeta>;
   keyValue: string;
@@ -204,6 +201,8 @@ function ProviderBlock({
   serverFallback: boolean;
   openaiBaseUrl?: string;
   onOpenaiBaseUrl?: (v: string) => void;
+  test?: { busy?: boolean; ok?: boolean; msg?: string; latencyMs?: number };
+  onTest?: () => void;
 }): JSX.Element {
   const hasKey = keyValue.trim().length > 0;
   return (
@@ -270,6 +269,32 @@ function ProviderBlock({
           <p className="text-[10px] text-muted mt-0.5">
             OpenAI-uyumlu özel endpoint kullanmıyorsan boş bırak.
           </p>
+        </div>
+      )}
+      {onTest && (
+        <div className="flex items-center gap-2 pt-1">
+          <button
+            type="button"
+            onClick={onTest}
+            disabled={test?.busy || (!keyValue && !serverFallback)}
+            className="text-xs border border-border rounded px-2.5 py-1 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+            title={!keyValue && !serverFallback ? 'Önce anahtar gir' : 'Bu sağlayıcıyı tek seferlik bir istekle test et'}
+          >
+            {test?.busy ? 'Test ediliyor…' : '🧪 Test et'}
+          </button>
+          {test?.msg && !test.busy && (
+            <span
+              className={`text-[11px] flex-1 truncate ${
+                test.ok ? 'text-teal' : 'text-red-700'
+              }`}
+              title={test.msg}
+            >
+              {test.ok ? '✓' : '✗'} {test.msg}
+              {test.latencyMs != null && (
+                <span className="text-muted ml-1">({test.latencyMs}ms)</span>
+              )}
+            </span>
+          )}
         </div>
       )}
     </div>
