@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Script from 'next/script';
+import { ExtensionBridge } from '@/components/ExtensionBridge';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -35,7 +36,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }
         `}</Script>
       </head>
-      <body className="min-h-screen font-sans">{children}</body>
+      <body className="min-h-screen font-sans">
+        <ExtensionBridge />
+        {children}
+      </body>
     </html>
   );
 }

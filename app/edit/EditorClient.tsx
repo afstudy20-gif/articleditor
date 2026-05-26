@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Project, Ref } from '@/store/types';
-import { saveProject } from '@/store/db';
+import { saveProject, getProject } from '@/store/db';
 import { ArticleEditor, computeRefOrder } from '@/components/Editor/Editor';
 import { RefsPanel } from '@/components/RefsPanel/RefsPanel';
 import { tiptapToBuildInput } from '@/lib/editor/to-export';
@@ -1273,6 +1273,20 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
       delete window.__enrOnCitationClick;
     };
   }, []);
+
+  // Listen for refs added via the RefDown Chrome extension bridge.
+  useEffect(() => {
+    const handler = (e: Event): void => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.projectId === project.id) {
+        getProject(project.id).then((p) => {
+          if (p) setRefs(p.refs);
+        });
+      }
+    };
+    window.addEventListener('ae-ref-added', handler);
+    return () => window.removeEventListener('ae-ref-added', handler);
+  }, [project.id]);
 
   // Global keyboard shortcuts: Ctrl/Cmd+F (find), Ctrl/Cmd+H (replace).
   useEffect(() => {
