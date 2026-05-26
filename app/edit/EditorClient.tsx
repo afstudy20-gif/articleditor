@@ -1483,7 +1483,7 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
   return (
     <div className="min-h-screen flex flex-col">
       <header className="border-b border-border bg-surface sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between gap-3 flex-wrap">
+        <div className="w-full px-4 sm:px-6 py-3 flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-3 flex-1 min-w-0">
             <button onClick={onExit} className="text-sm text-teal hover:underline shrink-0">
               ← Projelerim
@@ -1565,7 +1565,7 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
       </header>
 
       {importError && (
-        <div className="max-w-7xl w-full mx-auto px-6 mt-2">
+        <div className="w-full px-4 sm:px-6 mt-2">
           <div className="card bg-red-bg border-red-200 text-red text-sm p-3 flex items-center justify-between">
             <span>{importError}</span>
             <button className="text-red hover:underline text-xs" onClick={() => setImportError(null)}>
@@ -1577,7 +1577,7 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
 
       <main
         ref={gridRef}
-        className="flex-1 max-w-7xl w-full mx-auto px-6 py-4 hidden lg:flex flex-col min-h-0 overflow-hidden"
+        className="flex-1 w-full px-4 sm:px-6 py-4 hidden lg:flex flex-col min-h-0 overflow-hidden"
       >
         {/* TOP ROW */}
         <div className="flex min-w-0 overflow-hidden" style={{ height: topRowHeight }}>
@@ -1735,7 +1735,7 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
       </main>
 
       {/* Mobile / narrow screen fallback: stacked layout */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-6 py-4 lg:hidden flex flex-col gap-4 min-h-0">
+      <main className="flex-1 w-full px-3 sm:px-4 py-3 lg:hidden flex flex-col gap-3 min-h-0">
         <ArticleEditor
           initialContent={doc}
           refs={refs}

@@ -290,6 +290,17 @@ function RefList({
                   {r.authors[0]?.family || r.authors[0]?.literal || '—'}
                   {r.authors.length > 1 ? ' et al.' : ''} · {r.year ?? '?'} · {r.containerTitle ?? '—'}
                 </div>
+                {r.doi && (
+                  <a
+                    href={`https://doi.org/${r.doi}`}
+                    target="_blank"
+                    rel="noopener"
+                    className="block text-[11px] text-teal font-mono truncate mt-0.5 hover:underline"
+                    title={r.doi}
+                  >
+                    {r.doi}
+                  </a>
+                )}
                 <div className="text-xs mt-1 flex items-center gap-2 flex-wrap">
                   {r.doi && (
                     <a
