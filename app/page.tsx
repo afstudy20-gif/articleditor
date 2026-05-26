@@ -21,8 +21,8 @@ export default function HomePage(): JSX.Element {
     <div className="min-h-screen">
       <SiteHeader />
 
-      <main className="max-w-6xl mx-auto px-6 py-12">
-        <section className="text-center mb-12">
+      <main className="max-w-6xl mx-auto px-6 py-8">
+        <section className="text-center mb-8">
           <span className="inline-block text-xs font-bold uppercase tracking-widest text-teal bg-teal-bg px-3 py-1 rounded-full mb-3">
             {APP_NAME}
           </span>
@@ -38,75 +38,34 @@ export default function HomePage(): JSX.Element {
           </Link>
         </section>
 
-        <section className="mb-12">
-          <h2 className="text-xl font-bold text-primary mb-4 text-center">{t('features_title')}</h2>
-          <div className="grid md:grid-cols-3 gap-4">
+        <section className="mb-8">
+          <h2 className="text-lg font-bold text-primary mb-3 text-center">{t('features_title')}</h2>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
             {features.map((f) => (
-              <div key={f.key} className="card p-4">
-                <div className="text-2xl mb-2">{f.icon}</div>
-                <p className="text-sm text-secondary leading-relaxed">{t(f.key)}</p>
+              <div key={f.key} className="card px-3 py-2 flex items-start gap-2">
+                <span className="text-lg shrink-0">{f.icon}</span>
+                <p className="text-xs text-secondary leading-snug">{t(f.key)}</p>
               </div>
             ))}
           </div>
         </section>
 
-        <section className="mb-12">
-          <h2 className="text-xl font-bold text-primary mb-1 text-center">{t('ecosystem_title')}</h2>
-          <p className="text-sm text-muted text-center mb-4">{t('ecosystem_desc')}</p>
-          <div className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+        <section className="mb-8">
+          <h2 className="text-lg font-bold text-primary mb-1 text-center">{t('ecosystem_title')}</h2>
+          <p className="text-xs text-muted text-center mb-3">{t('ecosystem_desc')}</p>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
             {DRTR_TOOLS.map((tool) => (
               <a
                 key={tool.url}
                 href={tool.url}
                 target="_blank"
                 rel="noopener"
-                className="card p-3 hover:shadow-md hover:border-teal transition group"
+                className="card px-3 py-2 hover:shadow-md hover:border-teal transition group"
               >
-                <div className="font-bold text-primary group-hover:text-teal">{tool.name}</div>
-                <div className="text-xs text-muted mt-0.5">{tool.desc[lang]}</div>
-                <div className="text-xs text-teal mt-2 truncate">{tool.url}</div>
+                <div className="text-sm font-bold text-primary group-hover:text-teal">{tool.name}</div>
+                <div className="text-xs text-muted mt-0.5 leading-snug">{tool.desc[lang]}</div>
               </a>
             ))}
-          </div>
-        </section>
-        <section className="mb-12">
-          <div className="max-w-xl mx-auto">
-            <h2 className="text-xl font-bold text-primary mb-4 text-center">{t('ext_title')}</h2>
-            <div className="card p-5 text-center">
-              <p className="text-sm text-secondary mb-4">{t('ext_desc')}</p>
-              <div className="flex flex-wrap gap-3 justify-center">
-                <a
-                  href="/refdown-extension.zip"
-                  download
-                  className="inline-flex items-center gap-2 bg-teal text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-teal-dark transition"
-                  title={t('ext_install_tip')}
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v12"/><polyline points="7 10 12 15 17 10"/><path d="M5 21h14"/></svg>
-                  {t('ext_download')}
-                </a>
-                <button
-                  onClick={() => {
-                    if ('serviceWorker' in navigator) {
-                      navigator.serviceWorker.getRegistrations().then((regs) => {
-                        regs.forEach((r) => r.unregister());
-                      });
-                    }
-                    if ('caches' in window) {
-                      caches.keys().then((names) => {
-                        names.forEach((n) => caches.delete(n));
-                      });
-                    }
-                    setTimeout(() => window.location.reload(), 300);
-                  }}
-                  className="inline-flex items-center gap-2 border border-border text-secondary px-4 py-2 rounded-lg text-sm font-semibold hover:text-primary hover:border-teal transition"
-                  title={t('ext_update_tip')}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 0 1 15.5-6.36L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.5 6.36L3 16"/><path d="M3 21v-5h5"/></svg>
-                  {t('ext_update')}
-                </button>
-              </div>
-              <p className="text-xs text-muted mt-3">{t('ext_install_tip')}</p>
-            </div>
           </div>
         </section>
       </main>

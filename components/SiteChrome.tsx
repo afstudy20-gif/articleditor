@@ -43,6 +43,36 @@ export function SiteHeader({ showNav = true }: { showNav?: boolean }): JSX.Eleme
               {t('nav_privacy')}
             </Link>
             <span className="w-px h-5 bg-border mx-1" />
+            <a
+              href="/refdown-extension.zip"
+              download
+              className="text-xs text-secondary hover:text-teal px-2 py-1.5 inline-flex items-center gap-1"
+              title={t('ext_install_tip')}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v12"/><polyline points="7 10 12 15 17 10"/><path d="M5 21h14"/></svg>
+              {t('ext_title')}
+            </a>
+            <button
+              onClick={() => {
+                if ('serviceWorker' in navigator) {
+                  navigator.serviceWorker.getRegistrations().then((regs) => {
+                    regs.forEach((r) => r.unregister());
+                  });
+                }
+                if ('caches' in window) {
+                  caches.keys().then((names) => {
+                    names.forEach((n) => caches.delete(n));
+                  });
+                }
+                setTimeout(() => window.location.reload(), 300);
+              }}
+              className="text-xs text-secondary hover:text-teal px-2 py-1.5 inline-flex items-center gap-1"
+              title={t('ext_update_tip')}
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 0 1 15.5-6.36L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.5 6.36L3 16"/><path d="M3 21v-5h5"/></svg>
+              {t('ext_update')}
+            </button>
+            <span className="w-px h-5 bg-border mx-1" />
             <select
               value={lang}
               onChange={(e) => setLang(e.target.value as 'tr' | 'en')}
