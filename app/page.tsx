@@ -69,6 +69,46 @@ export default function HomePage(): JSX.Element {
             ))}
           </div>
         </section>
+        <section className="mb-12">
+          <div className="max-w-xl mx-auto">
+            <h2 className="text-xl font-bold text-primary mb-4 text-center">{t('ext_title')}</h2>
+            <div className="card p-5 text-center">
+              <p className="text-sm text-secondary mb-4">{t('ext_desc')}</p>
+              <div className="flex flex-wrap gap-3 justify-center">
+                <a
+                  href="/refdown-extension.zip"
+                  download
+                  className="inline-flex items-center gap-2 bg-teal text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-teal-dark transition"
+                  title={t('ext_install_tip')}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v12"/><polyline points="7 10 12 15 17 10"/><path d="M5 21h14"/></svg>
+                  {t('ext_download')}
+                </a>
+                <button
+                  onClick={() => {
+                    if ('serviceWorker' in navigator) {
+                      navigator.serviceWorker.getRegistrations().then((regs) => {
+                        regs.forEach((r) => r.unregister());
+                      });
+                    }
+                    if ('caches' in window) {
+                      caches.keys().then((names) => {
+                        names.forEach((n) => caches.delete(n));
+                      });
+                    }
+                    setTimeout(() => window.location.reload(), 300);
+                  }}
+                  className="inline-flex items-center gap-2 border border-border text-secondary px-4 py-2 rounded-lg text-sm font-semibold hover:text-primary hover:border-teal transition"
+                  title={t('ext_update_tip')}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 0 1 15.5-6.36L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.5 6.36L3 16"/><path d="M3 21v-5h5"/></svg>
+                  {t('ext_update')}
+                </button>
+              </div>
+              <p className="text-xs text-muted mt-3">{t('ext_install_tip')}</p>
+            </div>
+          </div>
+        </section>
       </main>
 
       <MapMyVisitors />

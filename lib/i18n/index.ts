@@ -31,6 +31,14 @@ const tr: Dict = {
   ecosystem_title: 'DrTR Tools Ekosistemi',
   ecosystem_desc: 'Dr. Yusuf Hoşoğlu tarafından geliştirilen ücretsiz klinik ve akademik araçlar.',
 
+  // Extension + Update
+  ext_title: 'Chrome Eklentisi',
+  ext_desc: 'RefDown — herhangi bir sayfada tek tıkla atıf oluştur ve kütüphanene ekle.',
+  ext_download: 'Eklentiyi İndir (.zip)',
+  ext_install_tip: 'ZIP\'i çıkarın → chrome://extensions → Geliştirici modu → Paketlenmemiş yükle',
+  ext_update: 'Güncelle',
+  ext_update_tip: 'Önbelleği temizle ve uygulamayı güncelle',
+
   // About
   about_title: 'Hakkında',
   about_version: 'Sürüm',
@@ -395,6 +403,13 @@ const en: Dict = {
 
   ecosystem_title: 'DrTR Tools Ecosystem',
   ecosystem_desc: 'Free clinical and academic tools developed by Dr. Yusuf Hoşoğlu.',
+
+  ext_title: 'Chrome Extension',
+  ext_desc: 'RefDown — one-click citation generator from any page, add directly to your library.',
+  ext_download: 'Download Extension (.zip)',
+  ext_install_tip: 'Extract ZIP → chrome://extensions → Developer mode → Load unpacked',
+  ext_update: 'Update',
+  ext_update_tip: 'Clear cache and update the app',
 
   about_title: 'About',
   about_version: 'Version',
