@@ -777,5 +777,4 @@ export const DRTR_TOOLS = [
   { name: 'PDF Translator', url: 'https://pdftranslator.drtr.uk/', desc: { tr: 'Belge çevirmen', en: 'Document translator' } },
   { name: 'Veri Düzelt', url: 'https://veriduzelt.drtr.uk/', desc: { tr: 'Excel eşleştirici', en: 'Excel matcher' } },
   { name: 'Nöbet', url: 'https://nobet.drtr.uk/', desc: { tr: 'Nöbet çizelgesi', en: 'Shift schedule' } },
-  { name: 'Kelime', url: 'https://kelime.drtr.uk/', desc: { tr: 'Türkçe kelime oyunu', en: 'Turkish word game' } },
 ];
