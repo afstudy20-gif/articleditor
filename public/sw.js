@@ -3,7 +3,14 @@ const VERSION = 'v1';
 const CACHE = `article-editor-${VERSION}`;
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE));
+  e.waitUntil(
+    caches.open(CACHE).then((cache) =>
+      cache.addAll([
+        '/',
+        '/edit',
+      ]).catch(() => {})
+    )
+  );
   self.skipWaiting();
 });
 

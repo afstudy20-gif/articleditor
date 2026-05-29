@@ -143,3 +143,44 @@ body {
   background-color: #854d0e;
   color: #fef3c7;
 }
+
+/* TipTap Table styles */
+.ProseMirror table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1em 0;
+}
+.ProseMirror th,
+.ProseMirror td {
+  border: 1px solid var(--border);
+  padding: 6px 10px;
+  min-width: 80px;
+  vertical-align: top;
+}
+.ProseMirror th {
+  background: var(--surface);
+  font-weight: 600;
+}
+.ProseMirror .selectedCell {
+  background: rgba(13, 148, 136, 0.1);
+}
+.ProseMirror .column-resize-handle {
+  position: absolute;
+  right: -2px;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background-color: var(--teal);
+  pointer-events: none;
+}
+
+/* TipTap Image styles */
+.ProseMirror img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+  margin: 0.5em 0;
+}
+.ProseMirror img.ProseMirror-selectednode {
+  outline: 2px solid var(--teal);
+}

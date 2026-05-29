@@ -5,6 +5,15 @@ import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import Link from '@tiptap/extension-link';
+import { Table } from '@tiptap/extension-table';
+import { TableRow } from '@tiptap/extension-table-row';
+import { TableHeader } from '@tiptap/extension-table-header';
+import { TableCell } from '@tiptap/extension-table-cell';
+import { Image } from '@tiptap/extension-image';
+import { Underline } from '@tiptap/extension-underline';
+import { TextAlign } from '@tiptap/extension-text-align';
+import { Superscript } from '@tiptap/extension-superscript';
+import { Subscript } from '@tiptap/extension-subscript';
 import { CitationWithView } from './extensions/citation-view';
 import type { Ref } from '@/store/types';
 import { useLang } from '@/lib/i18n/hooks';
@@ -89,12 +98,27 @@ export function ArticleEditor({
   const editor = useEditor({
     extensions: [
       StarterKit.configure({ heading: { levels: [1, 2, 3] } }),
-      Placeholder.configure({ placeholder: 'Makalenizi yazmaya başlayın…' }),
+      Placeholder.configure({ placeholder: t('ed_placeholder') }),
       Link.configure({ openOnClick: false }),
+      Table.configure({ resizable: true }),
+      TableRow,
+      TableHeader,
+      TableCell,
+      Image.configure({ inline: false, allowBase64: true }),
+      Underline,
+      TextAlign.configure({ types: ['heading', 'paragraph'] }),
+      Superscript,
+      Subscript,
       CitationWithView,
     ],
     content: initialContent || { type: 'doc', content: [{ type: 'paragraph' }] },
     immediatelyRender: false,
+    editorProps: {
+      attributes: {
+        spellcheck: 'true',
+        lang: 'auto',
+      },
+    },
     onUpdate({ editor }) {
       const json = editor.getJSON();
       onChange(json, editor.getText());
@@ -174,6 +198,53 @@ export function ArticleEditor({
         >
           “”
         </ToolbarButton>
+        <Sep />
+        <ToolbarButton
+          onClick={() => editor.chain().focus().toggleUnderline().run()}
+          active={editor.isActive('underline')}
+          title={t('ed_underline')}
+        >
+          <span className="underline">U</span>
+        </ToolbarButton>
+        <ToolbarButton
+          onClick={() => editor.chain().focus().toggleSuperscript().run()}
+          active={editor.isActive('superscript')}
+          title={t('ed_superscript')}
+        >
+          <span>X<sup>2</sup></span>
+        </ToolbarButton>
+        <ToolbarButton
+          onClick={() => editor.chain().focus().toggleSubscript().run()}
+          active={editor.isActive('subscript')}
+          title={t('ed_subscript')}
+        >
+          <span>X<sub>2</sub></span>
+        </ToolbarButton>
+        <Sep />
+        <ToolbarButton
+          onClick={() => editor.chain().focus().setTextAlign('left').run()}
+          active={editor.isActive({ textAlign: 'left' })}
+          title={t('ed_align_left')}
+        >
+          ≡L
+        </ToolbarButton>
+        <ToolbarButton
+          onClick={() => editor.chain().focus().setTextAlign('center').run()}
+          active={editor.isActive({ textAlign: 'center' })}
+          title={t('ed_align_center')}
+        >
+          ≡C
+        </ToolbarButton>
+        <ToolbarButton
+          onClick={() => editor.chain().focus().setTextAlign('right').run()}
+          active={editor.isActive({ textAlign: 'right' })}
+          title={t('ed_align_right')}
+        >
+          ≡R
+        </ToolbarButton>
+        <Sep />
+        <TableMenu editor={editor} t={t} />
+        <ImageInsertButton editor={editor} t={t} />
         <Sep />
         <SectionInserter editor={editor} />
         <Sep />
@@ -439,20 +510,124 @@ function ToolbarButton({
   onClick,
   active,
   children,
+  title,
 }: {
   onClick: () => void;
   active?: boolean;
   children: React.ReactNode;
+  title?: string;
 }) {
   return (
     <button
       onClick={onClick}
+      title={title}
       className={`px-2.5 py-1 rounded-md text-xs font-semibold transition ${
         active ? 'bg-teal text-white' : 'text-secondary hover:bg-slate-100'
       }`}
     >
       {children}
     </button>
+  );
+}
+
+function TableMenu({ editor, t }: { editor: any; t: (k: string) => string }): JSX.Element {
+  const [open, setOpen] = useState(false);
+  const inTable = editor.isActive('table');
+  return (
+    <div className="relative">
+      <button
+        onClick={() => {
+          if (!inTable) {
+            editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
+          } else {
+            setOpen((v) => !v);
+          }
+        }}
+        className={`px-2.5 py-1 rounded-md text-xs font-semibold transition ${
+          inTable ? 'bg-teal text-white' : 'text-secondary hover:bg-slate-100'
+        }`}
+        title={inTable ? t('ed_insert_table') : t('ed_insert_table')}
+      >
+        {inTable ? '⊞ ▾' : '⊞'}
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute top-full left-0 mt-1 z-20 bg-white border border-border rounded-lg shadow-lg w-40 py-1">
+            <button
+              onClick={() => { editor.chain().focus().addColumnAfter().run(); setOpen(false); }}
+              className="block w-full text-left px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal"
+            >
+              {t('ed_add_col')}
+            </button>
+            <button
+              onClick={() => { editor.chain().focus().addRowAfter().run(); setOpen(false); }}
+              className="block w-full text-left px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal"
+            >
+              {t('ed_add_row')}
+            </button>
+            <button
+              onClick={() => { editor.chain().focus().deleteColumn().run(); setOpen(false); }}
+              className="block w-full text-left px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal"
+            >
+              {t('ed_del_col')}
+            </button>
+            <button
+              onClick={() => { editor.chain().focus().deleteRow().run(); setOpen(false); }}
+              className="block w-full text-left px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal"
+            >
+              {t('ed_del_row')}
+            </button>
+            <div className="border-t border-border my-1" />
+            <button
+              onClick={() => { editor.chain().focus().deleteTable().run(); setOpen(false); }}
+              className="block w-full text-left px-3 py-1.5 text-xs text-red hover:bg-red-bg"
+            >
+              {t('ed_delete_table')}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function ImageInsertButton({ editor, t }: { editor: any; t: (k: string) => string }): JSX.Element {
+  const fileRef = useRef<HTMLInputElement>(null);
+  return (
+    <>
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = () => {
+            const result = reader.result as string;
+            editor.chain().focus().setImage({ src: result }).run();
+          };
+          reader.readAsDataURL(file);
+          e.target.value = '';
+        }}
+      />
+      <button
+        onClick={() => {
+          const url = prompt(t('ed_image_url'));
+          if (url) {
+            editor.chain().focus().setImage({ src: url }).run();
+          } else if (url === '') {
+            fileRef.current?.click();
+          }
+        }}
+        className="px-2.5 py-1 rounded-md text-xs font-semibold text-secondary hover:bg-slate-100 transition"
+        title={t('ed_insert_image')}
+      >
+        🖼
+      </button>
+    </>
   );
 }
 

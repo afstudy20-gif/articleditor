@@ -217,6 +217,23 @@ const tr: Dict = {
   ed_ai_structure_check: 'Yapı kontrolü',
   ed_ai_disabled: 'AI yapılandırılmamış',
 
+  // Editor formatting
+  ed_placeholder: 'Makalenizi yazmaya başlayın…',
+  ed_insert_table: 'Tablo ekle',
+  ed_insert_image: 'Resim ekle',
+  ed_image_url: 'Resim URL\'si',
+  ed_underline: 'Altı çizili',
+  ed_align_left: 'Sola hizala',
+  ed_align_center: 'Ortala',
+  ed_align_right: 'Sağa hizala',
+  ed_superscript: 'Üst simge',
+  ed_subscript: 'Alt simge',
+  ed_delete_table: 'Tabloyu sil',
+  ed_add_col: 'Sütun ekle',
+  ed_add_row: 'Satır ekle',
+  ed_del_col: 'Sütun sil',
+  ed_del_row: 'Satır sil',
+
   // Find/Replace
   find_title: 'Bul',
   find_replace_title: 'Bul ve Değiştir',
@@ -585,6 +602,23 @@ const en: Dict = {
   ed_ai_deep_research: 'Deep research',
   ed_ai_structure_check: 'Structure check',
   ed_ai_disabled: 'AI not configured',
+
+  // Editor formatting
+  ed_placeholder: 'Start writing your article…',
+  ed_insert_table: 'Insert table',
+  ed_insert_image: 'Insert image',
+  ed_image_url: 'Image URL',
+  ed_underline: 'Underline',
+  ed_align_left: 'Align left',
+  ed_align_center: 'Center',
+  ed_align_right: 'Align right',
+  ed_superscript: 'Superscript',
+  ed_subscript: 'Subscript',
+  ed_delete_table: 'Delete table',
+  ed_add_col: 'Add column',
+  ed_add_row: 'Add row',
+  ed_del_col: 'Delete column',
+  ed_del_row: 'Delete row',
 
   // Find/Replace
   find_title: 'Find',
