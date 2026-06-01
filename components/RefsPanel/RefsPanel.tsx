@@ -1286,7 +1286,7 @@ function AddPanel({
             ref={importFileRef}
             type="file"
             multiple
-            accept=".ris,.enw,.nbib,.xml,.enx,.bib,.bibtex,.txt,application/xml,text/plain"
+            accept=".ris,.enw,.nbib,.xml,.enx,.bib,.bibtex,.json,.csv,.tsv,.cff,.yaml,.yml,.txt,application/xml,application/json,text/csv,text/plain"
             className="hidden"
             onChange={async (e) => {
               const files = Array.from(e.target.files ?? []);
