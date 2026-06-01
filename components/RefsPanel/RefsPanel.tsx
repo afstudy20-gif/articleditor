@@ -718,13 +718,13 @@ function ContextMenu({
 
   const fullTextUrl = r.doi ? `https://doi.org/${r.doi}` : r.url;
   const pubmedUrl = r.pmid ? `https://pubmed.ncbi.nlm.nih.gov/${r.pmid}` : null;
-  const MENU_W = 580;
-  const MENU_MAX_H = 560;
+  const MENU_W = 720;
+  const MENU_MAX_H = 500;
   return (
     <>
       <div className="fixed inset-0 z-30" onClick={onClose} onContextMenu={(e) => e.preventDefault()} />
       <div
-        className="fixed z-40 bg-white border border-border rounded-lg shadow-xl py-1 text-sm flex flex-col"
+        className="fixed z-40 bg-white border border-border rounded-lg shadow-xl text-sm flex flex-col overflow-hidden"
         style={{
           left: Math.min(x, window.innerWidth - MENU_W - 8),
           top: Math.min(y, window.innerHeight - MENU_MAX_H - 8),
@@ -733,7 +733,8 @@ function ContextMenu({
         }}
         onContextMenu={(e) => e.preventDefault()}
       >
-        <div className="px-3 py-2 border-b border-border shrink-0">
+        {/* Header */}
+        <div className="px-3 py-2 border-b border-border shrink-0 bg-white">
           <div className="font-semibold text-primary text-sm leading-tight">
             {r.title || t('rp_no_title')}
           </div>
@@ -744,214 +745,232 @@ function ContextMenu({
           </div>
         </div>
 
-        <div className="flex-1">
-          {r.abstract && (
-            <div
-              onMouseUp={handleSelection}
-              className="px-3 py-2 border-b border-border text-xs text-secondary leading-relaxed selection:bg-teal selection:text-white"
-            >
-              <div className="tool-label mb-1">{t('rp_doi_abstract')}</div>
-              <div className="max-h-32 overflow-auto bg-slate-50 p-2 rounded whitespace-pre-wrap">
-                {r.abstract}
-              </div>
-            </div>
-          )}
-          {selectedText && (
-            <div className="px-3 py-1.5 bg-teal-bg border-b border-border flex items-center justify-between gap-3 shrink-0">
-              <span className="text-xs text-teal font-medium truncate max-w-[380px]">
-                {t('rp_selected')}: "{selectedText}"
-              </span>
-              <button
-                onClick={() => {
-                  if (onInsertText) {
-                    onInsertText(selectedText);
-                  }
-                }}
-                className="btn-primary text-[10px] px-2 py-0.5 rounded flex items-center gap-1 font-semibold whitespace-nowrap"
+        {/* Content Body: Two Columns */}
+        <div className="flex-1 flex flex-row min-h-0 divide-x divide-border">
+          
+          {/* Left Column: Abstract, Selection transfer bar, Aspects, Notes */}
+          <div className="flex-1 flex flex-col min-h-0 overflow-y-auto divide-y divide-border select-text">
+            {r.abstract && (
+              <div
+                onMouseUp={handleSelection}
+                className="px-3 py-2 text-xs text-secondary leading-relaxed selection:bg-teal selection:text-white flex-1 flex flex-col min-h-0"
               >
-                ✍️ {t('rp_transfer_text')}
-              </button>
-            </div>
-          )}
-          {!r.abstract && onLookup && (
-            <button
-              onClick={onLookup}
-              className="block w-full text-left px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal border-b border-border"
-            >
-              🔍 {t('rp_doi_abstract')}/{t('rp_lookup_doi')}
-            </button>
-          )}
-
-          {r.aspects && (
-            <div className="px-3 py-2 border-b border-border text-xs">
-              <div className="tool-label mb-1">{t('rp_extract_aspects')}</div>
-              {(['goals', 'methods', 'datasets', 'eval_protocols', 'limitations', 'contributions', 'findings'] as const).map((k) => {
-                const items = r.aspects?.[k];
-                if (!items || items.length === 0) return null;
-                const label: Record<string, string> = {
-                  goals: t('rp_aspects_goals'),
-                  methods: t('rp_aspects_methods'),
-                  datasets: t('rp_aspects_datasets'),
-                  eval_protocols: t('rp_aspects_eval'),
-                  limitations: t('rp_aspects_limitations'),
-                  contributions: t('rp_aspects_contributions'),
-                  findings: t('rp_aspects_findings'),
-                };
-                return (
-                  <div key={k} className="mb-1">
-                    <span className="font-semibold text-primary">{label[k]}:</span>
-                    <ul className="list-disc list-inside text-secondary">
-                      {items.map((it, i) => (
-                        <li key={i} className="leading-snug">{it}</li>
-                      ))}
-                    </ul>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Manual note section */}
-          <div className="px-3 py-2 border-b border-border">
-            <div className="tool-label mb-1.5">{t('rp_edit_note')}</div>
-            <textarea
-              value={noteValue}
-              onChange={(e) => setNoteValue(e.target.value)}
-              placeholder={t('rp_edit_note') + '...'}
-              className="w-full min-h-[60px] text-xs border border-border rounded p-2 outline-none focus:border-teal bg-slate-50 focus:bg-white resize-y"
-            />
-            {noteValue !== (r.userNote ?? '') && (
-              <div className="flex gap-2 mt-1.5 justify-end">
+                <div className="tool-label mb-1 shrink-0">{t('rp_doi_abstract')}</div>
+                <div className="flex-1 overflow-y-auto bg-slate-50 p-2.5 rounded whitespace-pre-wrap select-text">
+                  {r.abstract}
+                </div>
+              </div>
+            )}
+            
+            {selectedText && (
+              <div className="px-3 py-1.5 bg-teal-bg flex items-center justify-between gap-3 shrink-0">
+                <span className="text-xs text-teal font-medium truncate max-w-[280px]">
+                  {t('rp_selected')}: "{selectedText}"
+                </span>
                 <button
                   onClick={() => {
-                    onSaveNote?.(noteValue);
+                    if (onInsertText) {
+                      onInsertText(selectedText);
+                    }
                   }}
-                  className="btn-primary text-xs px-2.5 py-1"
+                  className="btn-primary text-[10px] px-2 py-0.5 rounded flex items-center gap-1 font-semibold whitespace-nowrap"
                 >
-                  {t('rp_edit_save')}
-                </button>
-                <button
-                  onClick={() => {
-                    setNoteValue(r.userNote ?? '');
-                  }}
-                  className="text-xs text-muted hover:text-primary px-1 py-1"
-                >
-                  {t('rp_edit_cancel')}
+                  ✍️ {t('rp_transfer_text')}
                 </button>
               </div>
             )}
+
+            {!r.abstract && onLookup && (
+              <button
+                onClick={onLookup}
+                className="block w-full text-left px-3 py-2 text-xs hover:bg-teal-bg hover:text-teal shrink-0"
+              >
+                🔍 {t('rp_doi_abstract')}/{t('rp_lookup_doi')}
+              </button>
+            )}
+
+            {r.aspects && (
+              <div className="px-3 py-2 text-xs">
+                <div className="tool-label mb-1">{t('rp_extract_aspects')}</div>
+                <div className="max-h-36 overflow-y-auto">
+                  {(['goals', 'methods', 'datasets', 'eval_protocols', 'limitations', 'contributions', 'findings'] as const).map((k) => {
+                    const items = r.aspects?.[k];
+                    if (!items || items.length === 0) return null;
+                    const label: Record<string, string> = {
+                      goals: t('rp_aspects_goals'),
+                      methods: t('rp_aspects_methods'),
+                      datasets: t('rp_aspects_datasets'),
+                      eval_protocols: t('rp_aspects_eval'),
+                      limitations: t('rp_aspects_limitations'),
+                      contributions: t('rp_aspects_contributions'),
+                      findings: t('rp_aspects_findings'),
+                    };
+                    return (
+                      <div key={k} className="mb-1">
+                        <span className="font-semibold text-primary">{label[k]}:</span>
+                        <ul className="list-disc list-inside text-secondary">
+                          {items.map((it, i) => (
+                            <li key={i} className="leading-snug inline-block w-full">{it}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Note field */}
+            <div className="px-3 py-2 shrink-0">
+              <div className="tool-label mb-1.5">{t('rp_edit_note')}</div>
+              <textarea
+                value={noteValue}
+                onChange={(e) => setNoteValue(e.target.value)}
+                placeholder={t('rp_edit_note') + '...'}
+                className="w-full min-h-[60px] text-xs border border-border rounded p-2 outline-none focus:border-teal bg-slate-50 focus:bg-white resize-y"
+              />
+              {noteValue !== (r.userNote ?? '') && (
+                <div className="flex gap-2 mt-1.5 justify-end">
+                  <button
+                    onClick={() => {
+                      onSaveNote?.(noteValue);
+                    }}
+                    className="btn-primary text-xs px-2.5 py-1"
+                  >
+                    {t('rp_edit_save')}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setNoteValue(r.userNote ?? '');
+                    }}
+                    className="text-xs text-muted hover:text-primary px-1 py-1"
+                  >
+                    {t('rp_edit_cancel')}
+                  </button>
+                </div>
+              )}
+            </div>
+
           </div>
 
-          {onShowAbstract && (
-            <button
-              onClick={onShowAbstract}
-              className="block w-full text-left px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal"
-            >
-              📄 {t('rp_extract_aspects')}
-            </button>
-          )}
+          {/* Right Column: Links and Action Buttons */}
+          <div className="w-[200px] shrink-0 flex flex-col divide-y divide-border overflow-y-auto bg-slate-50/50">
+            {/* Links section */}
+            <div className="py-1 shrink-0">
+              {onShowAbstract && (
+                <button
+                  onClick={onShowAbstract}
+                  className="block w-full text-left px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal"
+                >
+                  📄 {t('rp_extract_aspects')}
+                </button>
+              )}
 
-          {fullTextUrl ? (
-            <a
-              href={fullTextUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={onClose}
-              className="block px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal"
-            >
-              🔗 {t('rp_fulltext')} ({r.doi ? 'DOI' : 'URL'}) ↗
-            </a>
-          ) : (
-            <span className="block px-3 py-1.5 text-xs text-secondary opacity-50 cursor-not-allowed">
-              🔗 {t('rp_fulltext')} ↗
-            </span>
-          )}
+              {fullTextUrl ? (
+                <a
+                  href={fullTextUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={onClose}
+                  className="block px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal"
+                >
+                  🔗 {t('rp_fulltext')} ({r.doi ? 'DOI' : 'URL'}) ↗
+                </a>
+              ) : (
+                <span className="block px-3 py-1.5 text-xs text-secondary opacity-50 cursor-not-allowed">
+                  🔗 {t('rp_fulltext')} ↗
+                </span>
+              )}
 
-          {r.doi ? (
-            <a
-              href={`https://sci-hub.ist/${r.doi}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={onClose}
-              className="block px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal"
-            >
-              🔓 Sci-Hub ↗
-            </a>
-          ) : (
-            <span className="block px-3 py-1.5 text-xs text-secondary opacity-50 cursor-not-allowed">
-              🔓 Sci-Hub ↗
-            </span>
-          )}
+              {r.doi ? (
+                <a
+                  href={`https://sci-hub.ist/${r.doi}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={onClose}
+                  className="block px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal"
+                >
+                  🔓 Sci-Hub ↗
+                </a>
+              ) : (
+                <span className="block px-3 py-1.5 text-xs text-secondary opacity-50 cursor-not-allowed">
+                  🔓 Sci-Hub ↗
+                </span>
+              )}
 
-          {pubmedUrl ? (
-            <a
-              href={pubmedUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={onClose}
-              className="block px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal"
-            >
-              🔗 PubMed ↗
-            </a>
-          ) : (
-            <span className="block px-3 py-1.5 text-xs text-secondary opacity-50 cursor-not-allowed">
-              🔗 PubMed ↗
-            </span>
-          )}
+              {pubmedUrl ? (
+                <a
+                  href={pubmedUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={onClose}
+                  className="block px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal"
+                >
+                  🔗 PubMed ↗
+                </a>
+              ) : (
+                <span className="block px-3 py-1.5 text-xs text-secondary opacity-50 cursor-not-allowed">
+                  🔗 PubMed ↗
+                </span>
+              )}
 
-          <a
-            href={
-              r.doi
-                ? `https://www.google.com/scholar?q=${encodeURIComponent(r.doi)}`
-                : `https://www.google.com/scholar?q=${encodeURIComponent(r.title ?? '')}`
-            }
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={onClose}
-            className="block px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal"
-          >
-            🎓 Google Scholar ↗
-          </a>
-        </div>
+              <a
+                href={
+                  r.doi
+                    ? `https://www.google.com/scholar?q=${encodeURIComponent(r.doi)}`
+                    : `https://www.google.com/scholar?q=${encodeURIComponent(r.title ?? '')}`
+                }
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={onClose}
+                className="block px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal"
+              >
+                🎓 Google Scholar ↗
+              </a>
+            </div>
 
-        <div className="border-t border-border shrink-0 bg-white">
-          <button
-            onClick={onInsert}
-            className="block w-full text-left px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal font-semibold"
-          >
-            ➕ {t('rp_insert_citation')}
-          </button>
-          {onEdit && (
-            <button
-              onClick={onEdit}
-              className="block w-full text-left px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal"
-            >
-              ✏️ {t('rp_edit')}
-            </button>
-          )}
-          {onLookup && r.abstract && (
-            <button
-              onClick={onLookup}
-              className="block w-full text-left px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal"
-            >
-              🔄 {t('rp_lookup_doi')}
-            </button>
-          )}
-          {onExtractAspects && (
-            <button
-              onClick={onExtractAspects}
-              className="block w-full text-left px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal"
-              title={t('rp_extract_aspects')}
-            >
-              🔬 {t('rp_extract_aspects')}
-            </button>
-          )}
-          <button
-            onClick={onDelete}
-            className="block w-full text-left px-3 py-1.5 text-xs hover:bg-red-bg hover:text-red text-red"
-          >
-            🗑️ {t('rp_context_delete')}
-          </button>
+            {/* Actions section */}
+            <div className="py-1 shrink-0 bg-white">
+              <button
+                onClick={onInsert}
+                className="block w-full text-left px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal font-semibold text-teal"
+              >
+                ➕ {t('rp_insert_citation')}
+              </button>
+              {onEdit && (
+                <button
+                  onClick={onEdit}
+                  className="block w-full text-left px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal"
+                >
+                  ✏️ {t('rp_edit')}
+                </button>
+              )}
+              {onLookup && r.abstract && (
+                <button
+                  onClick={onLookup}
+                  className="block w-full text-left px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal"
+                >
+                  🔄 {t('rp_lookup_doi')}
+                </button>
+              )}
+              {onExtractAspects && (
+                <button
+                  onClick={onExtractAspects}
+                  className="block w-full text-left px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal"
+                  title={t('rp_extract_aspects')}
+                >
+                  🔬 {t('rp_extract_aspects')}
+                </button>
+              )}
+              <button
+                onClick={onDelete}
+                className="block w-full text-left px-3 py-1.5 text-xs hover:bg-red-bg hover:text-red text-red font-medium border-t border-border mt-1 pt-1.5"
+              >
+                🗑️ {t('rp_context_delete')}
+              </button>
+            </div>
+          </div>
+
         </div>
       </div>
     </>
