@@ -10,6 +10,7 @@ import { backupFilename, backupToBlob, buildBackup, parseBackup } from '@/lib/pr
 import { Dropzone } from '@/components/Convert/Dropzone';
 import { PasteBox } from '@/components/Convert/PasteBox';
 import { useLang } from '@/lib/i18n/hooks';
+import { newId } from '@/lib/id';
 import { parseDocx } from '@/lib/docx/parse';
 import { splitBodyAndBiblio, parseBiblioLines } from '@/lib/refs/parse-biblio';
 import { detectMarkers } from '@/lib/markers/detect';
@@ -123,9 +124,9 @@ function EditPageInner() {
     const split = splitBodyAndBiblio(text);
     const { refs: parsedRefs } = parseBiblioLines(split.refLines);
 
-    const refsWithIds: Ref[] = parsedRefs.map((r, i) => ({
+    const refsWithIds: Ref[] = parsedRefs.map((r) => ({
       ...r,
-      id: `r_${Date.now()}_${i}_${Math.random().toString(36).slice(2, 6)}`,
+      id: newId('r'),
     }));
 
     // Build TipTap doc: paragraphs with citation nodes inserted at [N], [N,M], [N-M] markers.

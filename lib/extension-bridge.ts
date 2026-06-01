@@ -1,6 +1,7 @@
 'use client';
 
 import { getDb } from '@/store/db';
+import { newId } from '@/lib/id';
 import type { Project, Ref, Author } from '@/store/types';
 
 // Type for external ref data coming from RefDown extension
@@ -39,7 +40,7 @@ function mapRefType(t?: string): Ref['type'] {
 
 function externalToRef(data: ExternalRefData): Ref {
   return {
-    id: `ref_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    id: newId('ref'),
     type: mapRefType(data.type),
     title: data.title,
     authors: (data.authors ?? []).filter(Boolean) as Author[],

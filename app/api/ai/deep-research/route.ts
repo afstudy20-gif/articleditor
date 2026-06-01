@@ -6,6 +6,7 @@ import { DeepResearchResult } from '@/lib/ai/schemas';
 import { searchCrossRef } from '@/lib/lookup/crossref';
 import { searchOpenAlex } from '@/lib/lookup/openalex';
 import { searchPubmed, fetchPubmedSummaries } from '@/lib/lookup/pubmed';
+import { newId } from '@/lib/id';
 
 export const runtime = 'nodejs';
 
@@ -104,8 +105,8 @@ export async function POST(req: Request) {
         if (cr.status === 'fulfilled') allRefs.push(...cr.value.refs);
         if (oa.status === 'fulfilled') {
           allRefs.push(
-            ...oa.value.map((o, i) => ({
-              id: `oa-dr-${i}-${Math.random().toString(36).slice(2, 8)}`,
+            ...oa.value.map((o) => ({
+              id: newId('oa-dr'),
               type: 'journal-article' as const,
               authors: o.authors ?? [],
               title: o.title,

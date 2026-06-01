@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react';
 import type { Ref, RefType } from '@/store/types';
+import { newId } from '@/lib/id';
 import { useLang } from '@/lib/i18n/hooks';
 import { importByAutoDetect, importByExtension, FORMAT_LABELS, type ImportFormat } from '@/lib/refs/import-auto';
 import {
@@ -1323,7 +1324,7 @@ function ManualAddSection({
 
   function handleAdd(): void {
     const ref: Ref = {
-      id: crypto.randomUUID?.() ?? String(Date.now()),
+      id: newId('ref'),
       type: mType,
       title: mTitle.trim() || undefined,
       authors: parseAuthors(mAuthors),

@@ -39,9 +39,10 @@ export async function enrichRef(ref: Ref, opts: EnrichOptions = {}): Promise<Ref
 
       // OpenAlex search — independent fallback, often better metadata than CrossRef alone.
       const oa = await searchOpenAlex(query, { mailto: opts.mailto }).catch(() => []);
-      for (const o of oa) {
+      for (let i = 0; i < oa.length; i += 1) {
+        const o = oa[i];
         candidates.push({
-          id: `oa-${o.openalexId ?? Math.random()}`,
+          id: `oa-${o.openalexId ?? i}`,
           type: 'journal-article',
           authors: o.authors ?? [],
           title: o.title,

@@ -1,6 +1,7 @@
 'use client';
 
 import Dexie, { type EntityTable } from 'dexie';
+import { newId } from '@/lib/id';
 import type { Project } from './types';
 
 export interface AppDB extends Dexie {
@@ -25,7 +26,7 @@ export function getDb(): AppDB {
 export function createProject(partial: Partial<Project> = {}): Project {
   const now = Date.now();
   return {
-    id: `p_${now}_${Math.random().toString(36).slice(2, 8)}`,
+    id: newId('p'),
     title: partial.title ?? 'Yeni Makale',
     createdAt: now,
     updatedAt: now,

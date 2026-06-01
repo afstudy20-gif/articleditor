@@ -11,6 +11,7 @@ import { refsToRis } from '@/lib/refs/ris';
 import { parseDocx } from '@/lib/docx/parse';
 import { splitBodyAndBiblio, parseBiblioLines } from '@/lib/refs/parse-biblio';
 import { detectMarkers } from '@/lib/markers/detect';
+import { newId } from '@/lib/id';
 import { backupToBlob, buildBackup, projectFilename, parseBackup } from '@/lib/projects/backup';
 import { STYLE_LABELS, type CitationStyle } from '@/lib/refs/styles';
 import { RefDetail } from '@/components/RefDetail/RefDetail';
@@ -2137,7 +2138,7 @@ function mergeTipTapDocs(prev: any, incoming: any): unknown {
 }
 
 function newRefId(): string {
-  return `r_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+  return newId('r');
 }
 
 function download(blob: Blob, filename: string): void {
