@@ -967,6 +967,7 @@ function AddPanel({
   const [importMsg, setImportMsg] = useState<string | null>(null);
   const [importBusy, setImportBusy] = useState(false);
   const [detectedFormat, setDetectedFormat] = useState<ImportFormat | null>(null);
+  const [dragActive, setDragActive] = useState(false);
   const importFileRef = useRef<HTMLInputElement>(null);
   const [doiPreview, setDoiPreview] = useState<Ref | null>(null);
   const [doiError, setDoiError] = useState<string | null>(null);
@@ -1235,7 +1236,44 @@ function AddPanel({
 
       <ManualAddSection onAddRef={onAddRef} t={t} />
 
-      <div className="pt-3 border-t border-border">
+      <div
+        className={`pt-3 border-t border-border rounded-lg transition relative ${
+          dragActive ? 'ring-2 ring-teal bg-teal-bg/40' : ''
+        }`}
+        onDragEnter={(e) => {
+          if (e.dataTransfer?.types?.includes('Files')) {
+            e.preventDefault();
+            setDragActive(true);
+          }
+        }}
+        onDragOver={(e) => {
+          if (e.dataTransfer?.types?.includes('Files')) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+            if (!dragActive) setDragActive(true);
+          }
+        }}
+        onDragLeave={(e) => {
+          // Only clear when leaving the container, not when entering a child.
+          if (e.currentTarget === e.target) setDragActive(false);
+        }}
+        onDrop={async (e) => {
+          e.preventDefault();
+          setDragActive(false);
+          const files = Array.from(e.dataTransfer?.files ?? []);
+          if (files.length === 0) {
+            const text = e.dataTransfer?.getData('text/plain');
+            if (text && text.trim().length >= 10) {
+              setImportText(text);
+              await importFromText(text);
+            }
+            return;
+          }
+          for (const f of files) {
+            await importFromFile(f);
+          }
+        }}
+      >
         <div className="flex items-center justify-between mb-1">
           <label className="tool-label">{t('rp_import_label')}</label>
           <button
@@ -1247,17 +1285,20 @@ function AddPanel({
           <input
             ref={importFileRef}
             type="file"
+            multiple
             accept=".ris,.enw,.nbib,.xml,.enx,.bib,.bibtex,.txt,application/xml,text/plain"
             className="hidden"
             onChange={async (e) => {
-              const f = e.target.files?.[0];
+              const files = Array.from(e.target.files ?? []);
               e.target.value = '';
-              if (f) await importFromFile(f);
+              for (const f of files) {
+                await importFromFile(f);
+              }
             }}
           />
         </div>
         <p className="text-xs text-muted mb-1.5">
-          {t('rp_import_support')}
+          {t('rp_import_support')} {t('rp_import_drop_hint')}
         </p>
         <textarea
           value={importText}
@@ -1283,6 +1324,11 @@ function AddPanel({
             {importBusy ? t('rp_import_busy') : t('rp_import_btn')}
           </button>
         </div>
+        {dragActive && (
+          <div className="pointer-events-none absolute inset-0 rounded-lg border-2 border-dashed border-teal bg-teal-bg/60 flex items-center justify-center">
+            <span className="text-sm font-semibold text-teal">⬇ {t('rp_import_drop_label')}</span>
+          </div>
+        )}
       </div>
     </div>
   );
