@@ -37,6 +37,9 @@ import { embedMissingRefs, embedTexts, embedInputFor } from '@/lib/ai/embed-refs
 import { topK } from '@/lib/ai/cosine';
 import { aiHeaders } from '@/lib/ai/user-keys';
 import { SettingsModal } from '@/components/AI/SettingsModal';
+import { CommandPalette, type Command } from '@/components/CommandPalette/CommandPalette';
+import { StatsPanel } from '@/components/Stats/StatsPanel';
+import { computeWritingStats } from '@/lib/stats/writing-stats';
 import {
   encodeSelection,
   decodeToTipTapContent,
@@ -147,6 +150,22 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
   const [researchOpen, setResearchOpen] = useState(false);
   const [aiConfigured, setAiConfigured] = useState<boolean | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [focusMode, setFocusMode] = useState(false);
+  const [statsOpen, setStatsOpen] = useState(false);
+  const [wordGoal, setWordGoal] = useState(0);
+
+  // Word goal persists locally (per browser, not per project).
+  useEffect(() => {
+    const raw = localStorage.getItem('enr-word-goal');
+    if (raw) setWordGoal(Number(raw) || 0);
+  }, []);
+  const updateWordGoal = useCallback((n: number): void => {
+    setWordGoal(n);
+    localStorage.setItem('enr-word-goal', String(n));
+  }, []);
+
+  const writingStats = useMemo(() => computeWritingStats(doc), [doc]);
 
   // One-shot AI config check on mount — disables AI buttons when no key.
   useEffect(() => {
@@ -1293,12 +1312,20 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
   useEffect(() => {
     function onKey(e: KeyboardEvent): void {
       const mod = e.ctrlKey || e.metaKey;
-      if (mod && (e.key === 'f' || e.key === 'F')) {
+      if (mod && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault();
+        setPaletteOpen((v) => !v);
+      } else if (mod && (e.key === 'f' || e.key === 'F')) {
         e.preventDefault();
         setShowFind(true);
       } else if (mod && (e.key === 'h' || e.key === 'H')) {
         e.preventDefault();
         setShowFind(true);
+      } else if (mod && e.key === '.') {
+        e.preventDefault();
+        setFocusMode((v) => !v);
+      } else if (e.key === 'Escape') {
+        setFocusMode(false);
       }
     }
     window.addEventListener('keydown', onKey);
@@ -1516,9 +1543,33 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
     setImportPasteText('');
   }
 
+  const aiOff = aiConfigured === false;
+  const commands: Command[] = [
+    { id: 'insert-citation', group: t('cmd_g_editor'), label: t('ed_insert_citation'), hint: '', run: insertFromLibrary },
+    { id: 'find', group: t('cmd_g_editor'), label: t('find_title'), hint: '⌘F', run: () => setShowFind(true) },
+    { id: 'update-citations', group: t('cmd_g_editor'), label: t('ed_update_citations'), run: updateAllCitations },
+    { id: 'focus', group: t('cmd_g_view'), label: t('ed_focus_mode'), hint: '⌘.', run: () => setFocusMode((v) => !v) },
+    { id: 'stats', group: t('cmd_g_view'), label: t('ed_stats'), run: () => setStatsOpen(true) },
+    { id: 'settings', group: t('cmd_g_view'), label: t('ai_settings_title'), run: () => setSettingsOpen(true) },
+    { id: 'ai-review', group: t('cmd_g_ai'), label: t('ed_ai_review'), disabled: aiOff, run: runAIReview },
+    { id: 'ai-score', group: t('cmd_g_ai'), label: t('ed_ai_score'), disabled: aiOff, run: runAIScore },
+    { id: 'ai-suggest', group: t('cmd_g_ai'), label: t('ed_ai_suggest_citation'), disabled: aiOff, run: runAISuggestCitation },
+    { id: 'ai-gaps', group: t('cmd_g_ai'), label: t('ed_ai_gap_detect'), disabled: aiOff, run: runAIDetectGaps },
+    { id: 'ai-compare', group: t('cmd_g_ai'), label: t('ed_ai_compare'), disabled: aiOff, run: runAICompare },
+    { id: 'ai-research', group: t('cmd_g_ai'), label: t('ed_ai_deep_research'), disabled: aiOff, run: runAIDeepResearch },
+    { id: 'ai-structure', group: t('cmd_g_ai'), label: t('ed_ai_structure_check'), disabled: aiOff, run: runAIStructureCheck },
+    { id: 'export-docx', group: t('cmd_g_export'), label: t('ed_export_docx_active'), run: () => exportDocx('active') },
+    { id: 'export-docx-ph', group: t('cmd_g_export'), label: t('ed_export_docx_placeholder'), run: () => exportDocx('placeholder') },
+    { id: 'export-ris', group: t('cmd_g_export'), label: t('ed_export_ris'), run: exportRis },
+    { id: 'export-latex', group: t('cmd_g_export'), label: t('ed_export_latex'), run: exportLatex },
+    { id: 'export-json', group: t('cmd_g_export'), label: 'JSON', run: exportProjectJson },
+    { id: 'import-docx', group: t('cmd_g_doc'), label: t('ed_import_docx'), run: () => { setShowImportModal(true); setImportPreview(null); setImportError(null); setImportPasteText(''); } },
+    { id: 'lookup-all', group: t('cmd_g_doc'), label: t('rp_scan_all'), run: lookupAllRefs },
+  ];
+
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="border-b border-border bg-surface sticky top-0 z-50">
+      <header className={`border-b border-border bg-surface sticky top-0 z-50 ${focusMode ? 'hidden' : ''}`}>
         <div className="w-full px-4 sm:px-6 py-3 flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-3 flex-1 min-w-0">
             <button onClick={onExit} className="text-sm text-teal hover:underline shrink-0">
@@ -1590,6 +1641,27 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
               <DropItem onClick={exportLatex}>📐 {t('ed_export_latex')}</DropItem>
             </HeaderDropdown>
             <button
+              onClick={() => setPaletteOpen(true)}
+              className="text-xs px-2 py-0.5 rounded border border-border text-muted hover:bg-slate-50 hover:text-primary"
+              title={`${t('cmd_open')} (⌘K)`}
+            >
+              ⌘K
+            </button>
+            <button
+              onClick={() => setStatsOpen(true)}
+              className="text-xs px-2 py-0.5 rounded border border-border text-muted hover:bg-slate-50 hover:text-primary"
+              title={t('ed_stats')}
+            >
+              📊
+            </button>
+            <button
+              onClick={() => setFocusMode(true)}
+              className="text-xs px-2 py-0.5 rounded border border-border text-muted hover:bg-slate-50 hover:text-primary"
+              title={`${t('ed_focus_mode')} (⌘.)`}
+            >
+              🎯
+            </button>
+            <button
               onClick={() => setSettingsOpen(true)}
               className={`text-xs px-2 py-0.5 rounded border ${aiConfigured ? 'border-teal text-teal' : 'border-border text-muted'} hover:bg-slate-50`}
               title={aiConfigured ? 'AI ayarlanmış — API anahtarlarını düzenle' : 'AI servisi yapılandırılmamış — API anahtarı gir'}
@@ -1616,7 +1688,10 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
         className="flex-1 w-full px-4 sm:px-6 py-4 hidden lg:flex flex-col min-h-0 overflow-hidden"
       >
         {/* TOP ROW */}
-        <div className="flex min-w-0 overflow-hidden" style={{ height: topRowHeight }}>
+        <div
+          className={`flex min-w-0 overflow-hidden ${focusMode ? 'flex-1' : ''}`}
+          style={{ height: focusMode ? undefined : topRowHeight }}
+        >
           {/* Top-left: Editor */}
           <div className="flex-1 min-h-0 min-w-0 flex flex-col gap-2 pr-2 overflow-hidden">
           {highlightRefId && activeCitationCount > 0 && (
@@ -1689,14 +1764,14 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
           {/* Top vertical divider */}
           <div
             onMouseDown={startTopColDrag}
-            className="cursor-col-resize flex items-center justify-center group shrink-0 w-2"
+            className={`cursor-col-resize flex items-center justify-center group shrink-0 w-2 ${focusMode ? 'hidden' : ''}`}
             title="Sürükle: üst sütun genişliği"
           >
             <div className="w-0.5 h-12 bg-border group-hover:bg-teal rounded-full transition" />
           </div>
 
           {/* Top-right: Atıf kütüphanesi (citation library) */}
-          <div className="min-h-0 min-w-0 pl-2 overflow-hidden shrink-0" style={{ width: topColWidth }}>
+          <div className={`min-h-0 min-w-0 pl-2 overflow-hidden shrink-0 ${focusMode ? 'hidden' : ''}`} style={{ width: focusMode ? 0 : topColWidth }}>
             <RefsPanel
             refs={refs}
             refOrder={refOrder}
@@ -1729,14 +1804,14 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
         {/* Horizontal row divider — full width */}
         <div
           onMouseDown={startRowDrag}
-          className="cursor-row-resize flex items-center justify-center group shrink-0 h-2"
+          className={`cursor-row-resize flex items-center justify-center group shrink-0 h-2 ${focusMode ? 'hidden' : ''}`}
           title="Sürükle: satır yüksekliği"
         >
           <div className="h-0.5 w-24 bg-border group-hover:bg-teal rounded-full transition" />
         </div>
 
         {/* BOTTOM ROW */}
-        <div className="flex flex-1 min-h-0 min-w-0 overflow-hidden">
+        <div className={`flex flex-1 min-h-0 min-w-0 overflow-hidden ${focusMode ? 'hidden' : ''}`}>
           {/* Bottom-left: Kaynakça (bibliography preview) */}
           <div className="flex-1 min-h-0 min-w-0 pr-2 overflow-hidden">
             <BibliographyPreview
@@ -1964,6 +2039,30 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
             onRescore={runAIScore}
           />
         </div>
+      )}
+
+      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} commands={commands} t={t} />
+
+      {statsOpen && (
+        <div className="fixed right-4 top-20 w-[320px] z-40 shadow-2xl">
+          <StatsPanel
+            stats={writingStats}
+            goal={wordGoal}
+            onSetGoal={updateWordGoal}
+            t={t}
+            onClose={() => setStatsOpen(false)}
+          />
+        </div>
+      )}
+
+      {focusMode && (
+        <button
+          onClick={() => setFocusMode(false)}
+          className="fixed top-3 right-3 z-50 text-xs px-3 py-1.5 rounded-lg bg-primary text-white shadow-lg hover:opacity-90"
+          title="Esc"
+        >
+          ✕ {t('ed_exit_focus')}
+        </button>
       )}
 
     </div>
