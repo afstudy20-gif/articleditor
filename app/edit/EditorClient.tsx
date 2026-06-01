@@ -42,6 +42,8 @@ import { CommandPalette, type Command } from '@/components/CommandPalette/Comman
 import { StatsPanel } from '@/components/Stats/StatsPanel';
 import { SnapshotsPanel } from '@/components/Snapshots/SnapshotsPanel';
 import { FiguresPanel } from '@/components/Figures/FiguresPanel';
+import { JournalCheckPanel } from '@/components/Journal/JournalCheckPanel';
+import { LettersPanel } from '@/components/Letters/LettersPanel';
 import { computeWritingStats } from '@/lib/stats/writing-stats';
 import {
   encodeSelection,
@@ -64,7 +66,7 @@ type ImportPreview = {
 } | null;
 
 export function EditorClient({ project, onExit, onSaved }: Props) {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const [title, setTitle] = useState(project.title);
   const [refs, setRefs] = useState<Ref[]>(project.refs);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
@@ -158,6 +160,8 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
   const [statsOpen, setStatsOpen] = useState(false);
   const [snapshotsOpen, setSnapshotsOpen] = useState(false);
   const [figuresOpen, setFiguresOpen] = useState(false);
+  const [journalOpen, setJournalOpen] = useState(false);
+  const [lettersOpen, setLettersOpen] = useState(false);
   const [wordGoal, setWordGoal] = useState(0);
 
   // Word goal persists locally (per browser, not per project).
@@ -1594,6 +1598,8 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
     { id: 'stats', group: t('cmd_g_view'), label: t('ed_stats'), run: () => setStatsOpen(true) },
     { id: 'snapshots', group: t('cmd_g_view'), label: t('ed_snapshots'), run: () => setSnapshotsOpen(true) },
     { id: 'figures', group: t('cmd_g_view'), label: t('ed_figures'), run: () => setFiguresOpen(true) },
+    { id: 'journal-check', group: t('cmd_g_doc'), label: t('ed_journal_check'), run: () => setJournalOpen(true) },
+    { id: 'letters', group: t('cmd_g_doc'), label: t('ed_letters'), run: () => setLettersOpen(true) },
     { id: 'snapshot-now', group: t('cmd_g_doc'), label: t('snap_create'), run: () => { void autoSnapshot(t('snap_manual_label')); setSnapshotsOpen(true); } },
     { id: 'settings', group: t('cmd_g_view'), label: t('ai_settings_title'), run: () => setSettingsOpen(true) },
     { id: 'ai-review', group: t('cmd_g_ai'), label: t('ed_ai_review'), disabled: aiOff, run: runAIReview },
@@ -1712,6 +1718,20 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
               title={t('ed_figures')}
             >
               🖼
+            </button>
+            <button
+              onClick={() => setJournalOpen(true)}
+              className="text-xs px-2 py-0.5 rounded border border-border text-muted hover:bg-slate-50 hover:text-primary"
+              title={t('ed_journal_check')}
+            >
+              📋
+            </button>
+            <button
+              onClick={() => setLettersOpen(true)}
+              className="text-xs px-2 py-0.5 rounded border border-border text-muted hover:bg-slate-50 hover:text-primary"
+              title={t('ed_letters')}
+            >
+              ✉️
             </button>
             <button
               onClick={() => setFocusMode(true)}
@@ -2132,6 +2152,28 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
         <div className="fixed right-4 top-20 bottom-4 w-[340px] z-40 shadow-2xl">
           <FiguresPanel editor={editorInstance.current} onClose={() => setFiguresOpen(false)} t={t} />
         </div>
+      )}
+
+      {journalOpen && (
+        <div className="fixed right-4 top-20 bottom-4 w-[360px] z-40 shadow-2xl">
+          <JournalCheckPanel
+            docJson={doc}
+            stats={writingStats}
+            referenceStyle={style}
+            onClose={() => setJournalOpen(false)}
+            t={t}
+          />
+        </div>
+      )}
+
+      {lettersOpen && (
+        <LettersPanel
+          defaultTitle={title}
+          lang={lang}
+          aiEnabled={aiConfigured !== false}
+          onClose={() => setLettersOpen(false)}
+          t={t}
+        />
       )}
 
       {focusMode && (
