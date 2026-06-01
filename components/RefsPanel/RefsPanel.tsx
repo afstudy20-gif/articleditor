@@ -1090,8 +1090,51 @@ function AddPanel({
     }
   }
 
+  async function handleDroppedData(dt: DataTransfer | null): Promise<void> {
+    const files = Array.from(dt?.files ?? []);
+    if (files.length === 0) {
+      const text = dt?.getData('text/plain');
+      if (text && text.trim().length >= 10) {
+        setImportText(text);
+        await importFromText(text);
+      }
+      return;
+    }
+    for (const f of files) {
+      await importFromFile(f);
+    }
+  }
+
   return (
-    <div className="space-y-4">
+    <div
+      className={`space-y-4 relative rounded-lg transition ${dragActive ? 'ring-2 ring-teal' : ''}`}
+      onDragEnter={(e) => {
+        if (e.dataTransfer?.types?.includes('Files')) {
+          e.preventDefault();
+          setDragActive(true);
+        }
+      }}
+      onDragOver={(e) => {
+        if (e.dataTransfer?.types?.includes('Files')) {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'copy';
+          if (!dragActive) setDragActive(true);
+        }
+      }}
+      onDragLeave={(e) => {
+        if (e.currentTarget === e.target) setDragActive(false);
+      }}
+      onDrop={async (e) => {
+        e.preventDefault();
+        setDragActive(false);
+        await handleDroppedData(e.dataTransfer);
+      }}
+    >
+      {dragActive && (
+        <div className="pointer-events-none absolute inset-0 z-10 rounded-lg border-2 border-dashed border-teal bg-teal-bg/70 flex items-center justify-center">
+          <span className="text-sm font-semibold text-teal">⬇ {t('rp_import_drop_label')}</span>
+        </div>
+      )}
       <div>
         <label className="tool-label block mb-1">{t('rp_doi_label')}</label>
         <div className="flex gap-2">
@@ -1236,44 +1279,7 @@ function AddPanel({
 
       <ManualAddSection onAddRef={onAddRef} t={t} />
 
-      <div
-        className={`pt-3 border-t border-border rounded-lg transition relative ${
-          dragActive ? 'ring-2 ring-teal bg-teal-bg/40' : ''
-        }`}
-        onDragEnter={(e) => {
-          if (e.dataTransfer?.types?.includes('Files')) {
-            e.preventDefault();
-            setDragActive(true);
-          }
-        }}
-        onDragOver={(e) => {
-          if (e.dataTransfer?.types?.includes('Files')) {
-            e.preventDefault();
-            e.dataTransfer.dropEffect = 'copy';
-            if (!dragActive) setDragActive(true);
-          }
-        }}
-        onDragLeave={(e) => {
-          // Only clear when leaving the container, not when entering a child.
-          if (e.currentTarget === e.target) setDragActive(false);
-        }}
-        onDrop={async (e) => {
-          e.preventDefault();
-          setDragActive(false);
-          const files = Array.from(e.dataTransfer?.files ?? []);
-          if (files.length === 0) {
-            const text = e.dataTransfer?.getData('text/plain');
-            if (text && text.trim().length >= 10) {
-              setImportText(text);
-              await importFromText(text);
-            }
-            return;
-          }
-          for (const f of files) {
-            await importFromFile(f);
-          }
-        }}
-      >
+      <div className="pt-3 border-t border-border">
         <div className="flex items-center justify-between mb-1">
           <label className="tool-label">{t('rp_import_label')}</label>
           <button
@@ -1324,11 +1330,6 @@ function AddPanel({
             {importBusy ? t('rp_import_busy') : t('rp_import_btn')}
           </button>
         </div>
-        {dragActive && (
-          <div className="pointer-events-none absolute inset-0 rounded-lg border-2 border-dashed border-teal bg-teal-bg/60 flex items-center justify-center">
-            <span className="text-sm font-semibold text-teal">⬇ {t('rp_import_drop_label')}</span>
-          </div>
-        )}
       </div>
     </div>
   );
