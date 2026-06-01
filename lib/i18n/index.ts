@@ -510,7 +510,7 @@ const tr: Dict = {
   app_close: 'kapat',
   tab_conflict_msg: 'Bu proje başka bir sekmede de açık ve orada da değişiklik yapılıyor. Çakışma riski var — sekmeyi kapatın veya birinde çalışın.',
   // Header icon captions
-  hdr_style: 'Stil',
+  hdr_style: 'Ref.Stili',
   hdr_find: 'Bul',
   hdr_renumber: 'Numara',
   hdr_palette: 'Komut',

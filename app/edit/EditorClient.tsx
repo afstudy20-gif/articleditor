@@ -1721,7 +1721,7 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
                 setStyleEditorOpen(true);
               }}
               title={t('style_edit')}
-              label="🎚"
+              label="🎨"
               caption={t('hdr_style')}
             />
             <HeaderIcon

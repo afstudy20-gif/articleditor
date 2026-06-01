@@ -773,53 +773,32 @@ function ContextMenu({
 
           {/* Manual note section */}
           <div className="px-3 py-2 border-b border-border">
-            <div className="flex items-center justify-between mb-1">
-              <span className="tool-label">{t('rp_edit_note')}</span>
-              {!noteEdit && (
+            <div className="tool-label mb-1.5">{t('rp_edit_note')}</div>
+            <textarea
+              value={noteValue}
+              onChange={(e) => setNoteValue(e.target.value)}
+              placeholder={t('rp_edit_note') + '...'}
+              className="w-full min-h-[60px] text-xs border border-border rounded p-2 outline-none focus:border-teal bg-slate-50 focus:bg-white resize-y"
+            />
+            {noteValue !== (r.userNote ?? '') && (
+              <div className="flex gap-2 mt-1.5 justify-end">
                 <button
-                  onClick={() => setNoteEdit(true)}
-                  className="text-xs text-teal hover:underline"
+                  onClick={() => {
+                    onSaveNote?.(noteValue);
+                  }}
+                  className="btn-primary text-xs px-2.5 py-1"
                 >
-                  {r.userNote ? t('rp_edit') : `+ ${t('rp_edit_note')}`}
+                  {t('rp_edit_save')}
                 </button>
-              )}
-            </div>
-            {noteEdit ? (
-              <>
-                <textarea
-                  value={noteValue}
-                  onChange={(e) => setNoteValue(e.target.value)}
-                  placeholder={t('rp_edit_note')}
-                  className="w-full min-h-[100px] text-xs border border-border rounded p-2 outline-none focus:border-teal resize-y"
-                  autoFocus
-                />
-                <div className="flex gap-2 mt-1.5">
-                  <button
-                    onClick={() => {
-                      onSaveNote?.(noteValue);
-                      setNoteEdit(false);
-                    }}
-                    className="btn-primary text-xs px-2.5 py-1"
-                  >
-                    {t('rp_edit_save')}
-                  </button>
-                  <button
-                    onClick={() => {
-                      setNoteValue(r.userNote ?? '');
-                      setNoteEdit(false);
-                    }}
-                    className="text-xs text-muted hover:text-primary"
-                  >
-                    {t('rp_edit_cancel')}
-                  </button>
-                </div>
-              </>
-            ) : r.userNote ? (
-              <p className="text-xs text-secondary whitespace-pre-wrap leading-relaxed bg-slate-50 p-2 rounded">
-                {r.userNote}
-              </p>
-            ) : (
-              <p className="text-xs text-faint italic">—</p>
+                <button
+                  onClick={() => {
+                    setNoteValue(r.userNote ?? '');
+                  }}
+                  className="text-xs text-muted hover:text-primary px-1 py-1"
+                >
+                  {t('rp_edit_cancel')}
+                </button>
+              </div>
             )}
           </div>
 
@@ -832,7 +811,7 @@ function ContextMenu({
             </button>
           )}
 
-          {fullTextUrl && (
+          {fullTextUrl ? (
             <a
               href={fullTextUrl}
               target="_blank"
@@ -842,8 +821,13 @@ function ContextMenu({
             >
               🔗 {t('rp_fulltext')} ({r.doi ? 'DOI' : 'URL'}) ↗
             </a>
+          ) : (
+            <span className="block px-3 py-1.5 text-xs text-secondary opacity-50 cursor-not-allowed">
+              🔗 {t('rp_fulltext')} ↗
+            </span>
           )}
-          {r.doi && (
+
+          {r.doi ? (
             <a
               href={`https://sci-hub.ist/${r.doi}`}
               target="_blank"
@@ -853,8 +837,13 @@ function ContextMenu({
             >
               🔓 Sci-Hub ↗
             </a>
+          ) : (
+            <span className="block px-3 py-1.5 text-xs text-secondary opacity-50 cursor-not-allowed">
+              🔓 Sci-Hub ↗
+            </span>
           )}
-          {pubmedUrl && (
+
+          {pubmedUrl ? (
             <a
               href={pubmedUrl}
               target="_blank"
@@ -864,18 +853,25 @@ function ContextMenu({
             >
               🔗 PubMed ↗
             </a>
+          ) : (
+            <span className="block px-3 py-1.5 text-xs text-secondary opacity-50 cursor-not-allowed">
+              🔗 PubMed ↗
+            </span>
           )}
-          {r.doi && (
-            <a
-              href={`https://www.google.com/scholar?q=${encodeURIComponent(r.doi)}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={onClose}
-              className="block px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal"
-            >
-              🎓 Google Scholar ↗
-            </a>
-          )}
+
+          <a
+            href={
+              r.doi
+                ? `https://www.google.com/scholar?q=${encodeURIComponent(r.doi)}`
+                : `https://www.google.com/scholar?q=${encodeURIComponent(r.title ?? '')}`
+            }
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={onClose}
+            className="block px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal"
+          >
+            🎓 Google Scholar ↗
+          </a>
         </div>
 
         <div className="border-t border-border shrink-0 bg-white">

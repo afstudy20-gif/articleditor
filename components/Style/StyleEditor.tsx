@@ -178,7 +178,7 @@ export function StyleEditor({ editId, seed, lang, aiEnabled, onClose, onSaved, t
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-          <h3 className="font-semibold text-primary">🎚 {t('style_title')}</h3>
+          <h3 className="font-semibold text-primary">🎨 {t('style_title')}</h3>
           <button onClick={onClose} className="text-muted hover:text-primary text-lg leading-none">
             ×
           </button>
