@@ -297,10 +297,24 @@ export function ArticleEditor({
           </>
         )}
       </div>
-      <EditorContent
-        editor={editor}
-        className="prose max-w-none p-6 flex-1 min-h-0 overflow-auto focus-within:outline-none [&_p]:my-2 [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:mt-4 [&_h2]:text-xl [&_h2]:font-bold [&_h3]:text-lg [&_h3]:font-semibold"
-      />
+      <div
+        className="flex-1 min-h-0 overflow-auto cursor-text"
+        onMouseDown={(e) => {
+          // Clicking padding/whitespace outside the ProseMirror content should
+          // still place the cursor inside the editor (default behaviour only
+          // hits ProseMirror's content boxes, which are small for empty docs).
+          if (!editor || editor.isFocused) return;
+          const target = e.target as HTMLElement;
+          if (target.closest('.ProseMirror')) return;
+          e.preventDefault();
+          editor.chain().focus('end').run();
+        }}
+      >
+        <EditorContent
+          editor={editor}
+          className="prose max-w-none p-6 min-h-full focus-within:outline-none [&_p]:my-2 [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:mt-4 [&_h2]:text-xl [&_h2]:font-bold [&_h3]:text-lg [&_h3]:font-semibold [&_.ProseMirror]:min-h-[50vh]"
+        />
+      </div>
     </div>
   );
 }

@@ -1975,6 +1975,7 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
                   ? refOrder.get(highlightRefId) ?? refs.findIndex((r) => r.id === highlightRefId) + 1
                   : undefined
               }
+              onUpdate={updateRef}
             />
           </div>
         </div>
@@ -2030,6 +2031,7 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
         <RefDetail
           reference={highlightRefId ? refs.find((r) => r.id === highlightRefId) ?? null : null}
           number={highlightRefId ? refOrder.get(highlightRefId) ?? refs.findIndex((r) => r.id === highlightRefId) + 1 : undefined}
+          onUpdate={updateRef}
         />
       </main>
 

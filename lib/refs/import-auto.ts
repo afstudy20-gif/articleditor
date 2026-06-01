@@ -3,14 +3,23 @@ import { parseRis } from './ris';
 import { parseEnw } from './enw';
 import { parseEndnoteXml } from './endnote-xml';
 import { parseBibtex } from './bibtex';
+import { parseNbib, looksLikeNbib } from './nbib';
 import { parseRefLine } from './parse-biblio';
 
-export type ImportFormat = 'ris' | 'enw' | 'endnote-xml' | 'bibtex' | 'plaintext' | 'unknown';
+export type ImportFormat =
+  | 'ris'
+  | 'enw'
+  | 'nbib'
+  | 'endnote-xml'
+  | 'bibtex'
+  | 'plaintext'
+  | 'unknown';
 
 export function detectImportFormat(text: string): ImportFormat {
-  const sample = text.trim().slice(0, 500);
+  const sample = text.trim().slice(0, 1000);
   if (/<\?xml[\s\S]*<records>/i.test(text) || /<EndNote>/.test(text)) return 'endnote-xml';
   if (/^@\w+\s*\{/m.test(sample)) return 'bibtex';
+  if (looksLikeNbib(sample)) return 'nbib';
   if (/^%0\s/m.test(sample) || /^%A\s/m.test(sample) || /^%T\s/m.test(sample)) return 'enw';
   if (/^TY\s*-\s/m.test(sample) || /\nER\s*-/.test(text)) return 'ris';
   // Plaintext fallback: needs at least one year-like token and some length.
@@ -69,6 +78,8 @@ export function importByAutoDetect(text: string): { format: ImportFormat; refs: 
       return { format, refs: parseRis(text) };
     case 'enw':
       return { format, refs: parseEnw(text) };
+    case 'nbib':
+      return { format, refs: parseNbib(text) };
     case 'endnote-xml':
       return { format, refs: parseEndnoteXml(text) };
     case 'bibtex':
@@ -85,8 +96,9 @@ export function importByExtension(filename: string, text: string): { format: Imp
   switch (ext) {
     case 'ris':
       return { format: 'ris', refs: parseRis(text) };
-    case 'enw':
     case 'nbib':
+      return { format: 'nbib', refs: parseNbib(text) };
+    case 'enw':
       return { format: 'enw', refs: parseEnw(text) };
     case 'xml':
     case 'enx':
@@ -102,6 +114,7 @@ export function importByExtension(filename: string, text: string): { format: Imp
 export const FORMAT_LABELS: Record<ImportFormat, string> = {
   ris: 'RIS',
   enw: 'EndNote .enw',
+  nbib: 'PubMed MEDLINE (.nbib)',
   'endnote-xml': 'EndNote XML',
   bibtex: 'BibTeX',
   plaintext: 'Düz metin (Vancouver/APA vb.)',

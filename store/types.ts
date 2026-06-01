@@ -39,6 +39,10 @@ export type Ref = {
   // suggestion. Regenerated when any of those fields change.
   embedding?: number[];
   embeddingSource?: string; // hash of input used to compute embedding
+  // User-placed highlights inside `abstract`. Offsets reference the abstract
+  // string as-is; renderer skips ranges that no longer fit (e.g. after abstract
+  // text changes).
+  abstractHighlights?: Array<{ start: number; end: number; color: string }>;
   // Aspect-level structured extraction (used by Compare My Work + Citation Gap).
   aspects?: {
     goals?: string[];
