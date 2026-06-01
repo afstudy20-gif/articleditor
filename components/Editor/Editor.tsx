@@ -18,7 +18,10 @@ import { TextStyle } from '@tiptap/extension-text-style';
 import { Color } from '@tiptap/extension-color';
 import { Highlight } from '@tiptap/extension-highlight';
 import { CitationWithView } from './extensions/citation-view';
+import { Equation } from './extensions/equation';
+import { Figure, FigureRef } from './extensions/figure';
 import type { Ref } from '@/store/types';
+import { newId } from '@/lib/id';
 import { useLang } from '@/lib/i18n/hooks';
 
 type Props = {
@@ -115,6 +118,9 @@ export function ArticleEditor({
       TextStyle,
       Color,
       Highlight.configure({ multicolor: true }),
+      Equation,
+      Figure,
+      FigureRef,
       CitationWithView,
     ],
     content: initialContent || { type: 'doc', content: [{ type: 'paragraph' }] },
@@ -260,6 +266,8 @@ export function ArticleEditor({
         <Sep />
         <TableMenu editor={editor} t={t} />
         <ImageInsertButton editor={editor} t={t} />
+        <FigureButton editor={editor} t={t} />
+        <EquationButton editor={editor} t={t} />
         <Sep />
         <SectionInserter editor={editor} />
         <Sep />
@@ -769,6 +777,57 @@ function ImageInsertButton({ editor, t }: { editor: any; t: (k: string) => strin
         title={t('ed_insert_image')}
       >
         🖼
+      </button>
+    </>
+  );
+}
+
+function EquationButton({ editor, t }: { editor: any; t: (k: string) => string }): JSX.Element {
+  return (
+    <button
+      onClick={() => {
+        const latex = prompt(t('eq_prompt'), '');
+        if (latex) editor.chain().focus().insertEquation(latex).run();
+      }}
+      className="px-2.5 py-1 rounded-md text-xs font-semibold text-secondary hover:bg-slate-100 transition"
+      title={t('eq_insert')}
+    >
+      Σ
+    </button>
+  );
+}
+
+function FigureButton({ editor, t }: { editor: any; t: (k: string) => string }): JSX.Element {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const insert = (src: string): void => {
+    editor.chain().focus().insertFigure({ src, kind: 'figure', figId: newId('fig') }).run();
+  };
+  return (
+    <>
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = () => insert(reader.result as string);
+          reader.readAsDataURL(file);
+          e.target.value = '';
+        }}
+      />
+      <button
+        onClick={() => {
+          const url = prompt(t('fig_url_prompt'));
+          if (url) insert(url);
+          else if (url === '') fileRef.current?.click();
+        }}
+        className="px-2.5 py-1 rounded-md text-xs font-semibold text-secondary hover:bg-slate-100 transition"
+        title={t('fig_insert')}
+      >
+        🖼＋
       </button>
     </>
   );

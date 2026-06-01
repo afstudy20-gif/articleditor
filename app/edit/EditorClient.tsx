@@ -41,6 +41,7 @@ import { SettingsModal } from '@/components/AI/SettingsModal';
 import { CommandPalette, type Command } from '@/components/CommandPalette/CommandPalette';
 import { StatsPanel } from '@/components/Stats/StatsPanel';
 import { SnapshotsPanel } from '@/components/Snapshots/SnapshotsPanel';
+import { FiguresPanel } from '@/components/Figures/FiguresPanel';
 import { computeWritingStats } from '@/lib/stats/writing-stats';
 import {
   encodeSelection,
@@ -156,6 +157,7 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
   const [focusMode, setFocusMode] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
   const [snapshotsOpen, setSnapshotsOpen] = useState(false);
+  const [figuresOpen, setFiguresOpen] = useState(false);
   const [wordGoal, setWordGoal] = useState(0);
 
   // Word goal persists locally (per browser, not per project).
@@ -1591,6 +1593,7 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
     { id: 'focus', group: t('cmd_g_view'), label: t('ed_focus_mode'), hint: '⌘.', run: () => setFocusMode((v) => !v) },
     { id: 'stats', group: t('cmd_g_view'), label: t('ed_stats'), run: () => setStatsOpen(true) },
     { id: 'snapshots', group: t('cmd_g_view'), label: t('ed_snapshots'), run: () => setSnapshotsOpen(true) },
+    { id: 'figures', group: t('cmd_g_view'), label: t('ed_figures'), run: () => setFiguresOpen(true) },
     { id: 'snapshot-now', group: t('cmd_g_doc'), label: t('snap_create'), run: () => { void autoSnapshot(t('snap_manual_label')); setSnapshotsOpen(true); } },
     { id: 'settings', group: t('cmd_g_view'), label: t('ai_settings_title'), run: () => setSettingsOpen(true) },
     { id: 'ai-review', group: t('cmd_g_ai'), label: t('ed_ai_review'), disabled: aiOff, run: runAIReview },
@@ -1702,6 +1705,13 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
               title={t('ed_snapshots')}
             >
               🕓
+            </button>
+            <button
+              onClick={() => setFiguresOpen(true)}
+              className="text-xs px-2 py-0.5 rounded border border-border text-muted hover:bg-slate-50 hover:text-primary"
+              title={t('ed_figures')}
+            >
+              🖼
             </button>
             <button
               onClick={() => setFocusMode(true)}
@@ -2115,6 +2125,12 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
             onClose={() => setSnapshotsOpen(false)}
             t={t}
           />
+        </div>
+      )}
+
+      {figuresOpen && editorInstance.current && (
+        <div className="fixed right-4 top-20 bottom-4 w-[340px] z-40 shadow-2xl">
+          <FiguresPanel editor={editorInstance.current} onClose={() => setFiguresOpen(false)} t={t} />
         </div>
       )}
 
