@@ -14,6 +14,9 @@ import { Underline } from '@tiptap/extension-underline';
 import { TextAlign } from '@tiptap/extension-text-align';
 import { Superscript } from '@tiptap/extension-superscript';
 import { Subscript } from '@tiptap/extension-subscript';
+import { TextStyle } from '@tiptap/extension-text-style';
+import { Color } from '@tiptap/extension-color';
+import { Highlight } from '@tiptap/extension-highlight';
 import { CitationWithView } from './extensions/citation-view';
 import type { Ref } from '@/store/types';
 import { useLang } from '@/lib/i18n/hooks';
@@ -109,6 +112,9 @@ export function ArticleEditor({
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
       Superscript,
       Subscript,
+      TextStyle,
+      Color,
+      Highlight.configure({ multicolor: true }),
       CitationWithView,
     ],
     content: initialContent || { type: 'doc', content: [{ type: 'paragraph' }] },
@@ -219,6 +225,15 @@ export function ArticleEditor({
           title={t('ed_subscript')}
         >
           <span>X<sub>2</sub></span>
+        </ToolbarButton>
+        <Sep />
+        <ColorPicker editor={editor} t={t} />
+        <HighlightPicker editor={editor} t={t} />
+        <ToolbarButton
+          onClick={() => editor.chain().focus().unsetAllMarks().run()}
+          title={t('ed_clear_format')}
+        >
+          <span className="inline-flex items-center">A<span className="text-[9px] align-super">✕</span></span>
         </ToolbarButton>
         <Sep />
         <ToolbarButton
@@ -527,6 +542,134 @@ function ToolbarButton({
     >
       {children}
     </button>
+  );
+}
+
+const TEXT_COLORS: Array<{ name: string; value: string }> = [
+  { name: 'Red', value: '#dc2626' },
+  { name: 'Orange', value: '#ea580c' },
+  { name: 'Amber', value: '#d97706' },
+  { name: 'Green', value: '#16a34a' },
+  { name: 'Teal', value: '#0d9488' },
+  { name: 'Blue', value: '#2563eb' },
+  { name: 'Indigo', value: '#4f46e5' },
+  { name: 'Purple', value: '#7c3aed' },
+  { name: 'Pink', value: '#db2777' },
+  { name: 'Gray', value: '#6b7280' },
+];
+
+const HIGHLIGHT_COLORS: Array<{ name: string; value: string }> = [
+  { name: 'Yellow', value: '#fef08a' },
+  { name: 'Green', value: '#bbf7d0' },
+  { name: 'Blue', value: '#bfdbfe' },
+  { name: 'Pink', value: '#fbcfe8' },
+  { name: 'Orange', value: '#fed7aa' },
+  { name: 'Purple', value: '#e9d5ff' },
+  { name: 'Teal', value: '#99f6e4' },
+  { name: 'Gray', value: '#e5e7eb' },
+];
+
+function ColorPicker({ editor, t }: { editor: any; t: (k: string) => string }): JSX.Element {
+  const [open, setOpen] = useState(false);
+  const current: string | undefined = editor.getAttributes('textStyle').color;
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        title={t('ed_text_color')}
+        className="px-2 py-1 rounded-md text-xs font-semibold text-secondary hover:bg-slate-100 transition flex flex-col items-center leading-none"
+      >
+        <span style={{ color: current ?? 'inherit' }}>A</span>
+        <span className="block w-4 h-1 rounded-sm mt-0.5" style={{ background: current ?? '#94a3b8' }} />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute top-full left-0 mt-1 z-20 bg-white border border-border rounded-lg shadow-lg p-2 w-44">
+            <div className="grid grid-cols-5 gap-1.5">
+              {TEXT_COLORS.map((c) => (
+                <button
+                  key={c.value}
+                  title={c.name}
+                  onClick={() => {
+                    editor.chain().focus().setColor(c.value).run();
+                    setOpen(false);
+                  }}
+                  className={`w-6 h-6 rounded-md border transition hover:scale-110 ${
+                    current === c.value ? 'border-primary ring-2 ring-teal/40' : 'border-border'
+                  }`}
+                  style={{ background: c.value }}
+                />
+              ))}
+            </div>
+            <button
+              onClick={() => {
+                editor.chain().focus().unsetColor().run();
+                setOpen(false);
+              }}
+              className="mt-2 w-full text-left px-2 py-1 text-xs rounded hover:bg-slate-100 text-secondary"
+            >
+              ✕ {t('ed_no_color')}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function HighlightPicker({ editor, t }: { editor: any; t: (k: string) => string }): JSX.Element {
+  const [open, setOpen] = useState(false);
+  const active = editor.isActive('highlight');
+  const current: string | undefined = editor.getAttributes('highlight').color;
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        title={t('ed_highlight')}
+        className={`px-2 py-1 rounded-md text-xs font-semibold transition flex items-center gap-1 ${
+          active ? 'bg-teal text-white' : 'text-secondary hover:bg-slate-100'
+        }`}
+      >
+        <span
+          className="inline-block w-3 h-3 rounded-sm border border-border"
+          style={{ background: current ?? '#fef08a' }}
+        />
+        <span className="text-[11px]">▾</span>
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute top-full left-0 mt-1 z-20 bg-white border border-border rounded-lg shadow-lg p-2 w-44">
+            <div className="grid grid-cols-4 gap-1.5">
+              {HIGHLIGHT_COLORS.map((c) => (
+                <button
+                  key={c.value}
+                  title={c.name}
+                  onClick={() => {
+                    editor.chain().focus().toggleHighlight({ color: c.value }).run();
+                    setOpen(false);
+                  }}
+                  className={`w-7 h-6 rounded-md border transition hover:scale-110 ${
+                    current === c.value ? 'border-primary ring-2 ring-teal/40' : 'border-border'
+                  }`}
+                  style={{ background: c.value }}
+                />
+              ))}
+            </div>
+            <button
+              onClick={() => {
+                editor.chain().focus().unsetHighlight().run();
+                setOpen(false);
+              }}
+              className="mt-2 w-full text-left px-2 py-1 text-xs rounded hover:bg-slate-100 text-secondary"
+            >
+              ✕ {t('ed_no_highlight')}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 
