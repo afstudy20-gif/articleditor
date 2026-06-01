@@ -726,11 +726,13 @@ function ContextMenu({
           </div>
         </div>
 
-        <div className="overflow-auto flex-1 min-h-0">
+        <div className="flex-1">
           {r.abstract && (
             <div className="px-3 py-2 border-b border-border text-xs text-secondary leading-relaxed">
               <div className="tool-label mb-1">{t('rp_doi_abstract')}</div>
-              <p className="whitespace-pre-wrap">{r.abstract}</p>
+              <div className="max-h-32 overflow-auto bg-slate-50 p-2 rounded whitespace-pre-wrap">
+                {r.abstract}
+              </div>
             </div>
           )}
           {!r.abstract && onLookup && (
