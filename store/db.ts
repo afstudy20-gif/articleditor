@@ -2,11 +2,12 @@
 
 import Dexie, { type EntityTable } from 'dexie';
 import { newId } from '@/lib/id';
-import type { Project, Snapshot, Ref } from './types';
+import type { PhraseCategory, Project, Snapshot, Ref, UserPhrasebank } from './types';
 
 export interface AppDB extends Dexie {
   projects: EntityTable<Project, 'id'>;
   snapshots: EntityTable<Snapshot, 'id'>;
+  phrasebanks: EntityTable<UserPhrasebank, 'id'>;
 }
 
 let _db: AppDB | null = null;
@@ -25,6 +26,11 @@ export function getDb(): AppDB {
   db.version(2).stores({
     projects: 'id, updatedAt',
     snapshots: 'id, projectId, createdAt',
+  });
+  db.version(3).stores({
+    projects: 'id, updatedAt',
+    snapshots: 'id, projectId, createdAt',
+    phrasebanks: 'id, updatedAt',
   });
   _db = db;
   return db;
@@ -103,4 +109,71 @@ export async function getProject(id: string): Promise<Project | undefined> {
 export async function deleteProject(id: string): Promise<void> {
   const db = getDb();
   await db.projects.delete(id);
+}
+
+export async function createPhrasebank(data: {
+  name: string;
+  categories: PhraseCategory[];
+  sourceFileName?: string;
+  active?: boolean;
+}): Promise<UserPhrasebank> {
+  const db = getDb();
+  const now = Date.now();
+  const shouldActivate = data.active ?? (await db.phrasebanks.count()) === 0;
+  const bank: UserPhrasebank = {
+    id: newId('pb'),
+    name: data.name.trim() || 'Phrasebank',
+    createdAt: now,
+    updatedAt: now,
+    active: shouldActivate,
+    categories: data.categories,
+    sourceFileName: data.sourceFileName,
+  };
+  await db.transaction('rw', db.phrasebanks, async () => {
+    if (shouldActivate) {
+      const activeRows = (await db.phrasebanks.toArray()).filter((row) => row.active);
+      await Promise.all(activeRows.map((row) => db.phrasebanks.update(row.id, { active: false })));
+    }
+    await db.phrasebanks.put(bank);
+  });
+  return bank;
+}
+
+export async function listPhrasebanks(): Promise<UserPhrasebank[]> {
+  const db = getDb();
+  return db.phrasebanks.orderBy('updatedAt').reverse().toArray();
+}
+
+export async function getActivePhrasebank(): Promise<UserPhrasebank | undefined> {
+  const db = getDb();
+  const active = (await db.phrasebanks.toArray()).find((row) => row.active);
+  if (active) return active;
+  return db.phrasebanks.orderBy('updatedAt').reverse().first();
+}
+
+export async function updatePhrasebank(
+  id: string,
+  patch: Partial<Omit<UserPhrasebank, 'id' | 'createdAt'>>,
+): Promise<void> {
+  await getDb().phrasebanks.update(id, { ...patch, updatedAt: Date.now() });
+}
+
+export async function setActivePhrasebank(id: string): Promise<void> {
+  const db = getDb();
+  await db.transaction('rw', db.phrasebanks, async () => {
+    const rows = await db.phrasebanks.toArray();
+    await Promise.all(rows.map((row) => db.phrasebanks.update(row.id, { active: row.id === id })));
+  });
+}
+
+export async function deletePhrasebank(id: string): Promise<void> {
+  const db = getDb();
+  await db.transaction('rw', db.phrasebanks, async () => {
+    const existing = await db.phrasebanks.get(id);
+    await db.phrasebanks.delete(id);
+    if (existing?.active) {
+      const next = await db.phrasebanks.orderBy('updatedAt').reverse().first();
+      if (next) await db.phrasebanks.update(next.id, { active: true, updatedAt: Date.now() });
+    }
+  });
 }

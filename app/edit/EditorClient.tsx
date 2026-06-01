@@ -44,6 +44,8 @@ import { SnapshotsPanel } from '@/components/Snapshots/SnapshotsPanel';
 import { FiguresPanel } from '@/components/Figures/FiguresPanel';
 import { JournalCheckPanel } from '@/components/Journal/JournalCheckPanel';
 import { LettersPanel } from '@/components/Letters/LettersPanel';
+import { PhrasebankPanel } from '@/components/Phrasebank/PhrasebankPanel';
+import { useTabSync } from '@/lib/hooks/useTabSync';
 import { computeWritingStats } from '@/lib/stats/writing-stats';
 import {
   encodeSelection,
@@ -162,6 +164,8 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
   const [figuresOpen, setFiguresOpen] = useState(false);
   const [journalOpen, setJournalOpen] = useState(false);
   const [lettersOpen, setLettersOpen] = useState(false);
+  const [phrasebankOpen, setPhrasebankOpen] = useState(false);
+  const [phrasebankSection, setPhrasebankSection] = useState<string | null>(null);
   const [wordGoal, setWordGoal] = useState(0);
 
   // Word goal persists locally (per browser, not per project).
@@ -484,6 +488,9 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
     }
   }, [refOrder, refsById, style]);
 
+  // Cross-tab edit detection — warns when another tab saved the same project.
+  const { conflict: tabConflict, dismiss: dismissTabConflict, notifySaved: notifyTabSaved } = useTabSync(project.id);
+
   useEffect(() => {
     const t = setTimeout(async () => {
       setSavingState('saving');
@@ -496,11 +503,12 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
       });
       setSavedAt(Date.now());
       setSavingState('saved');
+      notifyTabSaved();
       onSaved();
       setTimeout(() => setSavingState('idle'), 1200);
     }, 600);
     return () => clearTimeout(t);
-  }, [title, refs, doc, style, project, onSaved]);
+  }, [title, refs, doc, style, project, onSaved, notifyTabSaved]);
 
   async function callLookup(ref: Ref): Promise<Ref | null> {
     const res = await fetch('/api/lookup', {
@@ -725,6 +733,33 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
     runInsertCitation(ed, orderedIds);
     setLibrarySelectedIds(new Set());
   }, [librarySelectedIds, refs]);
+
+  const insertAcademicPhrase = useCallback((text: string): void => {
+    const ed = editorInstance.current;
+    if (!ed) return;
+    ed.chain().focus().insertContent(text).run();
+  }, []);
+
+  function detectCurrentHeading(): string | null {
+    const ed = editorInstance.current;
+    if (!ed || ed.isDestroyed) return null;
+    const cursor = ed.state.selection.from;
+    let heading: string | null = null;
+    ed.state.doc.descendants((node: any, pos: number) => {
+      if (pos > cursor) return false;
+      if (node.type?.name === 'heading') {
+        const text = node.textContent?.trim();
+        if (text) heading = text;
+      }
+      return true;
+    });
+    return heading;
+  }
+
+  function openPhrasebank(): void {
+    setPhrasebankSection(detectCurrentHeading());
+    setPhrasebankOpen(true);
+  }
 
   const bulkDeleteRefs = useCallback(
     (ids: string[]) => {
@@ -1592,6 +1627,8 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
   const aiOff = aiConfigured === false;
   const commands: Command[] = [
     { id: 'insert-citation', group: t('cmd_g_editor'), label: t('ed_insert_citation'), hint: '', run: insertFromLibrary },
+    { id: 'insert-academic-phrase', group: t('cmd_g_editor'), label: t('pb_cmd_insert'), keywords: 'phrasebank academic phrase', run: openPhrasebank },
+    { id: 'search-phrasebank', group: t('cmd_g_editor'), label: t('pb_cmd_search'), keywords: 'phrasebank search phrases', run: openPhrasebank },
     { id: 'find', group: t('cmd_g_editor'), label: t('find_title'), hint: '⌘F', run: () => setShowFind(true) },
     { id: 'update-citations', group: t('cmd_g_editor'), label: t('ed_update_citations'), run: updateAllCitations },
     { id: 'focus', group: t('cmd_g_view'), label: t('ed_focus_mode'), hint: '⌘.', run: () => setFocusMode((v) => !v) },
@@ -1699,6 +1736,13 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
               ⌘K
             </button>
             <button
+              onClick={openPhrasebank}
+              className="text-xs px-2 py-0.5 rounded border border-border text-muted hover:bg-slate-50 hover:text-primary"
+              title={t('pb_title')}
+            >
+              §
+            </button>
+            <button
               onClick={() => setStatsOpen(true)}
               className="text-xs px-2 py-0.5 rounded border border-border text-muted hover:bg-slate-50 hover:text-primary"
               title={t('ed_stats')}
@@ -1756,6 +1800,17 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
           <div className="card bg-red-bg border-red-200 text-red text-sm p-3 flex items-center justify-between">
             <span>{importError}</span>
             <button className="text-red hover:underline text-xs" onClick={() => setImportError(null)}>
+              {t('app_close')}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {tabConflict && (
+        <div className="w-full px-4 sm:px-6 mt-2">
+          <div className="card bg-amber-50 border-amber-200 text-amber-800 text-sm p-3 flex items-center justify-between gap-3">
+            <span>⚠️ {t('tab_conflict_msg')}</span>
+            <button className="text-amber-800 hover:underline text-xs" onClick={dismissTabConflict}>
               {t('app_close')}
             </button>
           </div>
@@ -2174,6 +2229,17 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
           onClose={() => setLettersOpen(false)}
           t={t}
         />
+      )}
+
+      {phrasebankOpen && (
+        <div className="fixed right-4 top-20 bottom-4 w-[420px] max-w-[calc(100vw-2rem)] z-40 shadow-2xl">
+          <PhrasebankPanel
+            onInsert={insertAcademicPhrase}
+            onClose={() => setPhrasebankOpen(false)}
+            currentSection={phrasebankSection}
+            t={t}
+          />
+        </div>
       )}
 
       {focusMode && (

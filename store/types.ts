@@ -81,6 +81,29 @@ export type Snapshot = {
   wordCount?: number;
 };
 
+export type Phrase = {
+  id: string;
+  text: string;
+  category: string;
+  tags?: string[];
+};
+
+export type PhraseCategory = {
+  id: string;
+  name: string;
+  phrases: Phrase[];
+};
+
+export type UserPhrasebank = {
+  id: string;
+  name: string;
+  createdAt: number;
+  updatedAt: number;
+  active: boolean;
+  categories: PhraseCategory[];
+  sourceFileName?: string;
+};
+
 export type ParsedDocument = {
   bodyText: string;
   refs: Ref[];
