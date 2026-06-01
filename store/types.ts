@@ -69,6 +69,18 @@ export type Project = {
   };
 };
 
+export type Snapshot = {
+  id: string;
+  projectId: string;
+  label: string;
+  createdAt: number;
+  /** True when created automatically (e.g. before a large AI edit). */
+  auto: boolean;
+  doc?: unknown;
+  refs: Ref[];
+  wordCount?: number;
+};
+
 export type ParsedDocument = {
   bodyText: string;
   refs: Ref[];

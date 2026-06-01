@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Project, Ref } from '@/store/types';
-import { saveProject, getProject } from '@/store/db';
+import { saveProject, getProject, createSnapshot } from '@/store/db';
+import type { Snapshot } from '@/store/types';
 import { ArticleEditor, computeRefOrder } from '@/components/Editor/Editor';
 import { RefsPanel } from '@/components/RefsPanel/RefsPanel';
 import { tiptapToBuildInput } from '@/lib/editor/to-export';
@@ -39,6 +40,7 @@ import { aiHeaders } from '@/lib/ai/user-keys';
 import { SettingsModal } from '@/components/AI/SettingsModal';
 import { CommandPalette, type Command } from '@/components/CommandPalette/CommandPalette';
 import { StatsPanel } from '@/components/Stats/StatsPanel';
+import { SnapshotsPanel } from '@/components/Snapshots/SnapshotsPanel';
 import { computeWritingStats } from '@/lib/stats/writing-stats';
 import {
   encodeSelection,
@@ -153,6 +155,7 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
+  const [snapshotsOpen, setSnapshotsOpen] = useState(false);
   const [wordGoal, setWordGoal] = useState(0);
 
   // Word goal persists locally (per browser, not per project).
@@ -166,6 +169,42 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
   }, []);
 
   const writingStats = useMemo(() => computeWritingStats(doc), [doc]);
+
+  // Capture a restore point before a large, hard-to-undo change (AI rewrites,
+  // structure patches). Best-effort: never block the operation on failure.
+  const autoSnapshot = useCallback(
+    async (label: string): Promise<void> => {
+      try {
+        const ed = editorInstance.current;
+        const liveDoc = ed && !ed.isDestroyed ? ed.getJSON() : doc;
+        await createSnapshot(project.id, {
+          label,
+          doc: liveDoc,
+          refs,
+          auto: true,
+          wordCount: computeWritingStats(liveDoc).words,
+        });
+      } catch {
+        // snapshotting must not break the user's action
+      }
+    },
+    // editorInstance is a stable ref-like object
+    [doc, refs, project.id],
+  );
+
+  const restoreSnapshot = useCallback(
+    (snap: Snapshot): void => {
+      if (!confirm(t('snap_restore_confirm'))) return;
+      setRefs(snap.refs);
+      setDoc(snap.doc);
+      const ed = editorInstance.current;
+      if (ed && !ed.isDestroyed && snap.doc) {
+        ed.commands.setContent(snap.doc as Record<string, unknown>);
+      }
+      setSnapshotsOpen(false);
+    },
+    [t],
+  );
 
   // One-shot AI config check on mount — disables AI buttons when no key.
   useEffect(() => {
@@ -924,12 +963,13 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
     if (!ed || !aiEnhance.range || aiEnhance.state.status !== 'ready') return;
     const content = decodeToTipTapContent(aiEnhance.afterEncoded, aiEnhance.nodes);
     if (content.length === 0) return;
+    void autoSnapshot(t('snap_auto_label'));
     ed.chain()
       .focus()
       .insertContentAt({ from: aiEnhance.range.from, to: aiEnhance.range.to }, content)
       .run();
     setAiEnhance({ state: { status: 'idle' }, mode: null, range: null, nodes: [], afterEncoded: '' });
-  }, [aiEnhance]);
+  }, [aiEnhance, autoSnapshot, t]);
 
   const closeEnhance = useCallback(() => {
     setAiEnhance({ state: { status: 'idle' }, mode: null, range: null, nodes: [], afterEncoded: '' });
@@ -1550,6 +1590,8 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
     { id: 'update-citations', group: t('cmd_g_editor'), label: t('ed_update_citations'), run: updateAllCitations },
     { id: 'focus', group: t('cmd_g_view'), label: t('ed_focus_mode'), hint: '⌘.', run: () => setFocusMode((v) => !v) },
     { id: 'stats', group: t('cmd_g_view'), label: t('ed_stats'), run: () => setStatsOpen(true) },
+    { id: 'snapshots', group: t('cmd_g_view'), label: t('ed_snapshots'), run: () => setSnapshotsOpen(true) },
+    { id: 'snapshot-now', group: t('cmd_g_doc'), label: t('snap_create'), run: () => { void autoSnapshot(t('snap_manual_label')); setSnapshotsOpen(true); } },
     { id: 'settings', group: t('cmd_g_view'), label: t('ai_settings_title'), run: () => setSettingsOpen(true) },
     { id: 'ai-review', group: t('cmd_g_ai'), label: t('ed_ai_review'), disabled: aiOff, run: runAIReview },
     { id: 'ai-score', group: t('cmd_g_ai'), label: t('ed_ai_score'), disabled: aiOff, run: runAIScore },
@@ -1653,6 +1695,13 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
               title={t('ed_stats')}
             >
               📊
+            </button>
+            <button
+              onClick={() => setSnapshotsOpen(true)}
+              className="text-xs px-2 py-0.5 rounded border border-border text-muted hover:bg-slate-50 hover:text-primary"
+              title={t('ed_snapshots')}
+            >
+              🕓
             </button>
             <button
               onClick={() => setFocusMode(true)}
@@ -2051,6 +2100,20 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
             onSetGoal={updateWordGoal}
             t={t}
             onClose={() => setStatsOpen(false)}
+          />
+        </div>
+      )}
+
+      {snapshotsOpen && (
+        <div className="fixed right-4 top-20 bottom-4 w-[360px] z-40 shadow-2xl">
+          <SnapshotsPanel
+            projectId={project.id}
+            currentDoc={doc}
+            currentRefs={refs}
+            currentWordCount={writingStats.words}
+            onRestore={restoreSnapshot}
+            onClose={() => setSnapshotsOpen(false)}
+            t={t}
           />
         </div>
       )}

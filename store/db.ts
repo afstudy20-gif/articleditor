@@ -2,10 +2,11 @@
 
 import Dexie, { type EntityTable } from 'dexie';
 import { newId } from '@/lib/id';
-import type { Project } from './types';
+import type { Project, Snapshot, Ref } from './types';
 
 export interface AppDB extends Dexie {
   projects: EntityTable<Project, 'id'>;
+  snapshots: EntityTable<Snapshot, 'id'>;
 }
 
 let _db: AppDB | null = null;
@@ -19,8 +20,55 @@ export function getDb(): AppDB {
   db.version(1).stores({
     projects: 'id, updatedAt',
   });
+  // v2 adds versioned snapshots (restore points). Existing projects are
+  // untouched — Dexie upgrades add the new object store only.
+  db.version(2).stores({
+    projects: 'id, updatedAt',
+    snapshots: 'id, projectId, createdAt',
+  });
   _db = db;
   return db;
+}
+
+const MAX_SNAPSHOTS_PER_PROJECT = 30;
+
+export async function createSnapshot(
+  projectId: string,
+  data: { label: string; doc?: unknown; refs: Ref[]; auto?: boolean; wordCount?: number },
+): Promise<Snapshot> {
+  const db = getDb();
+  const snap: Snapshot = {
+    id: newId('snap'),
+    projectId,
+    label: data.label,
+    createdAt: Date.now(),
+    auto: data.auto ?? false,
+    doc: data.doc,
+    refs: data.refs,
+    wordCount: data.wordCount,
+  };
+  await db.snapshots.put(snap);
+  // Prune oldest beyond the cap to bound storage.
+  const all = await db.snapshots.where('projectId').equals(projectId).sortBy('createdAt');
+  if (all.length > MAX_SNAPSHOTS_PER_PROJECT) {
+    const excess = all.slice(0, all.length - MAX_SNAPSHOTS_PER_PROJECT);
+    await db.snapshots.bulkDelete(excess.map((s) => s.id));
+  }
+  return snap;
+}
+
+export async function listSnapshots(projectId: string): Promise<Snapshot[]> {
+  const db = getDb();
+  const rows = await db.snapshots.where('projectId').equals(projectId).sortBy('createdAt');
+  return rows.reverse(); // newest first
+}
+
+export async function getSnapshot(id: string): Promise<Snapshot | undefined> {
+  return getDb().snapshots.get(id);
+}
+
+export async function deleteSnapshot(id: string): Promise<void> {
+  await getDb().snapshots.delete(id);
 }
 
 export function createProject(partial: Partial<Project> = {}): Project {
