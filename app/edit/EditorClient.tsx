@@ -1722,16 +1722,19 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
               }}
               title={t('style_edit')}
               label="🎚"
+              caption={t('hdr_style')}
             />
             <HeaderIcon
               onClick={() => setShowFind(true)}
               title="Bul ve Değiştir (Ctrl+F / Ctrl+H)"
               label="🔍"
+              caption={t('hdr_find')}
             />
             <HeaderIcon
               onClick={updateAllCitations}
               title="Atıfları yeniden numaralandır + orphan'ları temizle"
               label="↻"
+              caption={t('hdr_renumber')}
             />
             <HeaderDropdown label={`📥 ${t('ed_import')} ▾`}>
               <DropItem
@@ -1764,69 +1767,22 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
               <DropItem onClick={exportRis}>🗂️ {t('ed_export_ris')}</DropItem>
               <DropItem onClick={exportLatex}>📐 {t('ed_export_latex')}</DropItem>
             </HeaderDropdown>
-            <button
-              onClick={() => setPaletteOpen(true)}
-              className="text-xs px-2 py-0.5 rounded border border-border text-muted hover:bg-slate-50 hover:text-primary"
-              title={`${t('cmd_open')} (⌘K)`}
-            >
-              ⌘K
-            </button>
-            <button
-              onClick={openPhrasebank}
-              className="text-xs px-2 py-0.5 rounded border border-border text-muted hover:bg-slate-50 hover:text-primary"
-              title={t('pb_title')}
-            >
-              §
-            </button>
-            <button
-              onClick={() => setStatsOpen(true)}
-              className="text-xs px-2 py-0.5 rounded border border-border text-muted hover:bg-slate-50 hover:text-primary"
-              title={t('ed_stats')}
-            >
-              📊
-            </button>
-            <button
-              onClick={() => setSnapshotsOpen(true)}
-              className="text-xs px-2 py-0.5 rounded border border-border text-muted hover:bg-slate-50 hover:text-primary"
-              title={t('ed_snapshots')}
-            >
-              🕓
-            </button>
-            <button
-              onClick={() => setFiguresOpen(true)}
-              className="text-xs px-2 py-0.5 rounded border border-border text-muted hover:bg-slate-50 hover:text-primary"
-              title={t('ed_figures')}
-            >
-              🖼
-            </button>
-            <button
-              onClick={() => setJournalOpen(true)}
-              className="text-xs px-2 py-0.5 rounded border border-border text-muted hover:bg-slate-50 hover:text-primary"
-              title={t('ed_journal_check')}
-            >
-              📋
-            </button>
-            <button
-              onClick={() => setLettersOpen(true)}
-              className="text-xs px-2 py-0.5 rounded border border-border text-muted hover:bg-slate-50 hover:text-primary"
-              title={t('ed_letters')}
-            >
-              ✉️
-            </button>
-            <button
-              onClick={() => setFocusMode(true)}
-              className="text-xs px-2 py-0.5 rounded border border-border text-muted hover:bg-slate-50 hover:text-primary"
-              title={`${t('ed_focus_mode')} (⌘.)`}
-            >
-              🎯
-            </button>
-            <button
+            <HeaderIcon onClick={() => setPaletteOpen(true)} title={`${t('cmd_open')} (⌘K)`} label="⌘K" caption={t('hdr_palette')} />
+            <HeaderIcon onClick={openPhrasebank} title={t('pb_title')} label="§" caption={t('hdr_phrasebank')} />
+            <HeaderIcon onClick={() => setStatsOpen(true)} title={t('ed_stats')} label="📊" caption={t('hdr_stats')} />
+            <HeaderIcon onClick={() => setSnapshotsOpen(true)} title={t('ed_snapshots')} label="🕓" caption={t('hdr_versions')} />
+            <HeaderIcon onClick={() => setFiguresOpen(true)} title={t('ed_figures')} label="🖼" caption={t('hdr_figures')} />
+            <HeaderIcon onClick={() => setJournalOpen(true)} title={t('ed_journal_check')} label="📋" caption={t('hdr_journal')} />
+            <HeaderIcon onClick={() => setLettersOpen(true)} title={t('ed_letters')} label="✉️" caption={t('hdr_letters')} />
+            <HeaderIcon onClick={() => setFocusMode(true)} title={`${t('ed_focus_mode')} (⌘.)`} label="🎯" caption={t('hdr_focus')} />
+            <HeaderIcon
               onClick={() => setSettingsOpen(true)}
-              className={`text-xs px-2 py-0.5 rounded border ${aiConfigured ? 'border-teal text-teal' : 'border-border text-muted'} hover:bg-slate-50`}
               title={aiConfigured ? 'AI ayarlanmış — API anahtarlarını düzenle' : 'AI servisi yapılandırılmamış — API anahtarı gir'}
-            >
-              ⚙️ {aiConfigured === false && <span className="ml-0.5 inline-block w-1.5 h-1.5 rounded-full bg-red-500 align-middle" />}
-            </button>
+              label="⚙️"
+              caption={t('hdr_settings')}
+              accent={!!aiConfigured}
+              badge={aiConfigured === false}
+            />
           </div>
         </div>
       </header>
@@ -2512,18 +2468,30 @@ function HeaderIcon({
   onClick,
   title,
   label,
+  caption,
+  accent,
+  badge,
 }: {
   onClick: () => void;
   title: string;
   label: string;
+  caption?: string;
+  accent?: boolean;
+  badge?: boolean;
 }): JSX.Element {
   return (
     <button
       onClick={onClick}
       title={title}
-      className="px-2 py-0.5 text-xs rounded border border-border hover:bg-slate-50 text-secondary"
+      className={`flex flex-col items-center justify-center leading-none px-1.5 py-1 rounded border min-w-[2.6rem] transition ${
+        accent ? 'border-teal text-teal' : 'border-border text-secondary'
+      } hover:bg-slate-50 hover:text-primary`}
     >
-      {label}
+      <span className="text-sm">
+        {label}
+        {badge && <span className="ml-0.5 inline-block w-1.5 h-1.5 rounded-full bg-red-500 align-middle" />}
+      </span>
+      {caption && <span className="mt-0.5 text-[9px] text-muted">{caption}</span>}
     </button>
   );
 }
