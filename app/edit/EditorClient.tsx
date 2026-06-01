@@ -1923,6 +1923,12 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
             history={history}
             onUndoHistory={undoHistory}
             onClearHistory={clearHistory}
+            onInsertText={(text) => {
+              const ed = editorInstance.current;
+              if (ed && !ed.isDestroyed) {
+                ed.chain().focus().insertContent(text).run();
+              }
+            }}
           />
           </div>
         </div>
@@ -2018,6 +2024,12 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
           history={history}
           onUndoHistory={undoHistory}
           onClearHistory={clearHistory}
+          onInsertText={(text) => {
+            const ed = editorInstance.current;
+            if (ed && !ed.isDestroyed) {
+              ed.chain().focus().insertContent(text).run();
+            }
+          }}
         />
         <BibliographyPreview refs={refs} refOrder={refOrder} style={style} selectedId={highlightRefId} onSelect={selectRef} />
         <RefDetail

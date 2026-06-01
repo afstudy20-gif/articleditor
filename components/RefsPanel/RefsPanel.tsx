@@ -37,6 +37,7 @@ type Props = {
   history?: HistoryEntry[];
   onUndoHistory?: (id: string) => void;
   onClearHistory?: () => void;
+  onInsertText?: (text: string) => void;
 };
 
 export function RefsPanel({
@@ -64,6 +65,7 @@ export function RefsPanel({
   history,
   onUndoHistory,
   onClearHistory,
+  onInsertText,
 }: Props) {
   const { t } = useLang();
   const [tab, setTab] = useState<'list' | 'add' | 'history'>('list');
@@ -150,6 +152,7 @@ export function RefsPanel({
             onToggleSelect={toggleSelect}
             highlightedId={selectedId}
             onHighlight={onSelectRef}
+            onInsertText={onInsertText}
             t={t}
           />
         ) : tab === 'add' ? (
@@ -186,6 +189,7 @@ function RefList({
   highlightedId,
   onHighlight,
   onUpdate,
+  onInsertText,
   t,
 }: {
   refs: Ref[];
@@ -200,6 +204,7 @@ function RefList({
   onToggleSelect?: (id: string) => void;
   highlightedId?: string | null;
   onHighlight?: (id: string) => void;
+  onInsertText?: (text: string) => void;
   t: (k: string) => string;
 }): JSX.Element {
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -411,6 +416,10 @@ function RefList({
           }}
           onDelete={() => {
             onDelete(ctxRef.id);
+            closeContext();
+          }}
+          onInsertText={(text) => {
+            if (onInsertText) onInsertText(text);
             closeContext();
           }}
           onLookup={onLookup ? () => onLookup(ctxRef.id).then(closeContext) : undefined}
@@ -676,6 +685,7 @@ function ContextMenu({
   onClose,
   onInsert,
   onDelete,
+  onInsertText,
   onLookup,
   onShowAbstract,
   onSaveNote,
@@ -689,6 +699,7 @@ function ContextMenu({
   onClose: () => void;
   onInsert: () => void;
   onDelete: () => void;
+  onInsertText?: (text: string) => void;
   onLookup?: () => void;
   onShowAbstract?: () => void;
   onSaveNote?: (note: string) => void;
@@ -696,11 +707,18 @@ function ContextMenu({
   onExtractAspects?: () => void;
   t: (k: string) => string;
 }): JSX.Element {
-  const [noteEdit, setNoteEdit] = useState(false);
   const [noteValue, setNoteValue] = useState(r.userNote ?? '');
+  const [selectedText, setSelectedText] = useState('');
+  
+  function handleSelection(): void {
+    const sel = window.getSelection();
+    const text = sel ? sel.toString().trim() : '';
+    setSelectedText(text);
+  }
+
   const fullTextUrl = r.doi ? `https://doi.org/${r.doi}` : r.url;
   const pubmedUrl = r.pmid ? `https://pubmed.ncbi.nlm.nih.gov/${r.pmid}` : null;
-  const MENU_W = 420;
+  const MENU_W = 580;
   const MENU_MAX_H = 560;
   return (
     <>
@@ -728,11 +746,31 @@ function ContextMenu({
 
         <div className="flex-1">
           {r.abstract && (
-            <div className="px-3 py-2 border-b border-border text-xs text-secondary leading-relaxed">
+            <div
+              onMouseUp={handleSelection}
+              className="px-3 py-2 border-b border-border text-xs text-secondary leading-relaxed selection:bg-teal selection:text-white"
+            >
               <div className="tool-label mb-1">{t('rp_doi_abstract')}</div>
               <div className="max-h-32 overflow-auto bg-slate-50 p-2 rounded whitespace-pre-wrap">
                 {r.abstract}
               </div>
+            </div>
+          )}
+          {selectedText && (
+            <div className="px-3 py-1.5 bg-teal-bg border-b border-border flex items-center justify-between gap-3 shrink-0">
+              <span className="text-xs text-teal font-medium truncate max-w-[380px]">
+                {t('rp_selected')}: "{selectedText}"
+              </span>
+              <button
+                onClick={() => {
+                  if (onInsertText) {
+                    onInsertText(selectedText);
+                  }
+                }}
+                className="btn-primary text-[10px] px-2 py-0.5 rounded flex items-center gap-1 font-semibold whitespace-nowrap"
+              >
+                ✍️ {t('rp_transfer_text')}
+              </button>
             </div>
           )}
           {!r.abstract && onLookup && (
