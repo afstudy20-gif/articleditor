@@ -36,6 +36,7 @@
     "diff": "^9.0.0",
     "fast-xml-parser": "4.5.0",
     "jszip": "3.10.1",
+    "katex": "0.16.11",
     "lru-cache": "11.0.2",
     "next": "14.2.18",
     "openai": "^6.39.0",
@@ -44,6 +45,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@types/katex": "0.16.7",
     "@types/node": "22.10.1",
     "@types/react": "18.3.12",
     "@types/react-dom": "18.3.1",
