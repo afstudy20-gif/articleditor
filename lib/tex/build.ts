@@ -1,6 +1,6 @@
 import type { Ref } from '@/store/types';
 import { buildCitationKeyMap, generateBibtex } from '@/lib/refs/bibtex-out';
-import type { CitationStyle } from '@/lib/refs/styles';
+import type { CitationStyle, StyleId } from '@/lib/refs/styles';
 
 type Json = any;
 
@@ -8,7 +8,7 @@ export type TexBuildInput = {
   doc: Json;
   refs: Ref[];
   title?: string;
-  style: CitationStyle;
+  style: StyleId;
 };
 
 export type TexBuildOutput = {
@@ -28,7 +28,7 @@ export function buildLatex(input: TexBuildInput): TexBuildOutput {
   const bibFilename = 'refs.bib';
   const keyMap = buildCitationKeyMap(input.refs);
   const bib = generateBibtex(input.refs);
-  const pkg = STYLE_PACKAGE[input.style] ?? STYLE_PACKAGE.vancouver;
+  const pkg = STYLE_PACKAGE[input.style as CitationStyle] ?? STYLE_PACKAGE.vancouver;
   const tex = buildTexSource({
     title: input.title ?? 'Untitled',
     body: renderBody(input.doc, keyMap),

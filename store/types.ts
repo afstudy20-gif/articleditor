@@ -68,7 +68,8 @@ export type Project = {
   refs: Ref[];
   bodyText?: string;
   settings?: {
-    style?: 'vancouver' | 'apa' | 'ama' | 'ieee';
+    // Built-in id ('vancouver'|'apa'|'ama'|'ieee') or a 'custom:<id>' style.
+    style?: string;
     aiProvider?: 'anthropic' | 'openai';
   };
 };

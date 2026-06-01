@@ -1,7 +1,7 @@
 import JSZip from 'jszip';
 import type { Ref, MarkerOccurrence } from '@/store/types';
 import { buildEnCiteXmlMulti, formatVancouverDisplay, escapeXml } from '@/lib/refs/enxml';
-import { formatBibEntry, formatInTextCitation, type CitationStyle, isNumericStyle } from '@/lib/refs/styles';
+import { formatBibEntry, formatInTextCitation, type StyleId, isNumericStyle } from '@/lib/refs/styles';
 
 export type BuildMode = 'active' | 'placeholder' | 'plain';
 
@@ -11,7 +11,7 @@ export type BuildInput = {
   refs: Ref[];
   mode: BuildMode;
   title?: string;
-  style?: CitationStyle;
+  style?: StyleId;
 };
 
 // Assign EndNote record numbers (sequential, starting from 1).
@@ -41,7 +41,7 @@ export async function buildDocx(input: BuildInput): Promise<Blob> {
 const WORD_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
 function buildDocumentXml(input: BuildInput, refs: Ref[]): string {
-  const style: CitationStyle = input.style ?? 'vancouver';
+  const style: StyleId = input.style ?? 'vancouver';
   const paragraphs: string[] = [];
   if (input.title) {
     paragraphs.push(paragraphXml(`<w:pPr><w:pStyle w:val="Title"/></w:pPr>${runXml(input.title)}`));
@@ -83,7 +83,7 @@ function buildParagraph(
   paraStart: number,
   refs: Ref[],
   mode: BuildMode,
-  style: CitationStyle,
+  style: StyleId,
 ): string {
   if (paraMarkers.length === 0) {
     return paragraphXml(runXml(text || ' '));

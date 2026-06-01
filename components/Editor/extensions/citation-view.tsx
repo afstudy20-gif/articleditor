@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { NodeViewWrapper, ReactNodeViewRenderer } from '@tiptap/react';
 import { Citation as CitationCore } from './Citation';
 import type { Ref } from '@/store/types';
-import { formatInTextCitation, type CitationStyle } from '@/lib/refs/styles';
+import { formatInTextCitation, type StyleId } from '@/lib/refs/styles';
 
 type RefMap = Map<string, number>;
 
@@ -13,7 +13,7 @@ declare global {
   interface Window {
     __enrRefOrder?: RefMap;
     __enrRefs?: Map<string, Ref>;
-    __enrStyle?: CitationStyle;
+    __enrStyle?: StyleId;
     __enrHighlightRefId?: string | null;
     __enrOnCitationClick?: (pos: number, refIds: string[]) => void;
   }
@@ -45,7 +45,7 @@ function CitationNodeView({ node, getPos }: any) {
     (currentHighlight != null && refIds.includes(currentHighlight)) || node.attrs.highlighted === true;
   const order = (typeof window !== 'undefined' && window.__enrRefOrder) || new Map<string, number>();
   const refsMap = (typeof window !== 'undefined' && window.__enrRefs) || new Map<string, Ref>();
-  const style: CitationStyle = (typeof window !== 'undefined' && window.__enrStyle) || 'vancouver';
+  const style: StyleId = (typeof window !== 'undefined' && window.__enrStyle) || 'vancouver';
 
   const resolvedRefs: Ref[] = refIds.map((id) => refsMap.get(id)).filter((r): r is Ref => Boolean(r));
   const numbers = refIds.map((id) => order.get(id) ?? 0).filter((n) => n > 0);

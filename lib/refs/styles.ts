@@ -1,7 +1,23 @@
 import type { Ref } from '@/store/types';
 import { vancouverAuthorList, firstAuthorFamily } from './normalize';
+import {
+  getCustomStyle,
+  listCustomStyles,
+  formatInTextSpec,
+  formatBibEntrySpec,
+  isNumericSpec,
+  orderBySpec,
+} from './style-spec';
 
+// A style id is either a built-in name or a 'custom:<uuid>' id.
 export type CitationStyle = 'vancouver' | 'apa' | 'ama' | 'ieee';
+export type StyleId = CitationStyle | string;
+
+const BUILTIN_IDS: readonly CitationStyle[] = ['vancouver', 'apa', 'ama', 'ieee'];
+
+export function isBuiltinStyle(id: string): id is CitationStyle {
+  return (BUILTIN_IDS as readonly string[]).includes(id);
+}
 
 export const STYLE_LABELS: Record<CitationStyle, string> = {
   vancouver: 'Vancouver',
@@ -10,9 +26,27 @@ export const STYLE_LABELS: Record<CitationStyle, string> = {
   ieee: 'IEEE',
 };
 
+/** All selectable styles (built-ins + user custom styles) for the picker. */
+export function listAllStyles(): Array<{ id: StyleId; label: string; custom: boolean }> {
+  const builtins = BUILTIN_IDS.map((id) => ({ id, label: STYLE_LABELS[id], custom: false }));
+  const customs = listCustomStyles().map((s) => ({ id: s.id, label: s.name, custom: true }));
+  return [...builtins, ...customs];
+}
+
+/** Display label for any style id. */
+export function styleLabel(id: StyleId): string {
+  if (isBuiltinStyle(id)) return STYLE_LABELS[id];
+  return getCustomStyle(id)?.name ?? id;
+}
+
 // In-text citation display. Numbers parameter = ref numbers in order of citation.
 // refs parameter = the actual Ref objects for author-year styles.
-export function formatInTextCitation(style: CitationStyle, refs: Ref[], numbers: number[]): string {
+export function formatInTextCitation(style: StyleId, refs: Ref[], numbers: number[]): string {
+  if (!isBuiltinStyle(style)) {
+    const spec = getCustomStyle(style);
+    if (spec) return formatInTextSpec(spec, refs, numbers);
+    return formatNumeric(numbers, '[', ']');
+  }
   switch (style) {
     case 'apa':
       return formatApaInText(refs);
@@ -60,7 +94,12 @@ function formatNumeric(numbers: number[], open: string, close: string): string {
 }
 
 // Bibliography entry formatting. n = ordinal (1-based) for numeric styles.
-export function formatBibEntry(style: CitationStyle, r: Ref, n: number): string {
+export function formatBibEntry(style: StyleId, r: Ref, n: number): string {
+  if (!isBuiltinStyle(style)) {
+    const spec = getCustomStyle(style);
+    if (spec) return formatBibEntrySpec(spec, r, n);
+    return formatVancouverEntry(r, n);
+  }
   switch (style) {
     case 'apa':
       return formatApaEntry(r);
@@ -153,7 +192,11 @@ function stripPeriod(s: string): string {
 
 // Sort refs for bibliography ordering. APA = alphabetical by first author family;
 // others = order of citation in document (caller provides already-ordered array).
-export function orderRefsForBib<T extends Ref>(style: CitationStyle, refs: T[]): T[] {
+export function orderRefsForBib<T extends Ref>(style: StyleId, refs: T[]): T[] {
+  if (!isBuiltinStyle(style)) {
+    const spec = getCustomStyle(style);
+    return spec ? orderBySpec(spec, refs) : refs;
+  }
   if (style !== 'apa') return refs;
   return [...refs].sort((a, b) => {
     const fa = (a.authors[0]?.family ?? a.authors[0]?.literal ?? '').toLowerCase();
@@ -162,6 +205,10 @@ export function orderRefsForBib<T extends Ref>(style: CitationStyle, refs: T[]):
   });
 }
 
-export function isNumericStyle(style: CitationStyle): boolean {
+export function isNumericStyle(style: StyleId): boolean {
+  if (!isBuiltinStyle(style)) {
+    const spec = getCustomStyle(style);
+    return spec ? isNumericSpec(spec) : true;
+  }
   return style === 'vancouver' || style === 'ama' || style === 'ieee';
 }

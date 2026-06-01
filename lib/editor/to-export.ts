@@ -1,5 +1,5 @@
 import type { MarkerOccurrence, Ref } from '@/store/types';
-import { formatInTextCitation, orderRefsForBib, type CitationStyle } from '@/lib/refs/styles';
+import { formatInTextCitation, orderRefsForBib, type StyleId } from '@/lib/refs/styles';
 
 type Json = any;
 
@@ -9,7 +9,7 @@ export function tiptapToBuildInput(
   json: Json,
   refsById: Map<string, Ref>,
   refOrder: Map<string, number>,
-  style: CitationStyle = 'vancouver',
+  style: StyleId = 'vancouver',
 ): { bodyText: string; markers: MarkerOccurrence[]; orderedRefs: Ref[] } {
   const out: string[] = [];
   const markers: MarkerOccurrence[] = [];

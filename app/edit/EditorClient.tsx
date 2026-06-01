@@ -14,7 +14,8 @@ import { splitBodyAndBiblio, parseBiblioLines } from '@/lib/refs/parse-biblio';
 import { detectMarkers } from '@/lib/markers/detect';
 import { newId } from '@/lib/id';
 import { backupToBlob, buildBackup, projectFilename, parseBackup } from '@/lib/projects/backup';
-import { STYLE_LABELS, type CitationStyle } from '@/lib/refs/styles';
+import { type StyleId, listAllStyles } from '@/lib/refs/styles';
+import { StyleEditor } from '@/components/Style/StyleEditor';
 import { RefDetail } from '@/components/RefDetail/RefDetail';
 import { BibliographyPreview } from '@/components/Bibliography/BibliographyPreview';
 import { buildLatex } from '@/lib/tex/build';
@@ -102,9 +103,16 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
   const [doc, setDoc] = useState<unknown>(project.doc);
   const [savedAt, setSavedAt] = useState<number>(project.updatedAt);
   const [savingState, setSavingState] = useState<'idle' | 'saving' | 'saved'>('idle');
-  const [style, setStyle] = useState<CitationStyle>(
-    (project.settings?.style as CitationStyle) ?? 'vancouver',
+  const [style, setStyle] = useState<StyleId>(
+    (project.settings?.style as StyleId) ?? 'vancouver',
   );
+  const [styleEditorOpen, setStyleEditorOpen] = useState(false);
+  const [styleOptions, setStyleOptions] = useState(() => listAllStyles());
+  useEffect(() => {
+    const refresh = (): void => setStyleOptions(listAllStyles());
+    window.addEventListener('enr-styles-updated', refresh);
+    return () => window.removeEventListener('enr-styles-updated', refresh);
+  }, []);
   const [showImportModal, setShowImportModal] = useState(false);
   const [importPreview, setImportPreview] = useState<ImportPreview>(null);
   const [importPasteText, setImportPasteText] = useState('');
@@ -1677,16 +1685,29 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
           <div className="flex gap-1 items-center text-xs">
             <select
               value={style}
-              onChange={(e) => setStyle(e.target.value as CitationStyle)}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === '__new__') {
+                  setStyleEditorOpen(true);
+                  return;
+                }
+                setStyle(v as StyleId);
+              }}
               className="border border-border rounded px-1.5 py-0.5 text-xs bg-white focus:outline-none focus:border-teal"
               title="Atıf ve kaynakça stili"
             >
-              {(Object.keys(STYLE_LABELS) as CitationStyle[]).map((s) => (
-                <option key={s} value={s}>
-                  {STYLE_LABELS[s]}
+              {styleOptions.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.custom ? `★ ${s.label}` : s.label}
                 </option>
               ))}
+              <option value="__new__">＋ {t('style_new')}…</option>
             </select>
+            <HeaderIcon
+              onClick={() => setStyleEditorOpen(true)}
+              title={t('style_edit')}
+              label="🎚"
+            />
             <HeaderIcon
               onClick={() => setShowFind(true)}
               title="Bul ve Değiştir (Ctrl+F / Ctrl+H)"
@@ -2229,6 +2250,21 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
           lang={lang}
           aiEnabled={aiConfigured !== false}
           onClose={() => setLettersOpen(false)}
+          t={t}
+        />
+      )}
+
+      {styleEditorOpen && (
+        <StyleEditor
+          editId={typeof style === 'string' && style.startsWith('custom_') ? style : null}
+          lang={lang}
+          aiEnabled={aiConfigured !== false}
+          onClose={() => setStyleEditorOpen(false)}
+          onSaved={(id) => {
+            setStyleOptions(listAllStyles());
+            setStyle(id);
+            setStyleEditorOpen(false);
+          }}
           t={t}
         />
       )}

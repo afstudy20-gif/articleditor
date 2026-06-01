@@ -1,13 +1,13 @@
 'use client';
 
 import type { Ref } from '@/store/types';
-import { formatBibEntry, orderRefsForBib, type CitationStyle } from '@/lib/refs/styles';
+import { formatBibEntry, orderRefsForBib, type StyleId } from '@/lib/refs/styles';
 import { useLang } from '@/lib/i18n/hooks';
 
 type Props = {
   refs: Ref[];
   refOrder: Map<string, number>;
-  style: CitationStyle;
+  style: StyleId;
   selectedId?: string | null;
   onSelect?: (id: string) => void;
 };
