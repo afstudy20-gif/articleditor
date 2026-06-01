@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { generateStructured, isAIConfigured, AIError, configFromHeaders } from '@/lib/ai/provider';
+import { generateStructured, isAIConfigured, configFromHeaders } from '@/lib/ai/provider';
+import { checkRateLimit, timeoutSignal, aiErrorResponse } from '@/lib/ai/guard';
 import { GapDetectResult } from '@/lib/ai/schemas';
 import { citationPreservationInstruction } from '@/lib/ai/citation-safety';
 
@@ -54,6 +55,9 @@ function buildPrompt(args: { text: string; scope: string; lang: 'tr' | 'en'; cit
 }
 
 export async function POST(req: Request) {
+  const limited = checkRateLimit(req);
+  if (limited) return limited;
+
   const cfg = configFromHeaders(req.headers);
   if (!isAIConfigured(cfg)) {
     return NextResponse.json(
@@ -81,12 +85,12 @@ export async function POST(req: Request) {
         temperature: 0.2,
         maxTokens: 3072,
         config: cfg,
+        signal: timeoutSignal(),
       },
     );
     return NextResponse.json(result);
   } catch (err) {
-    const status = err instanceof AIError && err.stage === 'config' ? 503 : 500;
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status });
+    console.error('[ai/gap-detect]', err);
+    return aiErrorResponse(err);
   }
 }

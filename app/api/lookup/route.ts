@@ -5,8 +5,20 @@ import { enrichRef } from '@/lib/lookup/enrich';
 import { searchCrossRef, getCrossRefByDoi } from '@/lib/lookup/crossref';
 import { searchPubmed, fetchPubmedSummaries } from '@/lib/lookup/pubmed';
 import { searchOpenAlex } from '@/lib/lookup/openalex';
+import { LookupCache } from '@/lib/lookup/cache';
 
 export const runtime = 'nodejs';
+
+// Process-level cache shared across requests: dedupes identical concurrent
+// lookups and serves repeats from memory for an hour.
+const lookupCache = new LookupCache();
+
+function enrichKey(ref: { doi?: string; pmid?: string; title?: string }): string {
+  if (ref.doi) return `enrich:doi:${ref.doi.toLowerCase().trim()}`;
+  if (ref.pmid) return `enrich:pmid:${ref.pmid.trim()}`;
+  const t = ref.title?.toLowerCase().replace(/\s+/g, ' ').trim().slice(0, 120);
+  return t ? `enrich:t:${t}` : '';
+}
 
 const BodySchema = z.object({
   mode: z.enum(['enrich', 'search', 'doi']),
@@ -30,49 +42,55 @@ export async function POST(req: Request) {
 
   try {
     if (parsed.mode === 'enrich' && parsed.ref) {
-      const enriched = await enrichRef(parsed.ref, { mailto, ncbiKey, ncbiEmail });
+      const key = enrichKey(parsed.ref);
+      const enriched = key
+        ? await lookupCache.resolve(key, () => enrichRef(parsed.ref, { mailto, ncbiKey, ncbiEmail }))
+        : await enrichRef(parsed.ref, { mailto, ncbiKey, ncbiEmail });
       return NextResponse.json({ ref: enriched });
     }
     if (parsed.mode === 'search' && parsed.query) {
       const q = parsed.query;
       const fromYear = parsed.fromYear;
       const toYear = parsed.toYear;
-      // PubMed year filter: AND YYYY[PDAT] for single year, AND YYYY:YYYY[PDAT] for range.
-      let pmQuery = q;
-      if (fromYear && toYear) pmQuery = `${q} AND ${fromYear}:${toYear}[PDAT]`;
-      else if (fromYear) pmQuery = `${q} AND ${fromYear}:3000[PDAT]`;
-      else if (toYear) pmQuery = `${q} AND 1700:${toYear}[PDAT]`;
-      const [crResult, oaResult, pmResult] = await Promise.allSettled([
-        searchCrossRef(q, { mailto, rows: 5, fromYear, toYear }),
-        searchOpenAlex(q, { mailto, fromYear, toYear }),
-        (async () => {
-          const ids = await searchPubmed(pmQuery, { apiKey: ncbiKey, email: ncbiEmail, retmax: 5 });
-          return ids.length === 0 ? [] : fetchPubmedSummaries(ids, { apiKey: ncbiKey, email: ncbiEmail });
-        })(),
-      ]);
-      const crRefs: Ref[] = crResult.status === 'fulfilled' ? crResult.value.refs : [];
-      const oaRefs: Ref[] =
-        oaResult.status === 'fulfilled'
-          ? oaResult.value.map((o, i) => ({
-              id: `oa${i}`,
-              type: 'journal-article' as const,
-              authors: o.authors ?? [],
-              title: o.title,
-              containerTitle: o.containerTitle,
-              year: o.year,
-              volume: o.volume,
-              issue: o.issue,
-              pages: o.pages,
-              doi: o.doi,
-              abstract: o.abstract,
-            }))
-          : [];
-      const pmRefs: Ref[] = pmResult.status === 'fulfilled' ? pmResult.value : [];
-      const refs = mergeRefs([
-        { source: 'CrossRef', refs: crRefs },
-        { source: 'PubMed', refs: pmRefs },
-        { source: 'OpenAlex', refs: oaRefs },
-      ]);
+      const cacheKey = `search:${q}|${fromYear ?? ''}|${toYear ?? ''}`;
+      const refs = await lookupCache.resolve(cacheKey, async () => {
+        // PubMed year filter: AND YYYY[PDAT] for single year, AND YYYY:YYYY[PDAT] for range.
+        let pmQuery = q;
+        if (fromYear && toYear) pmQuery = `${q} AND ${fromYear}:${toYear}[PDAT]`;
+        else if (fromYear) pmQuery = `${q} AND ${fromYear}:3000[PDAT]`;
+        else if (toYear) pmQuery = `${q} AND 1700:${toYear}[PDAT]`;
+        const [crResult, oaResult, pmResult] = await Promise.allSettled([
+          searchCrossRef(q, { mailto, rows: 5, fromYear, toYear }),
+          searchOpenAlex(q, { mailto, fromYear, toYear }),
+          (async () => {
+            const ids = await searchPubmed(pmQuery, { apiKey: ncbiKey, email: ncbiEmail, retmax: 5 });
+            return ids.length === 0 ? [] : fetchPubmedSummaries(ids, { apiKey: ncbiKey, email: ncbiEmail });
+          })(),
+        ]);
+        const crRefs: Ref[] = crResult.status === 'fulfilled' ? crResult.value.refs : [];
+        const oaRefs: Ref[] =
+          oaResult.status === 'fulfilled'
+            ? oaResult.value.map((o, i) => ({
+                id: `oa${i}`,
+                type: 'journal-article' as const,
+                authors: o.authors ?? [],
+                title: o.title,
+                containerTitle: o.containerTitle,
+                year: o.year,
+                volume: o.volume,
+                issue: o.issue,
+                pages: o.pages,
+                doi: o.doi,
+                abstract: o.abstract,
+              }))
+            : [];
+        const pmRefs: Ref[] = pmResult.status === 'fulfilled' ? pmResult.value : [];
+        return mergeRefs([
+          { source: 'CrossRef', refs: crRefs },
+          { source: 'PubMed', refs: pmRefs },
+          { source: 'OpenAlex', refs: oaRefs },
+        ]);
+      });
       return NextResponse.json({ refs });
     }
     if (parsed.mode === 'doi' && parsed.doi) {
@@ -81,22 +99,30 @@ export async function POST(req: Request) {
       // treat as DOI (incl. forms like "https://doi.org/10.x/y" or "doi:10.x/y").
       const isPmid = /^\d{1,9}$/.test(raw);
       if (isPmid) {
-        const refs = await fetchPubmedSummaries([raw], { apiKey: ncbiKey, email: ncbiEmail });
-        const ref = refs[0] ?? null;
+        const ref = await lookupCache.resolve(`pmid:${raw}`, async () => {
+          const refs = await fetchPubmedSummaries([raw], { apiKey: ncbiKey, email: ncbiEmail });
+          return refs[0] ?? null;
+        });
         if (!ref) {
           return NextResponse.json({ error: `PMID ${raw} bulunamadı.` }, { status: 404 });
         }
         return NextResponse.json({ ref });
       }
-      const ref = await getCrossRefByDoi(raw, { mailto });
+      const ref = await lookupCache.resolve(`doi:${raw.toLowerCase()}`, () =>
+        getCrossRefByDoi(raw, { mailto }),
+      );
       if (!ref) {
         return NextResponse.json({ error: `DOI bulunamadı: ${raw}` }, { status: 404 });
       }
       return NextResponse.json({ ref });
     }
     return NextResponse.json({ error: 'missing params' }, { status: 400 });
-  } catch (e: any) {
-    return NextResponse.json({ error: String(e?.message ?? e) }, { status: 500 });
+  } catch (e: unknown) {
+    console.error('[lookup]', e);
+    return NextResponse.json(
+      { error: 'Arama servisi şu anda yanıt vermiyor. Lütfen tekrar deneyin. / Lookup service unavailable.' },
+      { status: 502 },
+    );
   }
 }
 

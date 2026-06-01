@@ -13,10 +13,25 @@ export type ParagraphNode = {
   style?: string;
 };
 
+/**
+ * Loose OOXML node as produced by fast-xml-parser (preserveOrder mode).
+ * Values are strings, nested nodes, arrays of nodes, or attribute primitives.
+ * The tree shape varies across Word versions, so this stays intentionally open.
+ */
+type OOXMLValue = string | number | boolean | OOXMLNode | OOXMLValue[] | undefined;
+interface OOXMLNode {
+  [key: string]: OOXMLValue;
+}
+
+/** True when the value is a traversable node (object, not array, not null). */
+function isOOXMLNode(value: unknown): value is OOXMLNode {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 const W_NS = '@_xmlns:w';
 
 export async function parseDocx(file: ArrayBuffer | Uint8Array | Blob): Promise<DocxParseResult> {
-  const zip = await JSZip.loadAsync(file as any);
+  const zip = await JSZip.loadAsync(file);
   const docFile = zip.file('word/document.xml');
   if (!docFile) throw new Error('word/document.xml not found in .docx');
   const documentXml = await docFile.async('string');
@@ -28,7 +43,7 @@ export async function parseDocx(file: ArrayBuffer | Uint8Array | Blob): Promise<
     parseTagValue: false,
     parseAttributeValue: false,
   });
-  const parsed = parser.parse(documentXml);
+  const parsed = parser.parse(documentXml) as OOXMLNode;
   const paragraphs: ParagraphNode[] = [];
   walk(parsed, paragraphs);
 
@@ -36,12 +51,12 @@ export async function parseDocx(file: ArrayBuffer | Uint8Array | Blob): Promise<
   return { paragraphs, plainText, zip, documentXml };
 }
 
-function walk(node: any, out: ParagraphNode[]): void {
+function walk(node: OOXMLValue, out: ParagraphNode[]): void {
   if (Array.isArray(node)) {
     for (const item of node) walk(item, out);
     return;
   }
-  if (!node || typeof node !== 'object') return;
+  if (!isOOXMLNode(node)) return;
   for (const key of Object.keys(node)) {
     if (key === 'w:p') {
       const text = extractParagraphText(node[key]);
@@ -53,22 +68,22 @@ function walk(node: any, out: ParagraphNode[]): void {
   }
 }
 
-function extractParagraphText(pNode: any): string {
+function extractParagraphText(pNode: OOXMLValue): string {
   const parts: string[] = [];
-  const recurse = (n: any) => {
+  const recurse = (n: OOXMLValue) => {
     if (Array.isArray(n)) {
       for (const item of n) recurse(item);
       return;
     }
-    if (!n || typeof n !== 'object') return;
+    if (!isOOXMLNode(n)) return;
     for (const k of Object.keys(n)) {
       if (k === 'w:t') {
         const t = n[k];
         if (Array.isArray(t)) {
           for (const inner of t) {
-            if (inner && typeof inner === 'object' && '#text' in inner) parts.push(String(inner['#text']));
+            if (isOOXMLNode(inner) && '#text' in inner) parts.push(String(inner['#text']));
           }
-        } else if (t && typeof t === 'object' && '#text' in t) {
+        } else if (isOOXMLNode(t) && '#text' in t) {
           parts.push(String(t['#text']));
         } else if (typeof t === 'string') {
           parts.push(t);
@@ -86,8 +101,8 @@ function extractParagraphText(pNode: any): string {
   return parts.join('');
 }
 
-function extractStyle(pNode: any): string | undefined {
-  const recurse = (n: any): string | undefined => {
+function extractStyle(pNode: OOXMLValue): string | undefined {
+  const recurse = (n: OOXMLValue): string | undefined => {
     if (Array.isArray(n)) {
       for (const item of n) {
         const r = recurse(item);
@@ -95,11 +110,14 @@ function extractStyle(pNode: any): string | undefined {
       }
       return undefined;
     }
-    if (!n || typeof n !== 'object') return undefined;
+    if (!isOOXMLNode(n)) return undefined;
     if (n['w:pStyle']) {
-      const attrs = n['w:pStyle']?.[':@'] ?? n[':@'];
-      const v = attrs?.['@_w:val'];
-      if (v) return v;
+      const pStyle = n['w:pStyle'];
+      const attrs = (isOOXMLNode(pStyle) ? pStyle[':@'] : undefined) ?? n[':@'];
+      const v = isOOXMLNode(attrs) ? attrs['@_w:val'] : undefined;
+      // Attribute values are strings (parseAttributeValue: false), so this guard
+      // narrows the type without altering observed behavior.
+      if (typeof v === 'string' && v) return v;
     }
     for (const k of Object.keys(n)) {
       if (k === 'w:pPr') {

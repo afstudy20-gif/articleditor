@@ -1,6 +1,31 @@
 import type { Ref, RefType } from '@/store/types';
 import { normalizeWhitespace, parseAuthors } from './normalize';
 
+// --- Safety guards -----------------------------------------------------------
+// These bound the work done by the (intentionally fragile) heuristic parser so
+// that malformed or hostile input cannot cause catastrophic regex backtracking
+// or unbounded memory use. They do NOT alter behaviour for well-formed input:
+// real reference lines are far shorter than MAX_REF_LINE_LENGTH and real
+// bibliographies far smaller than MAX_BIBLIO_LINES.
+
+/** Lines longer than this are treated as untrustworthy and skip heavy regex. */
+export const MAX_REF_LINE_LENGTH = 2000;
+
+/** Hard cap on the number of reference lines processed in one call. */
+export const MAX_BIBLIO_LINES = 5000;
+
+/**
+ * A single reference line is only fed to the heavy heuristics if it is within
+ * the length budget. Returns the (possibly truncated) string used for parsing
+ * and whether truncation occurred. Pure: never mutates its input.
+ */
+function clampRefLine(raw: string): { text: string; truncated: boolean } {
+  if (raw.length <= MAX_REF_LINE_LENGTH) {
+    return { text: raw, truncated: false };
+  }
+  return { text: raw.slice(0, MAX_REF_LINE_LENGTH), truncated: true };
+}
+
 const BIBLIO_HEADINGS = [
   'kaynaklar',
   'kaynakça',
@@ -16,6 +41,10 @@ export type BibSplit = {
   bodyText: string;
   refLines: string[];
   headingFound?: string;
+  /** True when the raw bibliography exceeded MAX_BIBLIO_LINES and was capped. */
+  truncated?: boolean;
+  /** Number of raw lines dropped past the cap (0 when not truncated). */
+  truncatedLineCount?: number;
 };
 
 export function splitBodyAndBiblio(fullText: string): BibSplit {
@@ -43,12 +72,22 @@ export function splitBodyAndBiblio(fullText: string): BibSplit {
     return { bodyText: fullText, refLines: [] };
   }
   const body = lines.slice(0, headingIdx).join('\n').trimEnd();
-  const refsRaw = lines
+  const refsRawAll = lines
     .slice(headingIdx + 1)
     .map((l) => l.replace(/\s+$/g, ''))
     .filter((l) => l.trim().length > 0);
+  // Cap the number of raw reference lines before grouping so that hostile or
+  // accidental megabyte-sized input cannot drive the heuristics indefinitely.
+  const truncated = refsRawAll.length > MAX_BIBLIO_LINES;
+  const refsRaw = truncated ? refsRawAll.slice(0, MAX_BIBLIO_LINES) : refsRawAll;
   const refLines = groupRefLines(refsRaw);
-  return { bodyText: body, refLines, headingFound: headingText };
+  return {
+    bodyText: body,
+    refLines,
+    headingFound: headingText,
+    truncated,
+    truncatedLineCount: truncated ? refsRawAll.length - MAX_BIBLIO_LINES : 0,
+  };
 }
 
 function detectTrailingNumberedList(lines: string[]): number {
@@ -133,7 +172,23 @@ export type ParsedRef = {
 };
 
 export function parseRefLine(raw: string, id: string): ParsedRef {
-  const original = normalizeWhitespace(raw);
+  // Guard first: an absurdly long line is never a real citation. Clamp it so
+  // the heavy heuristics below operate on a bounded string, and flag it as low
+  // confidence so the UI can surface it for manual review.
+  const clamped = clampRefLine(raw);
+  const original = normalizeWhitespace(clamped.text);
+
+  if (clamped.truncated) {
+    const ref: Ref = {
+      id,
+      type: 'journal-article',
+      authors: [],
+      raw: original,
+      confidence: 0,
+    };
+    return { ref, confidence: 0 };
+  }
+
   const numMatch = original.match(/^(?:\[(\d+)\]|(\d+)[\.\)])\s+/);
   const remainder = numMatch ? original.slice(numMatch[0].length) : original;
 
@@ -265,13 +320,29 @@ function stripTrailingPunct(s: string): string {
   return s.replace(/[\s.,;:]+$/, '').trim();
 }
 
-export function parseBiblioLines(refLines: string[]): { refs: Ref[]; lowConfidence: number[] } {
+export type ParsedBiblio = {
+  refs: Ref[];
+  lowConfidence: number[];
+  /** True when input exceeded MAX_BIBLIO_LINES and trailing lines were skipped. */
+  truncated: boolean;
+  /** Number of input lines beyond the cap that were not parsed (0 otherwise). */
+  truncatedLineCount: number;
+};
+
+export function parseBiblioLines(refLines: string[]): ParsedBiblio {
+  // Defense in depth: callers may pass an already-grouped array directly
+  // (bypassing splitBodyAndBiblio). Cap it here too rather than silently
+  // processing an unbounded number of lines.
+  const truncated = refLines.length > MAX_BIBLIO_LINES;
+  const truncatedLineCount = truncated ? refLines.length - MAX_BIBLIO_LINES : 0;
+  const capped = truncated ? refLines.slice(0, MAX_BIBLIO_LINES) : refLines;
+
   const refs: Ref[] = [];
   const lowConfidence: number[] = [];
-  refLines.forEach((line, i) => {
+  capped.forEach((line, i) => {
     const { ref, confidence } = parseRefLine(line, `r${i + 1}`);
     refs.push(ref);
     if (confidence < 0.4) lowConfidence.push(i);
   });
-  return { refs, lowConfidence };
+  return { refs, lowConfidence, truncated, truncatedLineCount };
 }

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { generateStructured, isAIConfigured, AIError, configFromHeaders } from '@/lib/ai/provider';
+import { generateStructured, isAIConfigured, configFromHeaders } from '@/lib/ai/provider';
+import { checkRateLimit, timeoutSignal, aiErrorResponse } from '@/lib/ai/guard';
 import { EnhanceMode, EnhanceResult } from '@/lib/ai/schemas';
 import { citationPreservationInstruction } from '@/lib/ai/citation-safety';
 
@@ -90,6 +91,9 @@ function buildPrompt(args: {
 }
 
 export async function POST(req: Request) {
+  const limited = checkRateLimit(req);
+  if (limited) return limited;
+
   const cfg = configFromHeaders(req.headers);
   if (!isAIConfigured(cfg)) {
     return NextResponse.json(
@@ -120,6 +124,7 @@ export async function POST(req: Request) {
       temperature: 0.3,
       maxTokens: 4096,
       config: cfg,
+      signal: timeoutSignal(),
     });
     const after = countSentinels(result.after);
     const missing: number[] = [];
@@ -136,8 +141,7 @@ export async function POST(req: Request) {
       citationCheck: { total: before.total, missing, extras },
     });
   } catch (err) {
-    const status = err instanceof AIError && err.stage === 'config' ? 503 : 500;
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status });
+    console.error('[ai/enhance]', err);
+    return aiErrorResponse(err);
   }
 }

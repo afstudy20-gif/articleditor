@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import type { Ref } from '@/store/types';
-import { generateStructured, isAIConfigured, AIError, configFromHeaders } from '@/lib/ai/provider';
+import { generateStructured, isAIConfigured, configFromHeaders } from '@/lib/ai/provider';
+import { checkRateLimit, timeoutSignal, aiErrorResponse } from '@/lib/ai/guard';
 import { DeepResearchResult } from '@/lib/ai/schemas';
 import { searchCrossRef } from '@/lib/lookup/crossref';
 import { searchOpenAlex } from '@/lib/lookup/openalex';
@@ -50,6 +51,9 @@ function dedupeRefs(refs: Ref[]): Ref[] {
 }
 
 export async function POST(req: Request) {
+  const limited = checkRateLimit(req);
+  if (limited) return limited;
+
   const cfg = configFromHeaders(req.headers);
   if (!isAIConfigured(cfg)) {
     return NextResponse.json(
@@ -68,6 +72,10 @@ export async function POST(req: Request) {
   const mailto = process.env.CROSSREF_MAILTO;
   const ncbiKey = process.env.NCBI_API_KEY;
   const ncbiEmail = process.env.NCBI_EMAIL;
+
+  // Deep research is multi-step (sub-queries + retrieval + clustering); give it
+  // a longer shared deadline than the single-shot routes.
+  const signal = timeoutSignal(120_000);
 
   try {
     // 1. Sub-query generation.
@@ -88,6 +96,7 @@ export async function POST(req: Request) {
       temperature: 0.5,
       maxTokens: 1024,
       config: cfg,
+      signal,
     });
 
     // 2. Parallel retrieval across CrossRef + OpenAlex + PubMed per sub-query.
@@ -153,6 +162,7 @@ export async function POST(req: Request) {
       temperature: 0.3,
       maxTokens: 3072,
       config: cfg,
+      signal,
     });
 
     // 4. Map ref_ids back to full Ref objects.
@@ -170,8 +180,7 @@ export async function POST(req: Request) {
       queries: subq.queries,
     });
   } catch (err) {
-    const status = err instanceof AIError && err.stage === 'config' ? 503 : 500;
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status });
+    console.error('[ai/deep-research]', err);
+    return aiErrorResponse(err);
   }
 }

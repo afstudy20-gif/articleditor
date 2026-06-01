@@ -15,13 +15,16 @@ export async function generateTextAnthropic(
 ): Promise<string> {
   const client = getClient(cfg);
   try {
-    const res = await client.messages.create({
-      model: cfg.model,
-      system: opts?.system,
-      max_tokens: opts?.maxTokens ?? 4096,
-      temperature: opts?.temperature ?? 0.2,
-      messages: [{ role: 'user', content: prompt }],
-    });
+    const res = await client.messages.create(
+      {
+        model: cfg.model,
+        system: opts?.system,
+        max_tokens: opts?.maxTokens ?? 4096,
+        temperature: opts?.temperature ?? 0.2,
+        messages: [{ role: 'user', content: prompt }],
+      },
+      opts?.signal ? { signal: opts.signal } : undefined,
+    );
     const block = res.content.find((c) => c.type === 'text');
     if (!block || block.type !== 'text') throw new AIError('anthropic', 'generate', 'No text block');
     return block.text;

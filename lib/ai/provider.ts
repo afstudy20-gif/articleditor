@@ -10,6 +10,7 @@ import { generateTextGemini, streamTextGemini, embedBatchGemini } from './gemini
 import { generateTextAnthropic, streamTextAnthropic } from './anthropic';
 import { generateTextOpenAI, streamTextOpenAI, embedBatchOpenAI } from './openai';
 import { PROVIDERS, getProviderMeta, type ProviderId } from './registry';
+import { isAbortError, isTransientError } from './errors';
 
 export type ProviderName = ProviderId;
 
@@ -27,13 +28,15 @@ export type GenerateOptions = {
   temperature?: number;
   maxTokens?: number;
   jsonMode?: boolean;
+  /** Aborts the upstream provider call (used for request timeouts). */
+  signal?: AbortSignal;
 };
 
 export interface AIProvider {
   name: ProviderName;
   generateText(prompt: string, opts?: GenerateOptions): Promise<string>;
   streamText(prompt: string, opts?: GenerateOptions): AsyncIterable<string>;
-  embedBatch?(texts: string[]): Promise<number[][]>;
+  embedBatch?(texts: string[], signal?: AbortSignal): Promise<number[][]>;
 }
 
 export class AIError extends Error {
@@ -155,7 +158,7 @@ export function getProvider(name?: ProviderName, cfg?: ProviderConfig): AIProvid
         name: 'gemini',
         generateText: (p, o) => generateTextGemini(p, o, r.gemini),
         streamText: (p, o) => streamTextGemini(p, o, r.gemini),
-        embedBatch: (t) => embedBatchGemini(t, r.gemini),
+        embedBatch: (t, s) => embedBatchGemini(t, r.gemini, s),
       };
     case 'anthropic':
       return {
@@ -168,7 +171,7 @@ export function getProvider(name?: ProviderName, cfg?: ProviderConfig): AIProvid
         name: 'openai',
         generateText: (p, o) => generateTextOpenAI(p, o, r.openai),
         streamText: (p, o) => streamTextOpenAI(p, o, r.openai),
-        embedBatch: (t) => embedBatchOpenAI(t, r.openai),
+        embedBatch: (t, s) => embedBatchOpenAI(t, r.openai, s),
       };
     case 'deepseek':
       // OpenAI-compatible; reuse openai adapter with vendor-specific baseUrl.
@@ -212,7 +215,13 @@ export function getProvider(name?: ProviderName, cfg?: ProviderConfig): AIProvid
   }
 }
 
-// JSON-validated structured output with one retry on schema parse failure.
+// Max transient (network/upstream-5xx) retries, on top of one schema-reminder
+// retry. Aborted/timed-out requests are never retried.
+const MAX_NET_RETRIES = 2;
+
+// JSON-validated structured output. Retries once with a schema reminder on
+// parse failure, and up to MAX_NET_RETRIES times with exponential backoff on
+// transient network/upstream errors. Respects opts.signal for cancellation.
 export async function generateStructured<T>(
   prompt: string,
   schema: z.ZodType<T>,
@@ -225,24 +234,69 @@ export async function generateStructured<T>(
     temperature: opts?.temperature ?? 0.2,
   };
 
-  const tryOnce = async (extraInstr?: string): Promise<T> => {
+  const callModel = (extraInstr?: string): Promise<string> => {
     const fullPrompt = extraInstr ? `${prompt}\n\n${extraInstr}` : prompt;
-    const raw = await provider.generateText(fullPrompt, baseOpts);
-    const cleaned = stripCodeFence(raw);
-    const parsed = JSON.parse(cleaned);
-    return schema.parse(parsed);
+    return provider.generateText(fullPrompt, baseOpts);
   };
+  const parse = (raw: string): T => schema.parse(JSON.parse(stripCodeFence(raw)));
 
-  try {
-    return await tryOnce();
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    const reminder =
-      'IMPORTANT: Your previous response failed JSON schema validation. ' +
-      `Error: ${msg.slice(0, 300)}. ` +
-      'Respond with ONLY valid JSON, no prose, no code fences. Match the schema exactly.';
-    return await tryOnce(reminder);
+  let schemaRetried = false;
+  let netRetries = 0;
+  let reminder: string | undefined;
+
+  for (;;) {
+    try {
+      const raw = await callModel(reminder);
+      try {
+        return parse(raw);
+      } catch (parseErr) {
+        if (schemaRetried) throw parseErr;
+        schemaRetried = true;
+        reminder = schemaReminder(parseErr);
+        continue;
+      }
+    } catch (err) {
+      // User/route timeout — stop immediately, do not burn retries.
+      if (isAbortError(err)) throw err;
+      if (isTransientError(err) && netRetries < MAX_NET_RETRIES) {
+        netRetries += 1;
+        await delay(backoffMs(netRetries), opts?.signal);
+        continue;
+      }
+      throw err;
+    }
   }
+}
+
+function schemaReminder(err: unknown): string {
+  const msg = err instanceof Error ? err.message : String(err);
+  return (
+    'IMPORTANT: Your previous response failed JSON schema validation. ' +
+    `Error: ${msg.slice(0, 300)}. ` +
+    'Respond with ONLY valid JSON, no prose, no code fences. Match the schema exactly.'
+  );
+}
+
+function backoffMs(attempt: number): number {
+  return Math.min(2000, 250 * 2 ** attempt);
+}
+
+function delay(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new DOMException('Aborted', 'AbortError'));
+      return;
+    }
+    const timer = setTimeout(resolve, ms);
+    signal?.addEventListener(
+      'abort',
+      () => {
+        clearTimeout(timer);
+        reject(new DOMException('Aborted', 'AbortError'));
+      },
+      { once: true },
+    );
+  });
 }
 
 function stripCodeFence(s: string): string {

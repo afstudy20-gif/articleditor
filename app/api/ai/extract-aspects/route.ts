@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { generateStructured, isAIConfigured, AIError, configFromHeaders } from '@/lib/ai/provider';
+import { generateStructured, isAIConfigured, configFromHeaders } from '@/lib/ai/provider';
+import { checkRateLimit, timeoutSignal, aiErrorResponse } from '@/lib/ai/guard';
 import { AspectExtract } from '@/lib/ai/schemas';
 
 export const runtime = 'nodejs';
@@ -48,6 +49,9 @@ function buildPrompt(b: z.infer<typeof BodySchema>): string {
 }
 
 export async function POST(req: Request) {
+  const limited = checkRateLimit(req);
+  if (limited) return limited;
+
   const cfg = configFromHeaders(req.headers);
   if (!isAIConfigured(cfg)) {
     return NextResponse.json(
@@ -71,11 +75,11 @@ export async function POST(req: Request) {
       temperature: 0.1,
       maxTokens: 2048,
       config: cfg,
+      signal: timeoutSignal(),
     });
     return NextResponse.json(result);
   } catch (err) {
-    const status = err instanceof AIError && err.stage === 'config' ? 503 : 500;
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status });
+    console.error('[ai/extract-aspects]', err);
+    return aiErrorResponse(err);
   }
 }

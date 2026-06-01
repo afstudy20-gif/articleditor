@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getProvider, getDefaultProvider, isAIConfigured, AIError, configFromHeaders } from '@/lib/ai/provider';
+import { checkRateLimit, timeoutSignal, aiErrorResponse } from '@/lib/ai/guard';
 
 export const runtime = 'nodejs';
 
@@ -9,6 +10,9 @@ const BodySchema = z.object({
 });
 
 export async function POST(req: Request) {
+  const limited = checkRateLimit(req);
+  if (limited) return limited;
+
   const cfg = configFromHeaders(req.headers);
   if (!isAIConfigured(cfg)) {
     return NextResponse.json(
@@ -27,11 +31,12 @@ export async function POST(req: Request) {
     // Pick first provider that supports embeddings.
     const order: Array<ReturnType<typeof getDefaultProvider>> = ['gemini', 'openai'];
     let lastErr: Error | null = null;
+    const signal = timeoutSignal();
     for (const name of order) {
       try {
         const provider = getProvider(name, cfg);
         if (!provider.embedBatch) continue;
-        const embeddings = await provider.embedBatch(body.texts);
+        const embeddings = await provider.embedBatch(body.texts, signal);
         const dim = embeddings[0]?.length ?? 0;
         return NextResponse.json({ embeddings, provider: name, dim });
       } catch (err) {
@@ -44,7 +49,7 @@ export async function POST(req: Request) {
     }
     throw lastErr ?? new Error('No embedding provider available');
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    console.error('[ai/embed-batch]', err);
+    return aiErrorResponse(err);
   }
 }

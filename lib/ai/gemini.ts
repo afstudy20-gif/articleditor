@@ -46,7 +46,10 @@ export async function generateTextGemini(
     safetySettings,
   });
   try {
-    const result = await model.generateContent(prompt);
+    const result = await model.generateContent(
+      prompt,
+      opts?.signal ? { signal: opts.signal } : undefined,
+    );
     const text = result.response.text();
     if (!text) throw new AIError('gemini', 'generate', 'Empty response');
     return text;
@@ -81,14 +84,22 @@ export async function* streamTextGemini(
   }
 }
 
-export async function embedBatchGemini(texts: string[], cfg: GeminiCfg): Promise<number[][]> {
+export async function embedBatchGemini(
+  texts: string[],
+  cfg: GeminiCfg,
+  signal?: AbortSignal,
+): Promise<number[][]> {
   if (texts.length === 0) return [];
   const client = getClient(cfg);
   const model = client.getGenerativeModel({ model: cfg.embedModel });
   try {
     const out: number[][] = [];
     for (const text of texts) {
-      const result = await model.embedContent(text);
+      if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+      const result = await model.embedContent(
+        text,
+        signal ? { signal } : undefined,
+      );
       out.push(result.embedding.values);
     }
     return out;

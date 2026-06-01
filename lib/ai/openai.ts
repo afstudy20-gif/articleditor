@@ -21,13 +21,16 @@ export async function generateTextOpenAI(
     const messages: Array<{ role: 'system' | 'user'; content: string }> = [];
     if (opts?.system) messages.push({ role: 'system', content: opts.system });
     messages.push({ role: 'user', content: prompt });
-    const res = await client.chat.completions.create({
-      model: cfg.model,
-      messages,
-      temperature: opts?.temperature ?? 0.2,
-      max_tokens: opts?.maxTokens ?? 4096,
-      response_format: opts?.jsonMode ? { type: 'json_object' } : undefined,
-    });
+    const res = await client.chat.completions.create(
+      {
+        model: cfg.model,
+        messages,
+        temperature: opts?.temperature ?? 0.2,
+        max_tokens: opts?.maxTokens ?? 4096,
+        response_format: opts?.jsonMode ? { type: 'json_object' } : undefined,
+      },
+      opts?.signal ? { signal: opts.signal } : undefined,
+    );
     const text = res.choices[0]?.message?.content;
     if (!text) throw new AIError('openai', 'generate', 'Empty response');
     return text;
@@ -65,14 +68,21 @@ export async function* streamTextOpenAI(
   }
 }
 
-export async function embedBatchOpenAI(texts: string[], cfg: OpenAICfg): Promise<number[][]> {
+export async function embedBatchOpenAI(
+  texts: string[],
+  cfg: OpenAICfg,
+  signal?: AbortSignal,
+): Promise<number[][]> {
   if (texts.length === 0) return [];
   const client = getClient(cfg);
   try {
-    const res = await client.embeddings.create({
-      model: cfg.embedModel,
-      input: texts,
-    });
+    const res = await client.embeddings.create(
+      {
+        model: cfg.embedModel,
+        input: texts,
+      },
+      signal ? { signal } : undefined,
+    );
     return res.data.map((d) => d.embedding);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
