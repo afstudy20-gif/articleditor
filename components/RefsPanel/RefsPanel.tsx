@@ -135,27 +135,6 @@ export function RefsPanel({
         </div>
       )}
 
-      {tab === 'list' && selectedIds.size > 0 && (
-        <div className="px-3 py-2 border-b border-border bg-teal-bg flex items-center justify-between gap-2">
-          <span className="text-xs text-teal font-semibold">
-            {selectedIds.size} {t('rp_selected_hint')}
-          </span>
-          <div className="flex gap-2">
-            <button onClick={clearSelection} className="text-xs text-muted hover:text-primary">
-              {t('rp_cancel')}
-            </button>
-            {onBulkDelete && (
-              <button
-                onClick={bulkDelete}
-                className="btn-danger text-xs px-2 py-1"
-                title={t('rp_context_delete')}
-              >
-                🗑️ {t('rp_context_delete')} ({selectedIds.size})
-              </button>
-            )}
-          </div>
-        </div>
-      )}
       <div className="flex-1 overflow-auto p-3">
         {tab === 'list' ? (
           <RefList
