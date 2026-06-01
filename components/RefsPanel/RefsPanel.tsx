@@ -5,6 +5,7 @@ import type { Ref, RefType } from '@/store/types';
 import { newId } from '@/lib/id';
 import { useLang } from '@/lib/i18n/hooks';
 import { importByAutoDetect, importByExtension, FORMAT_LABELS, type ImportFormat } from '@/lib/refs/import-auto';
+import { parseEns, looksLikeEns } from '@/lib/refs/ens';
 import {
   HISTORY_LABELS,
   formatHistoryTime,
@@ -1020,7 +1021,26 @@ function AddPanel({
     }
   }
 
+  // EndNote .ens is a STYLE, not references — detect it and open the Style
+  // Editor pre-filled instead of importing refs. Returns true if consumed.
+  async function tryImportEnsStyle(file: File): Promise<boolean> {
+    if (!/\.ens$/i.test(file.name)) return false;
+    try {
+      const buf = new Uint8Array(await file.arrayBuffer());
+      if (!looksLikeEns(buf)) return false;
+      const parsed = parseEns(buf);
+      window.dispatchEvent(new CustomEvent('enr-open-style-editor', { detail: parsed }));
+      setImportMsg(t('rp_ens_loaded').replace('{name}', parsed.name));
+      setTimeout(() => setImportMsg(null), 6000);
+      return true;
+    } catch {
+      setImportMsg(t('rp_ens_error'));
+      return true; // consumed (it was a .ens) even though it failed
+    }
+  }
+
   async function importFromFile(file: File): Promise<void> {
+    if (await tryImportEnsStyle(file)) return;
     try {
       const text = await file.text();
       const { format, refs } = importByExtension(file.name, text);
@@ -1292,7 +1312,7 @@ function AddPanel({
             ref={importFileRef}
             type="file"
             multiple
-            accept=".ris,.enw,.nbib,.xml,.enx,.bib,.bibtex,.json,.csv,.tsv,.cff,.yaml,.yml,.txt,application/xml,application/json,text/csv,text/plain"
+            accept=".ris,.enw,.nbib,.xml,.enx,.bib,.bibtex,.json,.csv,.tsv,.cff,.yaml,.yml,.ens,.txt,application/xml,application/json,text/csv,text/plain"
             className="hidden"
             onChange={async (e) => {
               const files = Array.from(e.target.files ?? []);

@@ -14,8 +14,15 @@ import {
   getCustomStyle,
 } from '@/lib/refs/style-spec';
 
+export interface StyleSeed {
+  name: string;
+  spec: Partial<StyleSpec>;
+  rawText?: string;
+}
+
 interface StyleEditorProps {
   editId: string | null;
+  seed?: StyleSeed | null;
   lang: 'tr' | 'en';
   aiEnabled: boolean;
   onClose: () => void;
@@ -78,16 +85,31 @@ function freshSpec(): StyleSpec {
   return { ...presetSpec('vancouver'), id: newId('custom'), name: '' };
 }
 
-export function StyleEditor({ editId, lang, aiEnabled, onClose, onSaved, t }: StyleEditorProps): JSX.Element {
+export function StyleEditor({ editId, seed, lang, aiEnabled, onClose, onSaved, t }: StyleEditorProps): JSX.Element {
   const [spec, setSpec] = useState<StyleSpec>(() => {
     if (editId) {
       const existing = getCustomStyle(editId);
       if (existing) return { ...existing };
     }
+    if (seed) {
+      const base = freshSpec();
+      return {
+        ...base,
+        ...seed.spec,
+        id: base.id,
+        name: seed.name || base.name,
+        authors: { ...base.authors, ...(seed.spec.authors ?? {}) },
+        inText: { ...base.inText, ...(seed.spec.inText ?? {}) },
+        title: { ...base.title, ...(seed.spec.title ?? {}) },
+        journal: { ...base.journal, ...(seed.spec.journal ?? {}) },
+        doi: { ...base.doi, ...(seed.spec.doi ?? {}) },
+        bib: { ...base.bib, ...(seed.spec.bib ?? {}) },
+      };
+    }
     return freshSpec();
   });
-  const [aiText, setAiText] = useState('');
-  const [aiMode, setAiMode] = useState<'rules' | 'example'>('example');
+  const [aiText, setAiText] = useState(seed?.rawText ?? '');
+  const [aiMode, setAiMode] = useState<'rules' | 'example'>(seed ? 'rules' : 'example');
   const [aiBusy, setAiBusy] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
 

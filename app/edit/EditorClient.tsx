@@ -15,7 +15,7 @@ import { detectMarkers } from '@/lib/markers/detect';
 import { newId } from '@/lib/id';
 import { backupToBlob, buildBackup, projectFilename, parseBackup } from '@/lib/projects/backup';
 import { type StyleId, listAllStyles } from '@/lib/refs/styles';
-import { StyleEditor } from '@/components/Style/StyleEditor';
+import { StyleEditor, type StyleSeed } from '@/components/Style/StyleEditor';
 import { RefDetail } from '@/components/RefDetail/RefDetail';
 import { BibliographyPreview } from '@/components/Bibliography/BibliographyPreview';
 import { buildLatex } from '@/lib/tex/build';
@@ -107,11 +107,22 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
     (project.settings?.style as StyleId) ?? 'vancouver',
   );
   const [styleEditorOpen, setStyleEditorOpen] = useState(false);
+  const [styleSeed, setStyleSeed] = useState<StyleSeed | null>(null);
   const [styleOptions, setStyleOptions] = useState(() => listAllStyles());
   useEffect(() => {
     const refresh = (): void => setStyleOptions(listAllStyles());
+    const onEnsStyle = (e: Event): void => {
+      const detail = (e as CustomEvent).detail as StyleSeed | undefined;
+      if (!detail) return;
+      setStyleSeed(detail);
+      setStyleEditorOpen(true);
+    };
     window.addEventListener('enr-styles-updated', refresh);
-    return () => window.removeEventListener('enr-styles-updated', refresh);
+    window.addEventListener('enr-open-style-editor', onEnsStyle);
+    return () => {
+      window.removeEventListener('enr-styles-updated', refresh);
+      window.removeEventListener('enr-open-style-editor', onEnsStyle);
+    };
   }, []);
   const [showImportModal, setShowImportModal] = useState(false);
   const [importPreview, setImportPreview] = useState<ImportPreview>(null);
@@ -1688,6 +1699,7 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
               onChange={(e) => {
                 const v = e.target.value;
                 if (v === '__new__') {
+                  setStyleSeed(null);
                   setStyleEditorOpen(true);
                   return;
                 }
@@ -1704,7 +1716,10 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
               <option value="__new__">＋ {t('style_new')}…</option>
             </select>
             <HeaderIcon
-              onClick={() => setStyleEditorOpen(true)}
+              onClick={() => {
+                setStyleSeed(null);
+                setStyleEditorOpen(true);
+              }}
               title={t('style_edit')}
               label="🎚"
             />
@@ -2256,14 +2271,19 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
 
       {styleEditorOpen && (
         <StyleEditor
-          editId={typeof style === 'string' && style.startsWith('custom_') ? style : null}
+          editId={styleSeed ? null : typeof style === 'string' && style.startsWith('custom_') ? style : null}
+          seed={styleSeed}
           lang={lang}
           aiEnabled={aiConfigured !== false}
-          onClose={() => setStyleEditorOpen(false)}
+          onClose={() => {
+            setStyleEditorOpen(false);
+            setStyleSeed(null);
+          }}
           onSaved={(id) => {
             setStyleOptions(listAllStyles());
             setStyle(id);
             setStyleEditorOpen(false);
+            setStyleSeed(null);
           }}
           t={t}
         />
