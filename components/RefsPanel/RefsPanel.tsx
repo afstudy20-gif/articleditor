@@ -738,7 +738,7 @@ function ContextMenu({
           <div className="font-semibold text-primary text-sm leading-tight">
             {r.title || t('rp_no_title')}
           </div>
-          <div className="text-xs text-muted mt-0.5">
+          <div className="text-sm text-muted mt-0.5">
             {r.authors[0]?.family || '—'}
             {r.authors.length > 1 ? ' et al.' : ''} · {r.year ?? '?'}
             {r.containerTitle ? ` · ${r.containerTitle}` : ''}
@@ -753,7 +753,7 @@ function ContextMenu({
             {r.abstract && (
               <div
                 onMouseUp={handleSelection}
-                className="px-3 py-2 text-xs text-secondary leading-relaxed selection:bg-teal selection:text-white flex-1 flex flex-col min-h-0"
+                className="px-3 py-2 text-sm text-secondary leading-relaxed selection:bg-teal selection:text-white flex-1 flex flex-col min-h-0"
               >
                 <div className="tool-label mb-1 shrink-0">{t('rp_doi_abstract')}</div>
                 <div className="flex-1 overflow-y-auto bg-slate-50 p-2.5 rounded whitespace-pre-wrap select-text">
@@ -764,7 +764,7 @@ function ContextMenu({
             
             {selectedText && (
               <div className="px-3 py-1.5 bg-teal-bg flex items-center justify-between gap-3 shrink-0">
-                <span className="text-xs text-teal font-medium truncate max-w-[280px]">
+                <span className="text-sm text-teal font-medium truncate max-w-[280px]">
                   {t('rp_selected')}: "{selectedText}"
                 </span>
                 <button
@@ -773,7 +773,7 @@ function ContextMenu({
                       onInsertText(selectedText);
                     }
                   }}
-                  className="btn-primary text-[10px] px-2 py-0.5 rounded flex items-center gap-1 font-semibold whitespace-nowrap"
+                  className="btn-primary text-sm px-2 py-0.5 rounded flex items-center gap-1 font-semibold whitespace-nowrap"
                 >
                   ✍️ {t('rp_transfer_text')}
                 </button>
@@ -783,14 +783,14 @@ function ContextMenu({
             {!r.abstract && onLookup && (
               <button
                 onClick={onLookup}
-                className="block w-full text-left px-3 py-2 text-xs hover:bg-teal-bg hover:text-teal shrink-0"
+                className="block w-full text-left px-3 py-2 text-sm hover:bg-teal-bg hover:text-teal shrink-0"
               >
                 🔍 {t('rp_doi_abstract')}/{t('rp_lookup_doi')}
               </button>
             )}
 
             {r.aspects && (
-              <div className="px-3 py-2 text-xs">
+              <div className="px-3 py-2 text-sm">
                 <div className="tool-label mb-1">{t('rp_extract_aspects')}</div>
                 <div className="max-h-36 overflow-y-auto">
                   {(['goals', 'methods', 'datasets', 'eval_protocols', 'limitations', 'contributions', 'findings'] as const).map((k) => {
@@ -827,7 +827,7 @@ function ContextMenu({
                 value={noteValue}
                 onChange={(e) => setNoteValue(e.target.value)}
                 placeholder={t('rp_edit_note') + '...'}
-                className="w-full min-h-[60px] text-xs border border-border rounded p-2 outline-none focus:border-teal bg-slate-50 focus:bg-white resize-y"
+                className="w-full min-h-[60px] text-sm border border-border rounded p-2 outline-none focus:border-teal bg-slate-50 focus:bg-white resize-y"
               />
               {noteValue !== (r.userNote ?? '') && (
                 <div className="flex gap-2 mt-1.5 justify-end">
@@ -835,7 +835,7 @@ function ContextMenu({
                     onClick={() => {
                       onSaveNote?.(noteValue);
                     }}
-                    className="btn-primary text-xs px-2.5 py-1"
+                    className="btn-primary text-sm px-2.5 py-1"
                   >
                     {t('rp_edit_save')}
                   </button>
@@ -843,7 +843,7 @@ function ContextMenu({
                     onClick={() => {
                       setNoteValue(r.userNote ?? '');
                     }}
-                    className="text-xs text-muted hover:text-primary px-1 py-1"
+                    className="text-sm text-muted hover:text-primary px-1 py-1"
                   >
                     {t('rp_edit_cancel')}
                   </button>
@@ -860,7 +860,7 @@ function ContextMenu({
               {onShowAbstract && (
                 <button
                   onClick={onShowAbstract}
-                  className="block w-full text-left px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal"
+                  className="block w-full text-left px-3 py-1.5 text-sm hover:bg-teal-bg hover:text-teal"
                 >
                   📄 {t('rp_extract_aspects')}
                 </button>
@@ -872,12 +872,12 @@ function ContextMenu({
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={onClose}
-                  className="block px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal"
+                  className="block px-3 py-1.5 text-sm hover:bg-teal-bg hover:text-teal"
                 >
                   🔗 {t('rp_fulltext')} ({r.doi ? 'DOI' : 'URL'}) ↗
                 </a>
               ) : (
-                <span className="block px-3 py-1.5 text-xs text-secondary opacity-50 cursor-not-allowed">
+                <span className="block px-3 py-1.5 text-sm text-secondary opacity-50 cursor-not-allowed">
                   🔗 {t('rp_fulltext')} ↗
                 </span>
               )}
@@ -888,12 +888,12 @@ function ContextMenu({
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={onClose}
-                  className="block px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal"
+                  className="block px-3 py-1.5 text-sm hover:bg-teal-bg hover:text-teal"
                 >
                   🔓 Sci-Hub ↗
                 </a>
               ) : (
-                <span className="block px-3 py-1.5 text-xs text-secondary opacity-50 cursor-not-allowed">
+                <span className="block px-3 py-1.5 text-sm text-secondary opacity-50 cursor-not-allowed">
                   🔓 Sci-Hub ↗
                 </span>
               )}
@@ -904,12 +904,12 @@ function ContextMenu({
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={onClose}
-                  className="block px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal"
+                  className="block px-3 py-1.5 text-sm hover:bg-teal-bg hover:text-teal"
                 >
                   🔗 PubMed ↗
                 </a>
               ) : (
-                <span className="block px-3 py-1.5 text-xs text-secondary opacity-50 cursor-not-allowed">
+                <span className="block px-3 py-1.5 text-sm text-secondary opacity-50 cursor-not-allowed">
                   🔗 PubMed ↗
                 </span>
               )}
@@ -923,7 +923,7 @@ function ContextMenu({
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={onClose}
-                className="block px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal"
+                className="block px-3 py-1.5 text-sm hover:bg-teal-bg hover:text-teal"
               >
                 🎓 Google Scholar ↗
               </a>
@@ -933,14 +933,14 @@ function ContextMenu({
             <div className="py-1 shrink-0 bg-white">
               <button
                 onClick={onInsert}
-                className="block w-full text-left px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal font-semibold text-teal"
+                className="block w-full text-left px-3 py-1.5 text-sm hover:bg-teal-bg hover:text-teal font-semibold text-teal"
               >
                 ➕ {t('rp_insert_citation')}
               </button>
               {onEdit && (
                 <button
                   onClick={onEdit}
-                  className="block w-full text-left px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal"
+                  className="block w-full text-left px-3 py-1.5 text-sm hover:bg-teal-bg hover:text-teal"
                 >
                   ✏️ {t('rp_edit')}
                 </button>
@@ -948,7 +948,7 @@ function ContextMenu({
               {onLookup && r.abstract && (
                 <button
                   onClick={onLookup}
-                  className="block w-full text-left px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal"
+                  className="block w-full text-left px-3 py-1.5 text-sm hover:bg-teal-bg hover:text-teal"
                 >
                   🔄 {t('rp_lookup_doi')}
                 </button>
@@ -956,7 +956,7 @@ function ContextMenu({
               {onExtractAspects && (
                 <button
                   onClick={onExtractAspects}
-                  className="block w-full text-left px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal"
+                  className="block w-full text-left px-3 py-1.5 text-sm hover:bg-teal-bg hover:text-teal"
                   title={t('rp_extract_aspects')}
                 >
                   🔬 {t('rp_extract_aspects')}
@@ -964,7 +964,7 @@ function ContextMenu({
               )}
               <button
                 onClick={onDelete}
-                className="block w-full text-left px-3 py-1.5 text-xs hover:bg-red-bg hover:text-red text-red font-medium border-t border-border mt-1 pt-1.5"
+                className="block w-full text-left px-3 py-1.5 text-sm hover:bg-red-bg hover:text-red text-red font-medium border-t border-border mt-1 pt-1.5"
               >
                 🗑️ {t('rp_context_delete')}
               </button>
