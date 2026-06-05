@@ -72,6 +72,7 @@ export type Project = {
     style?: string;
     aiProvider?: 'anthropic' | 'openai';
   };
+  deleted?: number | null;
 };
 
 export type Snapshot = {

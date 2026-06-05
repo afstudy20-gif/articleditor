@@ -5,7 +5,19 @@ import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useSearchParams, useRouter } from 'next/navigation';
 import type { Project, Ref } from '@/store/types';
-import { createProject, listProjects, saveProject, deleteProject } from '@/store/db';
+import {
+  createProject,
+  listProjects,
+  saveProject,
+  deleteProject,
+  listDeletedProjects,
+  softDeleteProject,
+  restoreProject,
+  purgeProject,
+  emptyTrash,
+} from '@/store/db';
+import * as gdrive from '@/lib/sync/google-drive';
+import Script from 'next/script';
 import { backupFilename, backupToBlob, buildBackup, parseBackup } from '@/lib/projects/backup';
 import { Dropzone } from '@/components/Convert/Dropzone';
 import { PasteBox } from '@/components/Convert/PasteBox';
@@ -21,16 +33,19 @@ const EditorClient = dynamic(() => import('./EditorClient').then((m) => m.Editor
 });
 
 function EditPageInner() {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const searchParams = useSearchParams();
   const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
+  const [deletedProjects, setDeletedProjects] = useState<Project[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [importMsg, setImportMsg] = useState<string | null>(null);
   const [conversionBusy, setConversionBusy] = useState(false);
   const [conversionError, setConversionError] = useState<string | null>(null);
   const [convTab, setConvTab] = useState<'upload' | 'paste'>('upload');
+  const [syncState, setSyncState] = useState<gdrive.SyncState | null>(null);
+  const [trashOpen, setTrashOpen] = useState(false);
   const backupInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -43,18 +58,36 @@ function EditPageInner() {
         router.replace('/edit');
       }
     });
+
+    listDeletedProjects().then((ps) => {
+      setDeletedProjects(ps);
+    });
+
+    gdrive.init().catch((e) => console.warn('[sync] init failed', e));
+
+    const unsub = gdrive.onChange((state) => {
+      setSyncState(state);
+      if (state.status === 'ok') {
+        refreshList();
+      }
+    });
+
+    return () => {
+      unsub();
+    };
   }, [searchParams, router]);
 
   async function newProject(): Promise<void> {
     const p = createProject();
     await saveProject(p);
-    const ps = await listProjects();
-    setProjects(ps);
+    gdrive.markDirty(p.id);
+    await refreshList();
     setActiveId(p.id);
   }
 
   async function refreshList(): Promise<void> {
     setProjects(await listProjects());
+    setDeletedProjects(await listDeletedProjects());
   }
 
   async function exportAll(): Promise<void> {
@@ -82,6 +115,7 @@ function EditPageInner() {
           continue;
         }
         await saveProject({ ...p, updatedAt: p.updatedAt ?? Date.now() });
+        gdrive.markDirty(p.id);
         added++;
       }
       await refreshList();
@@ -149,8 +183,8 @@ function EditPageInner() {
       bodyText: split.bodyText,
     });
     await saveProject(p);
-    const ps = await listProjects();
-    setProjects(ps);
+    gdrive.markDirty(p.id);
+    await refreshList();
     setActiveId(p.id);
   }
 
@@ -195,6 +229,88 @@ function EditPageInner() {
       <div className="min-h-screen">
         <Header />
         <main className="max-w-5xl mx-auto px-6 py-8">
+          {/* Google Drive Sync Section */}
+          {syncState && (
+            <section className="card p-5 mb-6">
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div>
+                  <h2 className="text-lg font-bold text-primary flex items-center gap-2">
+                    ☁️ {t('gdrive_sync_title')}
+                    {syncState.status === 'syncing' && (
+                      <span className="animate-spin text-teal text-sm">🔄</span>
+                    )}
+                    {syncState.status === 'ok' && (
+                      <span className="text-emerald-500 text-sm">✓</span>
+                    )}
+                    {syncState.status === 'error' && (
+                      <span className="text-rose-500 text-sm" title={syncState.message}>⚠️</span>
+                    )}
+                  </h2>
+                  <p className="text-xs text-muted mt-0.5">
+                    {t('gdrive_sync_desc')}
+                  </p>
+                  {syncState.lastSync && (
+                    <p className="text-xs text-secondary mt-1 font-semibold">
+                      {t('gdrive_last_sync')}: {new Date(syncState.lastSync).toLocaleString(lang === 'tr' ? 'tr-TR' : 'en-US')}
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-3 flex-wrap">
+                  {syncState.signedIn && syncState.user ? (
+                    <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-border">
+                      {syncState.user.picture ? (
+                        <img
+                          src={syncState.user.picture}
+                          alt="Avatar"
+                          className="w-8 h-8 rounded-full border border-border"
+                          referrerPolicy="no-referrer"
+                        />
+                      ) : (
+                        <span className="w-8 h-8 rounded-full bg-teal text-white flex items-center justify-center font-bold text-xs">
+                          U
+                        </span>
+                      )}
+                      <div className="text-left">
+                        <p className="text-xs font-bold text-primary leading-tight">{syncState.user.name || 'Google User'}</p>
+                        <p className="text-[10px] text-muted leading-tight">{syncState.user.email || ''}</p>
+                      </div>
+                      <button
+                        onClick={() => gdrive.signOut()}
+                        className="text-xs text-rose-600 hover:underline ml-2 font-medium"
+                      >
+                        {t('gdrive_disconnect')}
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => gdrive.signIn()}
+                      className="btn-primary text-xs flex items-center gap-2 px-4 py-2"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 48 48" className="shrink-0">
+                        <path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.2l6.7-6.7C35.7 2.5 30.2 0 24 0 14.7 0 6.7 5.5 2.8 13.5l7.8 6C12.5 13.2 17.8 9.5 24 9.5z"/>
+                        <path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4 6.9-10 6.9-17z"/>
+                        <path fill="#FBBC05" d="M10.6 28.5c-.5-1.5-.8-3.1-.8-4.8s.3-3.3.8-4.8l-7.8-6C1 16.2 0 20 0 24s1 7.8 2.8 11.1l7.8-6.6z"/>
+                        <path fill="#34A853" d="M24 48c6.2 0 11.4-2 15.2-5.5l-7.5-5.8c-2 1.4-4.6 2.2-7.7 2.2-6.2 0-11.5-3.7-13.4-9l-7.8 6C6.7 42.5 14.7 48 24 48z"/>
+                      </svg>
+                      {t('gdrive_connect')}
+                    </button>
+                  )}
+                  
+                  {syncState.signedIn && (
+                    <button
+                      onClick={() => gdrive.syncNow()}
+                      disabled={syncState.status === 'syncing'}
+                      className="btn-secondary text-xs px-4 py-2"
+                    >
+                      {syncState.status === 'syncing' ? t('gdrive_syncing') : t('gdrive_sync_now')}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </section>
+          )}
+
           {/* Convert + create flow card */}
           <section className="card p-5 mb-6">
             <div className="flex items-center justify-between gap-2 flex-wrap mb-3">
@@ -284,14 +400,15 @@ function EditPageInner() {
                   <div className="cursor-pointer flex-1" onClick={() => setActiveId(p.id)}>
                     <h3 className="font-semibold text-primary">{p.title}</h3>
                     <p className="text-xs text-muted mt-0.5">
-                      {p.refs.length} referans · son güncelleme {new Date(p.updatedAt).toLocaleString('tr-TR')}
+                      {p.refs.length} referans · son güncelleme {new Date(p.updatedAt).toLocaleString(lang === 'tr' ? 'tr-TR' : 'en-US')}
                     </p>
                   </div>
                   <button
-                    className="btn-danger text-xs"
+                    className="btn-danger text-xs text-rose-600 border border-rose-200 bg-rose-50/20 hover:bg-rose-50 px-2.5 py-1 rounded"
                     onClick={async () => {
-                      if (confirm(t('app_delete_confirm'))) {
-                        await deleteProject(p.id);
+                      if (confirm(t('trash_soft_delete_confirm'))) {
+                        await softDeleteProject(p.id);
+                        gdrive.markDirty(p.id);
                         await refreshList();
                       }
                     }}
@@ -302,17 +419,103 @@ function EditPageInner() {
               ))}
             </ul>
           )}
+
+          {/* Trash Bin Section */}
+          {deletedProjects.length > 0 && (
+            <section className="mt-8 border-t border-border pt-6">
+              <div className="flex items-center justify-between mb-3">
+                <button
+                  onClick={() => setTrashOpen(!trashOpen)}
+                  className="text-lg font-bold text-muted hover:text-primary flex items-center gap-2"
+                >
+                  🗑️ {t('trash_bin_title')} <span className="text-xs font-normal">({deletedProjects.length})</span>
+                  <span>{trashOpen ? '▼' : '▶'}</span>
+                </button>
+                {trashOpen && (
+                  <button
+                    onClick={async () => {
+                      if (confirm(t('trash_empty_confirm'))) {
+                        await emptyTrash();
+                        deletedProjects.forEach((p) => gdrive.markDirty(p.id));
+                        await refreshList();
+                      }
+                    }}
+                    className="text-xs text-red hover:underline font-semibold"
+                  >
+                    {t('trash_empty_btn')}
+                  </button>
+                )}
+              </div>
+
+              {trashOpen && (
+                <ul className="space-y-2">
+                  {deletedProjects.map((p) => (
+                    <li key={p.id} className="card p-3 flex items-center justify-between bg-slate-50/50 hover:bg-slate-50 transition border-dashed">
+                      <div>
+                        <h3 className="font-semibold text-secondary line-through">{p.title}</h3>
+                        <p className="text-[10px] text-muted mt-0.5">
+                          {p.deleted && (
+                            <span>
+                              {lang === 'tr' ? 'Silinme tarihi:' : 'Deleted on:'}{' '}
+                              {new Date(p.deleted).toLocaleString(lang === 'tr' ? 'tr-TR' : 'en-US')}
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          className="btn-secondary text-xs px-2.5 py-1 text-teal border-teal/30 hover:bg-teal-bg animate-fade-in"
+                          onClick={async () => {
+                            await restoreProject(p.id);
+                            gdrive.markDirty(p.id);
+                            await refreshList();
+                          }}
+                        >
+                          {t('trash_restore')}
+                        </button>
+                        <button
+                          className="btn-danger text-xs px-2.5 py-1"
+                          onClick={async () => {
+                            if (confirm(t('trash_purge_confirm'))) {
+                              await purgeProject(p.id);
+                              gdrive.markDirty(p.id);
+                              await refreshList();
+                            }
+                          }}
+                        >
+                          {t('trash_purge')}
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          )}
         </main>
       </div>
     );
   }
 
-  return <EditorClient project={active} onExit={() => setActiveId(null)} onSaved={refreshList} />;
+  return (
+    <EditorClient
+      project={active}
+      onExit={() => {
+        setActiveId(null);
+        gdrive.markDirty(active.id);
+      }}
+      onSaved={() => {
+        refreshList();
+        gdrive.markDirty(active.id);
+      }}
+    />
+  );
 }
 
 export default function EditPage() {
   return (
     <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-muted">Loading…</div>}>
+      <Script src="https://accounts.google.com/gsi/client" async defer strategy="afterInteractive" />
       <EditPageInner />
     </Suspense>
   );

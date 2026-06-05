@@ -98,7 +98,59 @@ export async function saveProject(p: Project): Promise<void> {
 
 export async function listProjects(): Promise<Project[]> {
   const db = getDb();
-  return db.projects.orderBy('updatedAt').reverse().toArray();
+  const all = await db.projects.orderBy('updatedAt').reverse().toArray();
+  return all.filter((p) => !p.deleted);
+}
+
+export async function listDeletedProjects(): Promise<Project[]> {
+  const db = getDb();
+  const all = await db.projects.orderBy('updatedAt').reverse().toArray();
+  return all.filter((p) => p.deleted && p.deleted !== 1);
+}
+
+export async function softDeleteProject(id: string): Promise<void> {
+  const db = getDb();
+  const p = await db.projects.get(id);
+  if (p) {
+    p.deleted = Date.now();
+    await saveProject(p);
+  }
+}
+
+export async function restoreProject(id: string): Promise<void> {
+  const db = getDb();
+  const p = await db.projects.get(id);
+  if (p) {
+    p.deleted = null;
+    await saveProject(p);
+  }
+}
+
+export async function purgeProject(id: string): Promise<void> {
+  const db = getDb();
+  const p = await db.projects.get(id);
+  if (p) {
+    p.deleted = 1;
+    await saveProject(p);
+    if (typeof window !== 'undefined' && !localStorage.getItem('gdrive_sync_token')) {
+      await db.projects.delete(id);
+    }
+  }
+}
+
+export async function emptyTrash(): Promise<void> {
+  const db = getDb();
+  const all = await db.projects.toArray();
+  const deletedProjects = all.filter((p) => p.deleted && p.deleted !== 1);
+  const isSigned = typeof window !== 'undefined' && !!localStorage.getItem('gdrive_sync_token');
+  for (const p of deletedProjects) {
+    if (isSigned) {
+      p.deleted = 1;
+      await saveProject(p);
+    } else {
+      await db.projects.delete(p.id);
+    }
+  }
 }
 
 export async function getProject(id: string): Promise<Project | undefined> {
