@@ -3,7 +3,7 @@
 import { getDb } from '@/store/db';
 import type { Project } from '@/store/types';
 
-const DEFAULT_CLIENT_ID = '866965837196-e30js8ltie1pirn0ohuv3is2uhcecmd3.apps.googleusercontent.com';
+const DEFAULT_CLIENT_ID = '866965837196-5d5a5b7p96ip3l7cg1kg9i3ielpcr0hk.apps.googleusercontent.com';
 const LS_CLIENT_ID = 'gdrive_sync_client_id';
 
 export function getClientId(): string {
