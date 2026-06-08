@@ -46,9 +46,12 @@ function EditPageInner() {
   const [convTab, setConvTab] = useState<'upload' | 'paste'>('upload');
   const [syncState, setSyncState] = useState<gdrive.SyncState | null>(null);
   const [trashOpen, setTrashOpen] = useState(false);
+  const [showSyncSettings, setShowSyncSettings] = useState(false);
+  const [clientIdInput, setClientIdInput] = useState('');
   const backupInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    setClientIdInput(gdrive.getClientId());
     listProjects().then((ps) => {
       setProjects(ps);
       setLoaded(true);
@@ -307,6 +310,55 @@ function EditPageInner() {
                     </button>
                   )}
                 </div>
+              </div>
+
+              {/* Advanced Settings Toggle & Form */}
+              <div className="mt-4 pt-3 border-t border-border">
+                <button
+                  onClick={() => setShowSyncSettings(!showSyncSettings)}
+                  className="text-xs text-muted hover:text-primary flex items-center gap-1 font-semibold"
+                >
+                  ⚙️ {t('gdrive_advanced_settings')} {showSyncSettings ? '▼' : '▶'}
+                </button>
+
+                {showSyncSettings && (
+                  <div className="mt-3 bg-slate-50 p-3 rounded-lg border border-border text-xs flex flex-col gap-2">
+                    <label className="font-bold text-primary block">
+                      {t('gdrive_client_id_label')}
+                    </label>
+                    <input
+                      type="text"
+                      value={clientIdInput}
+                      onChange={(e) => setClientIdInput(e.target.value)}
+                      className="w-full border border-border rounded px-3 py-1.5 outline-none focus:border-teal font-mono bg-white"
+                      placeholder="866965837196-..."
+                    />
+                    <p className="text-[10px] text-muted leading-relaxed">
+                      {t('gdrive_client_id_help')}
+                    </p>
+                    <div className="flex gap-2 justify-end mt-1">
+                      <button
+                        onClick={() => {
+                          gdrive.setClientId(clientIdInput);
+                          alert(lang === 'tr' ? 'Google Client ID güncellendi. Lütfen tekrar bağlanmayı deneyin.' : 'Google Client ID updated. Please try connecting again.');
+                        }}
+                        className="btn-primary text-[10px] px-3 py-1"
+                      >
+                        {t('gdrive_client_id_save')}
+                      </button>
+                      <button
+                        onClick={() => {
+                          gdrive.setClientId('');
+                          setClientIdInput(gdrive.getClientId());
+                          alert(lang === 'tr' ? 'Client ID varsayılana sıfırlandı.' : 'Client ID reset to default.');
+                        }}
+                        className="btn-secondary text-[10px] px-3 py-1"
+                      >
+                        {t('gdrive_client_id_reset')}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </section>
           )}

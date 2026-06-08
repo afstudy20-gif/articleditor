@@ -3,7 +3,27 @@
 import { getDb } from '@/store/db';
 import type { Project } from '@/store/types';
 
-const CLIENT_ID = '866965837196-e30js8ltie1pirn0ohuv3is2uhcecmd3.apps.googleusercontent.com';
+const DEFAULT_CLIENT_ID = '866965837196-e30js8ltie1pirn0ohuv3is2uhcecmd3.apps.googleusercontent.com';
+const LS_CLIENT_ID = 'gdrive_sync_client_id';
+
+export function getClientId(): string {
+  if (typeof window !== 'undefined') {
+    return localStorage.getItem(LS_CLIENT_ID) || DEFAULT_CLIENT_ID;
+  }
+  return DEFAULT_CLIENT_ID;
+}
+
+export function setClientId(id: string) {
+  if (typeof window !== 'undefined') {
+    if (id.trim()) {
+      localStorage.setItem(LS_CLIENT_ID, id.trim());
+    } else {
+      localStorage.removeItem(LS_CLIENT_ID);
+    }
+    tokenClient = null;
+    emit();
+  }
+}
 const SCOPE = 'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile';
 const DRIVE_API = 'https://www.googleapis.com/drive/v3';
 const DRIVE_UPLOAD = 'https://www.googleapis.com/upload/drive/v3';
@@ -149,7 +169,7 @@ function ensureGISLoaded(): Promise<void> {
 async function initTokenClient() {
   await ensureGISLoaded();
   tokenClient = (window as any).google.accounts.oauth2.initTokenClient({
-    client_id: CLIENT_ID,
+    client_id: getClientId(),
     scope: SCOPE,
     callback: (resp: any) => {
       if (resp.error) {
@@ -206,7 +226,7 @@ async function fetchUserInfo() {
 }
 
 async function refreshToken() {
-  if (!CLIENT_ID) throw new Error('Client ID missing');
+  if (!getClientId()) throw new Error('Client ID missing');
   await ensureGISLoaded();
   if (!tokenClient) await initTokenClient();
   await new Promise<void>((resolve, reject) => {
