@@ -26,6 +26,7 @@ interface ProjectWorkspaceProps {
 }
 
 type DocType = 'cover' | 'title-page' | 'response' | 'contrib' | 'coi' | 'custom';
+type WizardTab = DocType | 'author-pool';
 
 interface SavedAuthor {
   id: string;
@@ -60,7 +61,7 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
   
   // Template wizard states
   const [showWizard, setShowWizard] = useState(false);
-  const [wizardType, setWizardType] = useState<DocType>('cover');
+  const [wizardType, setWizardType] = useState<WizardTab>('cover');
   const [wizardLang, setWizardLang] = useState<LetterLang>('tr');
   
   // Wizard fields
@@ -205,13 +206,12 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
   };
 
   const updateAuthorField = (index: number, field: keyof WizardAuthor, value: string) => {
-    const updated = wizardAuthors.map((a, idx) => {
+    setWizardAuthors(prev => prev.map((a, idx) => {
       if (idx === index) {
         return { ...a, [field]: value };
       }
       return a;
-    });
-    setWizardAuthors(updated);
+    }));
   };
 
   const formatAuthorsList = (list: WizardAuthor[], correspondingName: string) => {
@@ -269,10 +269,17 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
                 <div
                   key={author.id}
                   onClick={() => {
-                    updateAuthorField(idx, 'name', author.name);
-                    updateAuthorField(idx, 'email', author.email || '');
-                    updateAuthorField(idx, 'orcid', author.orcid || '');
-                    updateAuthorField(idx, 'institution', author.address || '');
+                    setWizardAuthors(prev => prev.map((a, i) => {
+                      if (i === idx) {
+                        return {
+                          name: author.name,
+                          email: author.email || '',
+                          orcid: author.orcid || '',
+                          institution: author.address || '',
+                        };
+                      }
+                      return a;
+                    }));
                     setActiveSelectIdx(null);
                   }}
                   className="flex justify-between items-center px-3 py-1.5 text-xs hover:bg-slate-50 cursor-pointer text-left transition"
@@ -286,6 +293,132 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
             </div>
           </>
         )}
+      </div>
+    );
+  };
+
+  const addBlankAuthorToPool = () => {
+    const newAuthor: SavedAuthor = {
+      id: newId('auth'),
+      name: '',
+      email: '',
+      orcid: '',
+      address: '',
+    };
+    const updated = [...savedAuthors, newAuthor];
+    setSavedAuthors(updated);
+    localStorage.setItem('endnotere-author-pool', JSON.stringify(updated));
+  };
+
+  const updateSavedAuthorField = (id: string, field: keyof SavedAuthor, value: string) => {
+    const updated = savedAuthors.map(a => {
+      if (a.id === id) {
+        return { ...a, [field]: value };
+      }
+      return a;
+    });
+    setSavedAuthors(updated);
+    localStorage.setItem('endnotere-author-pool', JSON.stringify(updated));
+  };
+
+  const renderAuthorPoolManager = () => {
+    return (
+      <div className="space-y-4 pt-2">
+        <div className="flex justify-between items-center">
+          <div>
+            <h3 className="text-sm font-bold text-primary">
+              {wizardLang === 'tr' ? 'Yazar Havuzu Yönetimi' : 'Author Pool Management'}
+            </h3>
+            <p className="text-[10px] text-muted">
+              {wizardLang === 'tr' 
+                ? 'Sistemde kayıtlı olan yazarları buradan düzenleyebilir, yenilerini ekleyebilir veya silebilirsiniz.' 
+                : 'Here you can edit saved authors, add new ones, or delete them.'}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={addBlankAuthorToPool}
+            className="text-xs bg-violet-600 text-white hover:bg-violet-700 px-3 py-1.5 rounded-lg font-semibold flex items-center gap-1.5 shadow-sm transition"
+          >
+            ➕ {wizardLang === 'tr' ? 'Yeni Yazar Ekle' : 'Add New Author'}
+          </button>
+        </div>
+
+        <div className="space-y-4 max-h-[450px] overflow-y-auto pr-1">
+          {savedAuthors.length === 0 ? (
+            <div className="text-center py-8 border border-dashed border-border rounded-xl bg-slate-50/50">
+              <span className="text-3xl">👤</span>
+              <p className="text-xs text-muted mt-2">
+                {wizardLang === 'tr' ? 'Havuzda henüz kayıtlı yazar yok.' : 'No saved authors in the pool.'}
+              </p>
+            </div>
+          ) : (
+            savedAuthors.map((author, idx) => (
+              <div key={author.id} className="p-3 bg-slate-50/70 rounded-lg border border-slate-150 relative space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] font-bold text-slate-400">
+                    #{idx + 1} {wizardLang === 'tr' ? 'Kayıtlı Yazar' : 'Saved Author'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={(e) => deleteAuthorFromPool(author.id, e)}
+                    className="text-slate-400 hover:text-red-500 text-xs"
+                    title={wizardLang === 'tr' ? 'Havuzdan Sil' : 'Delete from Pool'}
+                  >
+                    🗑️
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-[9px] uppercase font-bold text-muted px-1">
+                      {wizardLang === 'tr' ? 'Adı Soyadı' : 'Full Name'}
+                    </span>
+                    <input
+                      className={inputCls}
+                      placeholder={wizardLang === 'tr' ? 'Adı Soyadı' : 'Full Name'}
+                      value={author.name}
+                      onChange={(e) => updateSavedAuthorField(author.id, 'name', e.target.value)}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-[9px] uppercase font-bold text-muted px-1">
+                      {wizardLang === 'tr' ? 'Kurum / Üniversite' : 'Institution / University'}
+                    </span>
+                    <input
+                      className={inputCls}
+                      placeholder={wizardLang === 'tr' ? 'Kurum / Üniversite' : 'Institution / University'}
+                      value={author.address || ''}
+                      onChange={(e) => updateSavedAuthorField(author.id, 'address', e.target.value)}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-[9px] uppercase font-bold text-muted px-1">
+                      {wizardLang === 'tr' ? 'E-posta' : 'Email'}
+                    </span>
+                    <input
+                      className={inputCls}
+                      placeholder={wizardLang === 'tr' ? 'E-posta' : 'Email'}
+                      value={author.email || ''}
+                      onChange={(e) => updateSavedAuthorField(author.id, 'email', e.target.value)}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-[9px] uppercase font-bold text-muted px-1">
+                      ORCID
+                    </span>
+                    <input
+                      className={inputCls}
+                      placeholder="ORCID (e.g. 0000-0002-xxxx-xxxx)"
+                      value={author.orcid || ''}
+                      onChange={(e) => updateSavedAuthorField(author.id, 'orcid', e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
       </div>
     );
   };
@@ -415,7 +548,7 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
   const documentsList = project.documents || [];
 
   // Reset wizard inputs
-  const resetWizardFields = (type: DocType) => {
+  const resetWizardFields = (type: WizardTab) => {
     setWizardType(type);
     setWizardLang(lang === 'tr' ? 'tr' : 'en');
     setDocTitle('');
@@ -543,7 +676,7 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
 
     const newDoc: ProjectDocument = {
       id: newId('doc'),
-      type: wizardType,
+      type: wizardType as DocType,
       title: finalTitle,
       content: generatedContent,
       createdAt: Date.now(),
@@ -667,24 +800,26 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
     setTimeout(() => URL.revokeObjectURL(url), 5000);
   };
 
-  const getDocIcon = (type: DocType) => {
+  const getDocIcon = (type: WizardTab) => {
     switch (type) {
       case 'cover': return '✉️';
       case 'title-page': return '📄';
       case 'response': return '💬';
       case 'contrib': return '👥';
       case 'coi': return '⚖️';
+      case 'author-pool': return '👥';
       default: return '📝';
     }
   };
 
-  const getDocTypeName = (type: DocType, l: LetterLang = lang === 'tr' ? 'tr' : 'en') => {
+  const getDocTypeName = (type: WizardTab, l: LetterLang = lang === 'tr' ? 'tr' : 'en') => {
     switch (type) {
       case 'cover': return tI18n('letters_cover', l);
       case 'title-page': return tI18n('letters_title_page', l);
       case 'response': return tI18n('letters_response', l);
       case 'contrib': return tI18n('letters_contrib', l);
       case 'coi': return tI18n('letters_coi', l);
+      case 'author-pool': return l === 'tr' ? 'Yazar Listesi' : 'Author List';
       default: return l === 'tr' ? 'Özel Belge' : 'Custom';
     }
   };
@@ -978,7 +1113,7 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
 
             {/* Template Selectors */}
             <div className="flex gap-1 px-4 py-2 bg-slate-50 border-b border-border overflow-x-auto whitespace-nowrap">
-              {(['cover', 'title-page', 'response', 'contrib', 'coi', 'custom'] as DocType[]).map((type) => (
+              {(['cover', 'title-page', 'response', 'contrib', 'coi', 'custom', 'author-pool'] as WizardTab[]).map((type) => (
                 <button
                   key={type}
                   onClick={() => resetWizardFields(type)}
@@ -994,69 +1129,73 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
             {/* Fields Form */}
             <div className="p-5 overflow-y-auto flex-1 space-y-4">
               {/* Language Selection */}
-              <div className="bg-slate-50 p-3 rounded-lg border border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <h4 className="text-xs font-bold text-primary">{lang === 'tr' ? 'Yazışma / Şablon Dili' : 'Correspondence / Template Language'}</h4>
-                  <p className="text-[10px] text-muted">{lang === 'tr' ? 'Oluşturulacak belgenin ve şablon alanlarının dilini seçin.' : 'Select the language for the generated document and template fields.'}</p>
+              {wizardType !== 'author-pool' && (
+                <div className="bg-slate-50 p-3 rounded-lg border border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h4 className="text-xs font-bold text-primary">{lang === 'tr' ? 'Yazışma / Şablon Dili' : 'Correspondence / Template Language'}</h4>
+                    <p className="text-[10px] text-muted">{lang === 'tr' ? 'Oluşturulacak belgenin ve şablon alanlarının dilini seçin.' : 'Select the language for the generated document and template fields.'}</p>
+                  </div>
+                  <div className="flex gap-1 bg-white p-0.5 rounded-lg border border-border w-fit shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setWizardLang('tr')}
+                      className={`px-3 py-1 text-xs rounded-md font-semibold transition ${
+                        wizardLang === 'tr' ? 'bg-violet-600 text-white shadow-sm' : 'text-secondary hover:bg-slate-50'
+                      }`}
+                    >
+                      Türkçe
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setWizardLang('en')}
+                      className={`px-3 py-1 text-xs rounded-md font-semibold transition ${
+                        wizardLang === 'en' ? 'bg-violet-600 text-white shadow-sm' : 'text-secondary hover:bg-slate-50'
+                      }`}
+                    >
+                      English
+                    </button>
+                  </div>
                 </div>
-                <div className="flex gap-1 bg-white p-0.5 rounded-lg border border-border w-fit shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => setWizardLang('tr')}
-                    className={`px-3 py-1 text-xs rounded-md font-semibold transition ${
-                      wizardLang === 'tr' ? 'bg-violet-600 text-white shadow-sm' : 'text-secondary hover:bg-slate-50'
-                    }`}
-                  >
-                    Türkçe
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setWizardLang('en')}
-                    className={`px-3 py-1 text-xs rounded-md font-semibold transition ${
-                      wizardLang === 'en' ? 'bg-violet-600 text-white shadow-sm' : 'text-secondary hover:bg-slate-50'
-                    }`}
-                  >
-                    English
-                  </button>
-                </div>
-              </div>
+              )}
 
               {/* Common Fields */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="sm:col-span-2 flex flex-col gap-1">
-                  <label className={labelCls}>{wizardLang === 'tr' ? 'Mektup / Belge Adı (İsteğe Bağlı)' : 'Letter / Document Title (Optional)'}</label>
-                  <input
-                    className={inputCls}
-                    placeholder={`${getDocTypeName(wizardType, wizardLang)} ${documentsList.length + 1}`}
-                    value={docTitle}
-                    onChange={(e) => setDocTitle(e.target.value)}
-                  />
+              {wizardType !== 'author-pool' && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="sm:col-span-2 flex flex-col gap-1">
+                    <label className={labelCls}>{wizardLang === 'tr' ? 'Mektup / Belge Adı (İsteğe Bağlı)' : 'Letter / Document Title (Optional)'}</label>
+                    <input
+                      className={inputCls}
+                      placeholder={`${getDocTypeName(wizardType, wizardLang)} ${documentsList.length + 1}`}
+                      value={docTitle}
+                      onChange={(e) => setDocTitle(e.target.value)}
+                    />
+                  </div>
+
+                  {(wizardType === 'cover' || wizardType === 'response') && (
+                    <div className="flex flex-col gap-1">
+                      <label className={labelCls}>{tLocal('letters_journal')}</label>
+                      <input
+                        className={inputCls}
+                        placeholder="e.g. Nature, IEEE Access"
+                        value={journalName}
+                        onChange={(e) => setJournalName(e.target.value)}
+                      />
+                    </div>
+                  )}
+
+                  {wizardType !== 'custom' && wizardType !== 'contrib' && wizardType !== 'coi' && (
+                    <div className="flex flex-col gap-1">
+                      <label className={labelCls}>{tLocal('letters_ms_title')}</label>
+                      <input
+                        className={inputCls}
+                        placeholder="e.g. A Deep Learning Approach..."
+                        value={manuscriptTitle}
+                        onChange={(e) => setManuscriptTitle(e.target.value)}
+                      />
+                    </div>
+                  )}
                 </div>
-
-                {(wizardType === 'cover' || wizardType === 'response') && (
-                  <div className="flex flex-col gap-1">
-                    <label className={labelCls}>{tLocal('letters_journal')}</label>
-                    <input
-                      className={inputCls}
-                      placeholder="e.g. Nature, IEEE Access"
-                      value={journalName}
-                      onChange={(e) => setJournalName(e.target.value)}
-                    />
-                  </div>
-                )}
-
-                {wizardType !== 'custom' && wizardType !== 'contrib' && wizardType !== 'coi' && (
-                  <div className="flex flex-col gap-1">
-                    <label className={labelCls}>{tLocal('letters_ms_title')}</label>
-                    <input
-                      className={inputCls}
-                      placeholder="e.g. A Deep Learning Approach..."
-                      value={manuscriptTitle}
-                      onChange={(e) => setManuscriptTitle(e.target.value)}
-                    />
-                  </div>
-                )}
-              </div>
+              )}
 
               {/* Cover Letter Fields */}
               {wizardType === 'cover' && (
@@ -1317,6 +1456,9 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
                     : 'A new empty document will be created. You can write whatever you want after creating it.'}
                 </div>
               )}
+
+              {/* Author Pool / Saved List Editor */}
+              {wizardType === 'author-pool' && renderAuthorPoolManager()}
             </div>
 
             <div className="px-5 py-3 border-t border-border bg-slate-50/50 flex gap-2 justify-end">
@@ -1326,12 +1468,14 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
               >
                 {wizardLang === 'tr' ? 'Kapat' : 'Close'}
               </button>
-              <button
-                onClick={handleCreateDocument}
-                className="btn-primary text-xs px-4 py-2 font-semibold shadow-sm bg-violet-600 hover:bg-violet-700 transition"
-              >
-                ⚙️ {tLocal('letters_generate')}
-              </button>
+              {wizardType !== 'author-pool' && (
+                <button
+                  onClick={handleCreateDocument}
+                  className="btn-primary text-xs px-4 py-2 font-semibold shadow-sm bg-violet-600 hover:bg-violet-700 transition"
+                >
+                  ⚙️ {tLocal('letters_generate')}
+                </button>
+              )}
             </div>
           </div>
         </div>
