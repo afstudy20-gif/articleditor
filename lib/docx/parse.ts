@@ -8,9 +8,17 @@ export type DocxParseResult = {
   documentXml: string;
 };
 
+export type ImportRun = {
+  text: string;
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+};
+
 export type ParagraphNode = {
   text: string;
   style?: string;
+  runs?: ImportRun[];
 };
 
 /**
@@ -61,7 +69,8 @@ function walk(node: OOXMLValue, out: ParagraphNode[]): void {
     if (key === 'w:p') {
       const text = extractParagraphText(node[key]);
       const style = extractStyle(node[key]);
-      out.push({ text, style });
+      const runs = extractParagraphRuns(node[key]);
+      out.push({ text, style, runs });
     } else if (key !== ':@') {
       walk(node[key], out);
     }
@@ -99,6 +108,96 @@ function extractParagraphText(pNode: OOXMLValue): string {
   };
   recurse(pNode);
   return parts.join('');
+}
+
+function extractParagraphRuns(pNode: OOXMLValue): ImportRun[] {
+  const runs: ImportRun[] = [];
+
+  const recurse = (n: OOXMLValue) => {
+    if (Array.isArray(n)) {
+      for (const item of n) recurse(item);
+      return;
+    }
+    if (!isOOXMLNode(n)) return;
+
+    for (const k of Object.keys(n)) {
+      if (k === 'w:r') {
+        const rNode = n[k];
+        let runText = '';
+        let bold = false;
+        let italic = false;
+        let underline = false;
+
+        const findPropsAndText = (rn: OOXMLValue) => {
+          if (Array.isArray(rn)) {
+            for (const item of rn) findPropsAndText(item);
+            return;
+          }
+          if (!isOOXMLNode(rn)) return;
+
+          for (const key of Object.keys(rn)) {
+            if (key === 'w:rPr') {
+              const rPr = rn[key];
+              const checkPr = (pr: OOXMLValue) => {
+                if (Array.isArray(pr)) {
+                  for (const item of pr) checkPr(item);
+                  return;
+                }
+                if (!isOOXMLNode(pr)) return;
+                if ('w:b' in pr) bold = true;
+                if ('w:i' in pr) italic = true;
+                if ('w:u' in pr) underline = true;
+                for (const subKey of Object.keys(pr)) {
+                  if (subKey === 'w:b' || subKey === 'w:i' || subKey === 'w:u') {
+                    if (subKey === 'w:b') bold = true;
+                    if (subKey === 'w:i') italic = true;
+                    if (subKey === 'w:u') underline = true;
+                  }
+                }
+              };
+              checkPr(rPr);
+            } else if (key === 'w:t') {
+              const t = rn[key];
+              if (Array.isArray(t)) {
+                for (const inner of t) {
+                  if (isOOXMLNode(inner) && '#text' in inner) runText += String(inner['#text']);
+                }
+              } else if (isOOXMLNode(t) && '#text' in t) {
+                runText += String(t['#text']);
+              } else if (typeof t === 'string') {
+                runText += t;
+              }
+            } else if (key === 'w:tab') {
+              runText += '\t';
+            } else if (key === 'w:br') {
+              runText += '\n';
+            } else if (key !== ':@') {
+              findPropsAndText(rn[key]);
+            }
+          }
+        };
+
+        findPropsAndText(rNode);
+        if (runText.length > 0) {
+          runs.push({
+            text: runText,
+            bold: bold || undefined,
+            italic: italic || undefined,
+            underline: underline || undefined,
+          });
+        }
+      } else if (k === 'w:tab') {
+        runs.push({ text: '\t' });
+      } else if (k === 'w:br') {
+        runs.push({ text: '\n' });
+      } else if (k !== ':@') {
+        recurse(n[k]);
+      }
+    }
+  };
+
+  recurse(pNode);
+  return runs;
 }
 
 function extractStyle(pNode: OOXMLValue): string | undefined {

@@ -9,7 +9,7 @@ import { RefsPanel } from '@/components/RefsPanel/RefsPanel';
 import { tiptapToBuildInput } from '@/lib/editor/to-export';
 import { buildDocx } from '@/lib/docx/build';
 import { refsToRis } from '@/lib/refs/ris';
-import { parseDocx } from '@/lib/docx/parse';
+import { parseDocx, type ImportRun } from '@/lib/docx/parse';
 import { splitBodyAndBiblio, parseBiblioLines } from '@/lib/refs/parse-biblio';
 import { detectMarkers } from '@/lib/markers/detect';
 import { newId } from '@/lib/id';
@@ -66,7 +66,14 @@ type Props = {
   onGoToDocuments?: () => void;
 };
 
+type ImportParagraph = {
+  text: string;
+  style?: string;
+  runs?: ImportRun[];
+};
+
 type ImportPreview = {
+  paragraphs: ImportParagraph[];
   bodyText: string;
   refs: Ref[];
   markerCount: number;
@@ -132,6 +139,8 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
   const [exportLineNumbers, setExportLineNumbers] = useState(false);
   const [importPreview, setImportPreview] = useState<ImportPreview>(null);
   const [importPasteText, setImportPasteText] = useState('');
+  const [pastedHtmlParagraphs, setPastedHtmlParagraphs] = useState<ImportParagraph[] | null>(null);
+  const [pastedPlainReference, setPastedPlainReference] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [lookupBusyId, setLookupBusyId] = useState<string | null>(null);
   const [lookupAllBusy, setLookupAllBusy] = useState(false);
@@ -1627,8 +1636,29 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
     setImportError(null);
     try {
       const buf = await file.arrayBuffer();
-      const { plainText } = await parseDocx(buf);
-      processImportText(plainText);
+      const { paragraphs, plainText } = await parseDocx(buf);
+
+      const split = splitBodyAndBiblio(plainText);
+      const { refs: parsedRefs } = parseBiblioLines(split.refLines);
+
+      let referencesStartIndex = paragraphs.length;
+      for (let i = 0; i < paragraphs.length; i++) {
+        const lower = paragraphs[i].text.trim().toLowerCase();
+        if (lower === 'references' || lower === 'kaynaklar' || lower === 'bibliography' || lower === 'literatür') {
+          referencesStartIndex = i;
+          break;
+        }
+      }
+
+      const bodyParagraphs = paragraphs.slice(0, referencesStartIndex);
+      const markers = detectMarkers(bodyParagraphs.map((p) => p.text).join('\n'));
+
+      setImportPreview({
+        paragraphs: bodyParagraphs,
+        bodyText: bodyParagraphs.map((p) => p.text).join('\n'),
+        refs: parsedRefs,
+        markerCount: markers.length,
+      });
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       setImportError(t('ed_import_error').replace('{msg}', msg));
@@ -1638,8 +1668,46 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
   function processImportText(text: string): void {
     const split = splitBodyAndBiblio(text);
     const { refs: parsedRefs } = parseBiblioLines(split.refLines);
+
+    if (pastedHtmlParagraphs && pastedPlainReference && text.trim() === pastedPlainReference.trim()) {
+      let referencesStartIndex = pastedHtmlParagraphs.length;
+      for (let i = 0; i < pastedHtmlParagraphs.length; i++) {
+        const lower = pastedHtmlParagraphs[i].text.trim().toLowerCase();
+        if (
+          lower === 'references' ||
+          lower === 'kaynaklar' ||
+          lower === 'bibliography' ||
+          lower === 'literatür'
+        ) {
+          referencesStartIndex = i;
+          break;
+        }
+      }
+
+      const bodyParagraphs = pastedHtmlParagraphs.slice(0, referencesStartIndex);
+      const markers = detectMarkers(bodyParagraphs.map((p) => p.text).join('\n'));
+
+      setImportPreview({
+        paragraphs: bodyParagraphs,
+        bodyText: bodyParagraphs.map((p) => p.text).join('\n'),
+        refs: parsedRefs,
+        markerCount: markers.length,
+      });
+      return;
+    }
+
+    const lines = split.bodyText.split(/\r?\n+/).filter((l) => l.trim().length > 0);
+    const paragraphs = lines.map((line, idx) => {
+      const headingLevel = isCommonHeading(line, idx);
+      return {
+        text: line,
+        style: headingLevel ? `Heading${headingLevel}` : undefined,
+      };
+    });
+
     const markers = detectMarkers(split.bodyText);
     setImportPreview({
+      paragraphs,
       bodyText: split.bodyText,
       refs: parsedRefs,
       markerCount: markers.length,
@@ -1650,7 +1718,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
     if (!importPreview) return;
     const newRefs: Ref[] = importPreview.refs.map((r) => ({ ...r, id: newRefId() }));
     // Build TipTap doc with citation nodes inserted at [N], [N,M], [N-M] marker positions.
-    const newDoc = buildDocWithCitations(importPreview.bodyText, newRefs);
+    const newDoc = buildDocWithCitations(importPreview.paragraphs, newRefs);
     if (replace) {
       setRefs(newRefs);
       setDoc(newDoc);
@@ -1674,6 +1742,8 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
     setShowImportModal(false);
     setImportPreview(null);
     setImportPasteText('');
+    setPastedHtmlParagraphs(null);
+    setPastedPlainReference(null);
   }
 
   const aiOff = aiConfigured === false;
@@ -1704,7 +1774,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
     { id: 'export-ris', group: t('cmd_g_export'), label: t('ed_export_ris'), run: exportRis },
     { id: 'export-latex', group: t('cmd_g_export'), label: t('ed_export_latex'), run: exportLatex },
     { id: 'export-json', group: t('cmd_g_export'), label: 'JSON', run: exportProjectJson },
-    { id: 'import-docx', group: t('cmd_g_doc'), label: t('ed_import_docx'), run: () => { setShowImportModal(true); setImportPreview(null); setImportError(null); setImportPasteText(''); } },
+    { id: 'import-docx', group: t('cmd_g_doc'), label: t('ed_import_docx'), run: () => { setShowImportModal(true); setImportPreview(null); setImportError(null); setImportPasteText(''); setPastedHtmlParagraphs(null); setPastedPlainReference(null); } },
     { id: 'lookup-all', group: t('cmd_g_doc'), label: t('rp_scan_all'), run: lookupAllRefs },
   ];
 
@@ -2174,6 +2244,8 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
             setShowImportModal(false);
             setImportPreview(null);
             setImportPasteText('');
+            setPastedHtmlParagraphs(null);
+            setPastedPlainReference(null);
           }}
           docxInputRef={docxInputRef}
           onSelectDocx={async (file) => {
@@ -2182,6 +2254,13 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
           pasteText={importPasteText}
           setPasteText={setImportPasteText}
           onProcessPaste={() => processImportText(importPasteText)}
+          onPasteHtml={(html, plain) => {
+            const parsed = parseHtmlToParagraphs(html);
+            if (parsed.length > 0) {
+              setPastedHtmlParagraphs(parsed);
+              setPastedPlainReference(plain);
+            }
+          }}
           preview={importPreview}
           onApply={applyImport}
         />
@@ -2437,6 +2516,7 @@ function ImportModal({
   pasteText,
   setPasteText,
   onProcessPaste,
+  onPasteHtml,
   preview,
   onApply,
 }: {
@@ -2446,6 +2526,7 @@ function ImportModal({
   pasteText: string;
   setPasteText: (v: string) => void;
   onProcessPaste: () => void;
+  onPasteHtml?: (html: string, plain: string) => void;
   preview: ImportPreview;
   onApply: (replace: boolean) => void;
 }): JSX.Element {
@@ -2490,6 +2571,13 @@ function ImportModal({
                   placeholder="Belge metnini yapıştır. Kaynakça otomatik algılanır."
                   value={pasteText}
                   onChange={(e) => setPasteText(e.target.value)}
+                  onPaste={(e) => {
+                    const html = e.clipboardData.getData('text/html');
+                    const plain = e.clipboardData.getData('text/plain');
+                    if (html && onPasteHtml) {
+                      onPasteHtml(html, plain);
+                    }
+                  }}
                 />
                 <div className="mt-2 flex justify-end">
                   <button
@@ -2555,25 +2643,215 @@ function bodyTextToTipTap(text: string): unknown {
   return { type: 'doc', content: content.length > 0 ? content : [{ type: 'paragraph' }] };
 }
 
-function buildDocWithCitations(text: string, refs: Ref[]): unknown {
-  const paragraphs = text.split(/\r?\n+/).filter((l) => l.trim().length > 0);
-  const content = paragraphs.map((para) => ({
-    type: 'paragraph',
-    content: paragraphToCitationInline(para, refs),
-  }));
+function isCommonHeading(line: string, index: number): number | null {
+  const trimmed = line.trim();
+  if (trimmed.length === 0 || trimmed.length > 120) return null;
+
+  // First paragraph is likely a Title (Heading 1) if it's not too long and doesn't end with a period
+  if (index === 0 && !/[.?!]$/.test(trimmed)) {
+    return 1;
+  }
+
+  const lower = trimmed.toLowerCase();
+  const commonHeadings = [
+    'abstract', 'özet', 'introduction', 'giriş', 'background', 'arka plan',
+    'methods', 'yöntem', 'yöntemler', 'methodology', 'materials and methods', 'gereç ve yöntem',
+    'results', 'bulgular', 'discussion', 'tartışma', 'conclusion', 'sonuç',
+    'conclusions', 'sonuçlar', 'limitations', 'kısıtlılıklar', 'acknowledgments', 'teşekkür',
+    'funding', 'finansman', 'conflict of interest', 'çıkar çatışması', 'ethics', 'etik',
+    'author contributions', 'yazar katkıları', 'data availability', 'veri erişimi',
+    'references', 'kaynaklar', 'supplementary', 'ek materyaller',
+  ];
+
+  if (commonHeadings.includes(lower)) {
+    return 2;
+  }
+
+  // Custom numbered headings: e.g. "1. Introduction", "2. Methods", "2.1 Study Design"
+  if (/^\d+(\.\d+)*\s+[A-Z\u00C0-\u00DC]/.test(trimmed) && !/[.?!]$/.test(trimmed) && trimmed.length < 60) {
+    return 3;
+  }
+
+  return null;
+}
+
+function buildDocWithCitations(paragraphs: Array<{ text: string; style?: string; runs?: ImportRun[] }>, refs: Ref[]): unknown {
+  const content = paragraphs.map((p) => {
+    let style = p.style?.toLowerCase() ?? '';
+    const text = p.text;
+
+    // Auto-detect heading from runs if style is not explicitly a heading style
+    if (!style.includes('heading') && style !== 'title' && style !== 'subtitle') {
+      const detected = detectHeadingFromRuns(text, p.runs);
+      if (detected) {
+        style = detected.toLowerCase();
+      }
+    }
+
+    let headingLevel: number | null = null;
+    if (style.includes('heading1') || style === 'title' || style === 'heading 1') {
+      headingLevel = 1;
+    } else if (style.includes('heading2') || style === 'subtitle' || style === 'heading 2') {
+      headingLevel = 2;
+    } else if (style.includes('heading3') || style === 'heading 3') {
+      headingLevel = 3;
+    }
+
+    if (headingLevel !== null) {
+      return {
+        type: 'heading',
+        attrs: { level: headingLevel },
+        content: paragraphToCitationInlineRich(text, p.runs, refs),
+      };
+    }
+
+    return {
+      type: 'paragraph',
+      content: paragraphToCitationInlineRich(text, p.runs, refs),
+    };
+  });
   return { type: 'doc', content: content.length > 0 ? content : [{ type: 'paragraph' }] };
 }
 
-function paragraphToCitationInline(para: string, refs: Ref[]): Array<Record<string, unknown>> {
-  const markers = detectMarkers(para);
-  if (markers.length === 0) {
-    return para.length > 0 ? [{ type: 'text', text: para }] : [];
+function detectHeadingFromRuns(text: string, runs?: ImportRun[]): string | undefined {
+  if (!runs || runs.length === 0) return undefined;
+  const trimmed = text.trim();
+  if (trimmed.length === 0 || trimmed.length > 120 || /[.?!]$/.test(trimmed)) return undefined;
+
+  // Check if all non-whitespace text is bold
+  const nonWsChars = trimmed.replace(/\s+/g, '');
+  let boldCharsCount = 0;
+  for (const r of runs) {
+    if (r.bold) {
+      boldCharsCount += r.text.replace(/\s+/g, '').length;
+    }
   }
+
+  if (boldCharsCount > 0 && boldCharsCount >= nonWsChars.length * 0.9) {
+    return 'Heading2';
+  }
+  return undefined;
+}
+
+function parseHtmlToParagraphs(html: string): ImportParagraph[] {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, 'text/html');
+  const paragraphs: ImportParagraph[] = [];
+
+  const blockElements = doc.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li, blockquote');
+
+  if (blockElements.length === 0) {
+    const divs = doc.querySelectorAll('div');
+    if (divs.length > 0) {
+      divs.forEach((div) => {
+        if (!div.querySelector('div')) {
+          paragraphs.push(parseElementToParagraph(div));
+        }
+      });
+    }
+  } else {
+    blockElements.forEach((el) => {
+      paragraphs.push(parseElementToParagraph(el));
+    });
+  }
+
+  return paragraphs.filter((p) => p.text.trim().length > 0);
+}
+
+function parseElementToParagraph(el: Element): ImportParagraph {
+  const text = el.textContent || '';
+  const tagName = el.tagName.toLowerCase();
+
+  let style: string | undefined = undefined;
+  if (tagName === 'h1') style = 'Heading1';
+  else if (tagName === 'h2') style = 'Heading2';
+  else if (tagName === 'h3') style = 'Heading3';
+  else if (tagName === 'h4') style = 'Heading4';
+  else if (tagName === 'h5') style = 'Heading5';
+  else if (tagName === 'h6') style = 'Heading6';
+
+  const runs: ImportRun[] = [];
+
+  const traverse = (node: Node, boldActive: boolean, italicActive: boolean, underlineActive: boolean) => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      const txt = node.textContent || '';
+      if (txt) {
+        runs.push({
+          text: txt,
+          bold: boldActive || undefined,
+          italic: italicActive || undefined,
+          underline: underlineActive || undefined,
+        });
+      }
+    } else if (node.nodeType === Node.ELEMENT_NODE) {
+      const childEl = node as Element;
+      const childTag = childEl.tagName.toLowerCase();
+
+      const isBold = boldActive || childTag === 'strong' || childTag === 'b' || childEl.getAttribute('style')?.includes('font-weight: bold') || childEl.getAttribute('style')?.includes('font-weight: 700') || childEl.getAttribute('style')?.includes('font-weight:bold');
+      const isItalic = italicActive || childTag === 'em' || childTag === 'i' || childEl.getAttribute('style')?.includes('font-style: italic') || childEl.getAttribute('style')?.includes('font-style:italic');
+      const isUnderline = underlineActive || childTag === 'u' || childEl.getAttribute('style')?.includes('text-decoration: underline') || childEl.getAttribute('style')?.includes('text-decoration:underline');
+
+      childEl.childNodes.forEach((child) => {
+        traverse(child, !!isBold, !!isItalic, !!isUnderline);
+      });
+    }
+  };
+
+  el.childNodes.forEach((child) => {
+    traverse(child, false, false, false);
+  });
+
+  if (!style) {
+    const isAllBold = runs.length > 0 && runs.every((r) => r.bold || /^\s*$/.test(r.text));
+    const isFirstBold = runs.length > 0 && runs[0].bold && runs[0].text.trim().length > 0;
+    const trimmedText = text.trim();
+
+    if (trimmedText.length > 0 && trimmedText.length < 120 && !/[.?!]$/.test(trimmedText)) {
+      if (isAllBold) {
+        style = 'Heading2';
+      } else if (isFirstBold && runs[0].text.trim().length === trimmedText.length) {
+        style = 'Heading2';
+      }
+    }
+  }
+
+  return {
+    text,
+    style,
+    runs,
+  };
+}
+
+function paragraphToCitationInlineRich(
+  paraText: string,
+  runs: ImportRun[] | undefined,
+  refs: Ref[]
+): Array<Record<string, unknown>> {
+  const activeRuns = runs && runs.length > 0 ? runs : [{ text: paraText }];
+  const markers = detectMarkers(paraText);
+  const charStyles: Array<{ bold?: boolean; italic?: boolean; underline?: boolean }> = [];
+  
+  for (const r of activeRuns) {
+    for (let i = 0; i < r.text.length; i++) {
+      charStyles.push({
+        bold: r.bold,
+        italic: r.italic,
+        underline: r.underline,
+      });
+    }
+  }
+  
+  while (charStyles.length < paraText.length) {
+    charStyles.push({});
+  }
+
   const out: Array<Record<string, unknown>> = [];
   let cursor = 0;
+
   for (const m of markers) {
     if (m.startIndex > cursor) {
-      out.push({ type: 'text', text: para.slice(cursor, m.startIndex) });
+      const segmentText = paraText.slice(cursor, m.startIndex);
+      out.push(...makeTextNodesWithStyles(segmentText, cursor, charStyles));
     }
     const refIds = m.refNumbers
       .map((n) => refs[n - 1]?.id)
@@ -2581,14 +2859,64 @@ function paragraphToCitationInline(para: string, refs: Ref[]): Array<Record<stri
     if (refIds.length > 0) {
       out.push({ type: 'citation', attrs: { refIds } });
     } else {
-      out.push({ type: 'text', text: m.raw });
+      const segmentText = m.raw;
+      out.push(...makeTextNodesWithStyles(segmentText, m.startIndex, charStyles));
     }
     cursor = m.endIndex;
   }
-  if (cursor < para.length) {
-    out.push({ type: 'text', text: para.slice(cursor) });
+
+  if (cursor < paraText.length) {
+    const segmentText = paraText.slice(cursor);
+    out.push(...makeTextNodesWithStyles(segmentText, cursor, charStyles));
   }
+
   return out;
+}
+
+function makeTextNodesWithStyles(
+  text: string,
+  startOffset: number,
+  charStyles: Array<{ bold?: boolean; italic?: boolean; underline?: boolean }>
+): Array<Record<string, unknown>> {
+  if (text.length === 0) return [];
+  const nodes: Array<Record<string, unknown>> = [];
+  let currentText = '';
+  let prevStyleKey = '';
+
+  for (let i = 0; i < text.length; i++) {
+    const charIndex = startOffset + i;
+    const style = charStyles[charIndex] || {};
+    const styleKey = `${style.bold ? 'B' : ''}_${style.italic ? 'I' : ''}_${style.underline ? 'U' : ''}`;
+
+    if (i === 0) {
+      currentText = text[i];
+      prevStyleKey = styleKey;
+    } else if (styleKey === prevStyleKey) {
+      currentText += text[i];
+    } else {
+      nodes.push(createTextNode(currentText, charStyles[startOffset + i - currentText.length]));
+      currentText = text[i];
+      prevStyleKey = styleKey;
+    }
+  }
+
+  if (currentText.length > 0) {
+    nodes.push(createTextNode(currentText, charStyles[startOffset + text.length - currentText.length]));
+  }
+
+  return nodes;
+}
+
+function createTextNode(text: string, style: { bold?: boolean; italic?: boolean; underline?: boolean }): Record<string, unknown> {
+  const node: Record<string, unknown> = { type: 'text', text };
+  const marks: Array<Record<string, unknown>> = [];
+  if (style.bold) marks.push({ type: 'bold' });
+  if (style.italic) marks.push({ type: 'italic' });
+  if (style.underline) marks.push({ type: 'underline' });
+  if (marks.length > 0) {
+    node.marks = marks;
+  }
+  return node;
 }
 
 function mergeTipTapDocs(prev: any, incoming: any): unknown {
