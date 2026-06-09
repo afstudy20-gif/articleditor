@@ -429,3 +429,98 @@ function splitByMarkers(lines: ReadonlyArray<string>): string[] {
 function splitByBlankLines(text: string): string[] {
   return text.split(/\n\s*\n+/);
 }
+
+// ---------------------------------------------------------------------------
+// Title Page Template
+// ---------------------------------------------------------------------------
+
+export interface TitlePageInput {
+  manuscriptTitle: string;
+  runningTitle?: string;
+  authorsStr?: string;
+  correspondingAuthor?: string;
+  correspondingEmail?: string;
+  correspondingAddress?: string;
+  orcid?: string;
+  abstractWordCount?: string;
+  manuscriptWordCount?: string;
+  figuresCount?: string;
+  tablesCount?: string;
+  conflictOfInterest?: string;
+  funding?: string;
+  acknowledgements?: string;
+  lang: LetterLang;
+}
+
+export function buildTitlePage(input: TitlePageInput): string {
+  return input.lang === 'tr'
+    ? buildTitlePageTr(input)
+    : buildTitlePageEn(input);
+}
+
+function buildTitlePageEn(input: TitlePageInput): string {
+  const title = orPlaceholder(input.manuscriptTitle, '[Manuscript Title]');
+  const running = orPlaceholder(input.runningTitle, '[Running Title]');
+  const authors = orPlaceholder(input.authorsStr, '[Author Names and Affiliations]');
+  const corrAuthor = orPlaceholder(input.correspondingAuthor, '[Corresponding Author Name]');
+  const corrEmail = orPlaceholder(input.correspondingEmail, '[Email Address]');
+  const corrAddress = orPlaceholder(input.correspondingAddress, '[Full Mailing Address]');
+  const orcid = orPlaceholder(input.orcid, '[ORCID]');
+  
+  const absWords = orPlaceholder(input.abstractWordCount, '[Count]');
+  const msWords = orPlaceholder(input.manuscriptWordCount, '[Count]');
+  const figs = orPlaceholder(input.figuresCount, '[Count]');
+  const tbls = orPlaceholder(input.tablesCount, '[Count]');
+  
+  const conflict = orPlaceholder(input.conflictOfInterest, 'The authors declare no conflict of interest.');
+  const funding = orPlaceholder(input.funding, 'This research received no external funding.');
+  const ack = orPlaceholder(input.acknowledgements, 'None.');
+
+  const header = `TITLE PAGE`;
+  
+  const mainTitleBlock = `Title: ${title}\nRunning Title: ${running}`;
+  
+  const authorBlock = `Authors:\n${authors}`;
+  
+  const corrBlock = `Corresponding Author:\nName: ${corrAuthor}\nAddress: ${corrAddress}\nEmail: ${corrEmail}\nORCID: ${orcid}`;
+  
+  const statsBlock = `Word Counts & Elements:\n- Abstract Word Count: ${absWords}\n- Manuscript Word Count: ${msWords}\n- Number of Figures: ${figs}\n- Number of Tables: ${tbls}`;
+  
+  const declarations = `Conflict of Interest:\n${conflict}\n\nFunding:\n${funding}\n\nAcknowledgements:\n${ack}`;
+
+  return joinParagraphs([header, mainTitleBlock, authorBlock, corrBlock, statsBlock, declarations]);
+}
+
+function buildTitlePageTr(input: TitlePageInput): string {
+  const title = orPlaceholder(input.manuscriptTitle, '[Makale Başlığı]');
+  const running = orPlaceholder(input.runningTitle, '[Kısa Başlık]');
+  const authors = orPlaceholder(input.authorsStr, '[Yazar İsimleri ve Kurumları]');
+  const corrAuthor = orPlaceholder(input.correspondingAuthor, '[Sorumlu Yazar Adı]');
+  const corrEmail = orPlaceholder(input.correspondingEmail, '[E-posta Adresi]');
+  const corrAddress = orPlaceholder(input.correspondingAddress, '[Açık Posta Adresi]');
+  const orcid = orPlaceholder(input.orcid, '[ORCID]');
+  
+  const absWords = orPlaceholder(input.abstractWordCount, '[Adet]');
+  const msWords = orPlaceholder(input.manuscriptWordCount, '[Adet]');
+  const figs = orPlaceholder(input.figuresCount, '[Adet]');
+  const tbls = orPlaceholder(input.tablesCount, '[Adet]');
+  
+  const conflict = orPlaceholder(input.conflictOfInterest, 'Yazarlar herhangi bir çıkar çatışması bulunmadığını beyan eder.');
+  const funding = orPlaceholder(input.funding, 'Bu araştırma için herhangi bir dış fon alınmamıştır.');
+  const ack = orPlaceholder(input.acknowledgements, 'Bulunmamaktadır.');
+
+  const header = `BAŞLIK SAYFASI`;
+  
+  const mainTitleBlock = `Başlık: ${title}\nKısa Başlık: ${running}`;
+  
+  const authorBlock = `Yazarlar:\n${authors}`;
+  
+  const corrBlock = `Sorumlu Yazar:\nİsim: ${corrAuthor}\nAdres: ${corrAddress}\nE-posta: ${corrEmail}\nORCID: ${orcid}`;
+  
+  const statsBlock = `Kelime Sayıları ve Unsurlar:\n- Özet Kelime Sayısı: ${absWords}\n- Ana Metin Kelime Sayısı: ${msWords}\n- Şekil Sayısı: ${figs}\n- Tablo Sayısı: ${tbls}`;
+  
+  const declarations = `Çıkar Çatışması:\n${conflict}\n\nFinansal Destek:\n${funding}\n\nTeşekkür:\n${ack}`;
+
+  return joinParagraphs([header, mainTitleBlock, authorBlock, corrBlock, statsBlock, declarations]);
+}
+

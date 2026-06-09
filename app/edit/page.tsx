@@ -32,6 +32,8 @@ const EditorClient = dynamic(() => import('./EditorClient').then((m) => m.Editor
   loading: () => <div className="text-muted p-8">Loading…</div>,
 });
 
+import { ProjectWorkspace } from '@/components/Workspace/ProjectWorkspace';
+
 function EditPageInner() {
   const { t, lang } = useLang();
   const searchParams = useSearchParams();
@@ -39,6 +41,7 @@ function EditPageInner() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [deletedProjects, setDeletedProjects] = useState<Project[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [activeSubView, setActiveSubView] = useState<'workspace' | 'workspace-documents' | 'manuscript'>('workspace');
   const [loaded, setLoaded] = useState(false);
   const [importMsg, setImportMsg] = useState<string | null>(null);
   const [conversionBusy, setConversionBusy] = useState(false);
@@ -79,6 +82,11 @@ function EditPageInner() {
       unsub();
     };
   }, [searchParams, router]);
+
+  useEffect(() => {
+    setActiveSubView('workspace');
+  }, [activeId]);
+
 
   async function newProject(): Promise<void> {
     const p = createProject();
@@ -446,27 +454,74 @@ function EditPageInner() {
               <p className="text-muted text-sm">{t('app_no_projects')}</p>
             </div>
           ) : (
-            <ul className="space-y-2">
+            <ul className="space-y-3">
               {projects.map((p) => (
-                <li key={p.id} className="card p-4 flex items-center justify-between hover:shadow-md transition">
-                  <div className="cursor-pointer flex-1" onClick={() => setActiveId(p.id)}>
-                    <h3 className="font-semibold text-primary">{p.title}</h3>
-                    <p className="text-xs text-muted mt-0.5">
-                      {p.refs.length} referans · son güncelleme {new Date(p.updatedAt).toLocaleString(lang === 'tr' ? 'tr-TR' : 'en-US')}
-                    </p>
+                <li key={p.id} className="card p-4 flex flex-col gap-3 hover:shadow-md transition bg-white">
+                  {/* Card Header: Title, Update Date, Sil Button */}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="cursor-pointer flex-1" onClick={() => { setActiveId(p.id); setActiveSubView('workspace'); }}>
+                      <h3 className="font-bold text-primary text-base flex items-center gap-1.5 hover:text-teal transition">
+                        📁 {p.title}
+                      </h3>
+                      <p className="text-xs text-muted mt-0.5">
+                        {p.refs.length} {t('ws_ref_count')} · {lang === 'tr' ? 'son güncelleme' : 'last updated'}{' '}
+                        {new Date(p.updatedAt).toLocaleString(lang === 'tr' ? 'tr-TR' : 'en-US')}
+                      </p>
+                    </div>
+                    <button
+                      className="btn-danger text-xs text-rose-600 border border-rose-200 bg-rose-50/20 hover:bg-rose-50 px-2.5 py-1 rounded transition"
+                      onClick={async () => {
+                        if (confirm(t('trash_soft_delete_confirm'))) {
+                          await softDeleteProject(p.id);
+                          gdrive.markDirty(p.id);
+                          await refreshList();
+                        }
+                      }}
+                    >
+                      {t('app_delete')}
+                    </button>
                   </div>
-                  <button
-                    className="btn-danger text-xs text-rose-600 border border-rose-200 bg-rose-50/20 hover:bg-rose-50 px-2.5 py-1 rounded"
-                    onClick={async () => {
-                      if (confirm(t('trash_soft_delete_confirm'))) {
-                        await softDeleteProject(p.id);
-                        gdrive.markDirty(p.id);
-                        await refreshList();
-                      }
-                    }}
-                  >
-                    {t('app_delete')}
-                  </button>
+
+                  {/* Card Body: The 2 Branches */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-1">
+                    {/* Branch 1: Ana Yazı */}
+                    <div
+                      onClick={() => {
+                        setActiveId(p.id);
+                        setActiveSubView('manuscript');
+                      }}
+                      className="border border-border rounded-lg p-2.5 bg-slate-50/30 hover:border-teal/40 hover:bg-teal-bg/10 cursor-pointer text-left transition flex items-center gap-2.5 group"
+                    >
+                      <span className="text-lg group-hover:scale-110 transition shrink-0">📝</span>
+                      <div>
+                        <div className="text-xs font-bold text-primary leading-tight group-hover:text-teal transition">
+                          {t('ws_main_manuscript')}
+                        </div>
+                        <div className="text-[10px] text-muted leading-tight mt-0.5">
+                          {p.bodyText ? p.bodyText.trim().split(/\s+/).filter(Boolean).length : 0} {t('ws_word_count')} · {p.refs.length} {t('ws_ref_count')}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Branch 2: Diğer Yazılar */}
+                    <div
+                      onClick={() => {
+                        setActiveId(p.id);
+                        setActiveSubView('workspace-documents');
+                      }}
+                      className="border border-border rounded-lg p-2.5 bg-slate-50/30 hover:border-violet-500/40 hover:bg-violet-50/20 cursor-pointer text-left transition flex items-center gap-2.5 group"
+                    >
+                      <span className="text-lg group-hover:scale-110 transition shrink-0">✉️</span>
+                      <div>
+                        <div className="text-xs font-bold text-primary leading-tight group-hover:text-violet-600 transition">
+                          {t('ws_other_docs')}
+                        </div>
+                        <div className="text-[10px] text-muted leading-tight mt-0.5">
+                          {p.documents ? p.documents.length : 0} {lang === 'tr' ? 'ek belge' : 'documents'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </li>
               ))}
             </ul>
@@ -549,11 +604,39 @@ function EditPageInner() {
     );
   }
 
+  if (activeSubView === 'workspace' || activeSubView === 'workspace-documents') {
+    return (
+      <ProjectWorkspace
+        project={active}
+        initialView={activeSubView === 'workspace-documents' ? 'documents' : 'dashboard'}
+        onExit={() => {
+          setActiveId(null);
+          gdrive.markDirty(active.id);
+        }}
+        onOpenManuscript={() => {
+          setActiveSubView('manuscript');
+        }}
+        onSaved={(updatedProject) => {
+          refreshList();
+          gdrive.markDirty(updatedProject.id);
+        }}
+      />
+    );
+  }
+
   return (
     <EditorClient
       project={active}
       onExit={() => {
+        setActiveSubView('workspace');
+        gdrive.markDirty(active.id);
+      }}
+      onExitToProjects={() => {
         setActiveId(null);
+        gdrive.markDirty(active.id);
+      }}
+      onGoToDocuments={() => {
+        setActiveSubView('workspace-documents');
         gdrive.markDirty(active.id);
       }}
       onSaved={() => {

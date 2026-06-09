@@ -59,6 +59,15 @@ export type Citation = {
   refIds: string[];
 };
 
+export type ProjectDocument = {
+  id: string;
+  type: 'cover' | 'title-page' | 'response' | 'contrib' | 'coi' | 'custom';
+  title: string;
+  content: string;
+  createdAt: number;
+  updatedAt: number;
+};
+
 export type Project = {
   id: string;
   title: string;
@@ -73,7 +82,9 @@ export type Project = {
     aiProvider?: 'anthropic' | 'openai';
   };
   deleted?: number | null;
+  documents?: ProjectDocument[];
 };
+
 
 export type Snapshot = {
   id: string;

@@ -43,6 +43,7 @@ import { CommandPalette, type Command } from '@/components/CommandPalette/Comman
 import { StatsPanel } from '@/components/Stats/StatsPanel';
 import { SnapshotsPanel } from '@/components/Snapshots/SnapshotsPanel';
 import { FiguresPanel } from '@/components/Figures/FiguresPanel';
+import { TablePanel } from '@/components/Tables/TablePanel';
 import { JournalCheckPanel } from '@/components/Journal/JournalCheckPanel';
 import { LettersPanel } from '@/components/Letters/LettersPanel';
 import { PhrasebankPanel } from '@/components/Phrasebank/PhrasebankPanel';
@@ -60,6 +61,8 @@ type Props = {
   project: Project;
   onExit: () => void;
   onSaved: () => void;
+  onExitToProjects?: () => void;
+  onGoToDocuments?: () => void;
 };
 
 type ImportPreview = {
@@ -68,7 +71,7 @@ type ImportPreview = {
   markerCount: number;
 } | null;
 
-export function EditorClient({ project, onExit, onSaved }: Props) {
+export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoToDocuments }: Props) {
   const { t, lang } = useLang();
   const [title, setTitle] = useState(project.title);
   const [refs, setRefs] = useState<Ref[]>(project.refs);
@@ -181,6 +184,7 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
   const [statsOpen, setStatsOpen] = useState(false);
   const [snapshotsOpen, setSnapshotsOpen] = useState(false);
   const [figuresOpen, setFiguresOpen] = useState(false);
+  const [tablesOpen, setTablesOpen] = useState(false);
   const [journalOpen, setJournalOpen] = useState(false);
   const [lettersOpen, setLettersOpen] = useState(false);
   const [phrasebankOpen, setPhrasebankOpen] = useState(false);
@@ -1654,8 +1658,9 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
     { id: 'stats', group: t('cmd_g_view'), label: t('ed_stats'), run: () => setStatsOpen(true) },
     { id: 'snapshots', group: t('cmd_g_view'), label: t('ed_snapshots'), run: () => setSnapshotsOpen(true) },
     { id: 'figures', group: t('cmd_g_view'), label: t('ed_figures'), run: () => setFiguresOpen(true) },
+    { id: 'tables', group: t('cmd_g_view'), label: t('tbl_title'), run: () => setTablesOpen(true) },
     { id: 'journal-check', group: t('cmd_g_doc'), label: t('ed_journal_check'), run: () => setJournalOpen(true) },
-    { id: 'letters', group: t('cmd_g_doc'), label: t('ed_letters'), run: () => setLettersOpen(true) },
+    { id: 'letters', group: t('cmd_g_doc'), label: t('ed_letters'), run: () => { if (onGoToDocuments) onGoToDocuments(); else setLettersOpen(true); } },
     { id: 'snapshot-now', group: t('cmd_g_doc'), label: t('snap_create'), run: () => { void autoSnapshot(t('snap_manual_label')); setSnapshotsOpen(true); } },
     { id: 'settings', group: t('cmd_g_view'), label: t('ai_settings_title'), run: () => setSettingsOpen(true) },
     { id: 'ai-review', group: t('cmd_g_ai'), label: t('ed_ai_review'), disabled: aiOff, run: runAIReview },
@@ -1679,9 +1684,31 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
       <header className={`border-b border-border bg-surface sticky top-0 z-50 ${focusMode ? 'hidden' : ''}`}>
         <div className="w-full px-4 sm:px-6 py-3 flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-3 flex-1 min-w-0">
-            <button onClick={onExit} className="text-sm text-teal hover:underline shrink-0">
-              ← {t('app_my_projects')}
-            </button>
+            <div className="flex items-center gap-2 flex-wrap shrink-0 text-xs mr-2 border border-border px-2 py-1 rounded-lg bg-white shadow-xs">
+              <button
+                onClick={onExitToProjects || onExit}
+                className="text-secondary hover:text-primary font-bold flex items-center gap-1 transition"
+                title="Ana Proje Listesi"
+              >
+                🏠 {lang === 'tr' ? 'Projelerim' : 'Projects'}
+              </button>
+              <span className="text-muted/40">|</span>
+              <button
+                onClick={onExit}
+                className="text-secondary hover:text-primary font-bold flex items-center gap-1 transition"
+                title="Proje Çalışma Alanı"
+              >
+                📁 {t('ws_title') || 'Çalışma Alanı'}
+              </button>
+              <span className="text-muted/40">|</span>
+              <button
+                onClick={onGoToDocuments || onExit}
+                className="text-teal hover:text-teal-dark font-bold flex items-center gap-1 transition"
+                title="Mektuplar & Ek Belgeler"
+              >
+                ✉️ {lang === 'tr' ? 'Diğer Yazılar' : 'Letters'}
+              </button>
+            </div>
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
@@ -1772,8 +1799,9 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
             <HeaderIcon onClick={() => setStatsOpen(true)} title={t('ed_stats')} label="📊" caption={t('hdr_stats')} />
             <HeaderIcon onClick={() => setSnapshotsOpen(true)} title={t('ed_snapshots')} label="🕓" caption={t('hdr_versions')} />
             <HeaderIcon onClick={() => setFiguresOpen(true)} title={t('ed_figures')} label="🖼" caption={t('hdr_figures')} />
+            <HeaderIcon onClick={() => setTablesOpen(true)} title={t('tbl_title')} label="⊞" caption={t('hdr_tables')} />
             <HeaderIcon onClick={() => setJournalOpen(true)} title={t('ed_journal_check')} label="📋" caption={t('hdr_journal')} />
-            <HeaderIcon onClick={() => setLettersOpen(true)} title={t('ed_letters')} label="✉️" caption={t('hdr_letters')} />
+            <HeaderIcon onClick={() => { if (onGoToDocuments) onGoToDocuments(); else setLettersOpen(true); }} title={t('ed_letters')} label="✉️" caption={t('hdr_letters')} />
             <HeaderIcon onClick={() => setFocusMode(true)} title={`${t('ed_focus_mode')} (⌘.)`} label="🎯" caption={t('hdr_focus')} />
             <HeaderIcon
               onClick={() => setSettingsOpen(true)}
@@ -2212,6 +2240,12 @@ export function EditorClient({ project, onExit, onSaved }: Props) {
       {figuresOpen && editorInstance.current && (
         <div className="fixed right-4 top-20 bottom-4 w-[340px] z-40 shadow-2xl">
           <FiguresPanel editor={editorInstance.current} onClose={() => setFiguresOpen(false)} t={t} />
+        </div>
+      )}
+
+      {tablesOpen && editorInstance.current && (
+        <div className="fixed right-4 top-20 bottom-4 w-[380px] z-40 shadow-2xl">
+          <TablePanel editor={editorInstance.current} onClose={() => setTablesOpen(false)} t={t} />
         </div>
       )}
 
