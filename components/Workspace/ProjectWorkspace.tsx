@@ -35,6 +35,13 @@ interface SavedAuthor {
   address?: string;
 }
 
+interface WizardAuthor {
+  name: string;
+  email: string;
+  orcid: string;
+  institution: string;
+}
+
 function getWordCount(text: string): number {
   if (!text) return 0;
   return text.trim().split(/\s+/).filter(Boolean).length;
@@ -64,7 +71,12 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
   const [correspondingEmail, setCorrespondingEmail] = useState('');
   const [correspondingAddress, setCorrespondingAddress] = useState('');
   const [orcid, setOrcid] = useState('');
-  const [authorsStr, setAuthorsStr] = useState('');
+  const [wizardAuthors, setWizardAuthors] = useState<WizardAuthor[]>([
+    { name: '', email: '', orcid: '', institution: '' }
+  ]);
+  const [activeSelectIdx, setActiveSelectIdx] = useState<number | null>(null);
+  const [savedFeedback, setSavedFeedback] = useState<Record<number, boolean>>({});
+  const [corrFeedbackIdx, setCorrFeedbackIdx] = useState<number | null>(null);
   const [manuscriptType, setManuscriptType] = useState('Original Article');
   const [keyFinding, setKeyFinding] = useState('');
   const [reviewerRaw, setReviewerRaw] = useState('');
@@ -192,6 +204,210 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
     );
   };
 
+  const updateAuthorField = (index: number, field: keyof WizardAuthor, value: string) => {
+    const updated = wizardAuthors.map((a, idx) => {
+      if (idx === index) {
+        return { ...a, [field]: value };
+      }
+      return a;
+    });
+    setWizardAuthors(updated);
+  };
+
+  const formatAuthorsList = (list: WizardAuthor[], correspondingName: string) => {
+    const active = list.filter(a => a.name.trim().length > 0);
+    if (active.length === 0) return '';
+    
+    // 1. Generate author names line
+    const namesLine = active.map((a, idx) => {
+      const isCorr = a.name.trim().toLowerCase() === correspondingName.trim().toLowerCase();
+      const corrMark = isCorr ? '*' : '';
+      return `${a.name} ${idx + 1}${corrMark}`;
+    }).join(', ');
+
+    // 2. Generate affiliations lines
+    const affiliationsLines = active.map((a, idx) => {
+      const details = [
+        a.orcid ? `ORCID: ${a.orcid}` : '',
+        a.email ? `Email: ${a.email}` : ''
+      ].filter(Boolean).join(', ');
+      const detailsStr = details ? ` (${details})` : '';
+      return `${idx + 1} ${a.institution || '[Kurum/Institution]'}${detailsStr}`;
+    }).join('\n');
+
+    const hasCorr = active.some(a => a.name.trim().toLowerCase() === correspondingName.trim().toLowerCase());
+    const corrNote = hasCorr
+      ? '\n* Sorumlu yazar / Corresponding author'
+      : '';
+
+    return `${namesLine}\n${affiliationsLines}${corrNote}`;
+  };
+
+  const renderAuthorSelectorForIndex = (idx: number) => {
+    if (savedAuthors.length === 0) return null;
+    const isOpen = activeSelectIdx === idx;
+    return (
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => setActiveSelectIdx(isOpen ? null : idx)}
+          className="text-[10px] text-violet-600 hover:text-violet-700 font-semibold"
+        >
+          👤 {wizardLang === 'tr' ? 'Yazar Seç' : 'Select'}
+        </button>
+        {isOpen && (
+          <>
+            <div 
+              className="fixed inset-0 z-40" 
+              onClick={() => setActiveSelectIdx(null)}
+            />
+            <div className="absolute right-0 mt-1 w-64 bg-white border border-slate-200 rounded-md shadow-lg py-1 z-50 max-h-48 overflow-y-auto">
+              <div className="px-2 py-1 text-[10px] font-semibold text-slate-400 border-b border-slate-100">
+                {tLocal('letters_author_pool')}
+              </div>
+              {savedAuthors.map((author) => (
+                <div
+                  key={author.id}
+                  onClick={() => {
+                    updateAuthorField(idx, 'name', author.name);
+                    updateAuthorField(idx, 'email', author.email || '');
+                    updateAuthorField(idx, 'orcid', author.orcid || '');
+                    updateAuthorField(idx, 'institution', author.address || '');
+                    setActiveSelectIdx(null);
+                  }}
+                  className="flex justify-between items-center px-3 py-1.5 text-xs hover:bg-slate-50 cursor-pointer text-left transition"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-slate-700 truncate">{author.name}</p>
+                    {author.email && <p className="text-[10px] text-slate-400 truncate">{author.email}</p>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    );
+  };
+
+  const renderAuthorsManager = () => {
+    return (
+      <div className="space-y-3 border-t border-slate-100 pt-3 sm:col-span-2">
+        <div className="flex justify-between items-center">
+          <h4 className="text-xs font-bold text-slate-700">
+            {wizardLang === 'tr' ? 'Yazarlar Listesi' : 'Authors List'}
+          </h4>
+          <button
+            type="button"
+            onClick={() => setWizardAuthors([...wizardAuthors, { name: '', email: '', orcid: '', institution: '' }])}
+            className="text-xs text-violet-600 hover:text-violet-700 font-semibold flex items-center gap-1 transition"
+          >
+            ➕ {wizardLang === 'tr' ? 'Yazar Ekle' : 'Add Author'}
+          </button>
+        </div>
+        
+        <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
+          {wizardAuthors.map((author, idx) => (
+            <div key={idx} className="p-3 bg-slate-50/70 rounded-lg border border-slate-150 relative space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-[10px] font-bold text-slate-400">
+                  #{idx + 1} {wizardLang === 'tr' ? 'Yazar' : 'Author'}
+                </span>
+                <div className="flex items-center gap-3">
+                  {/* Set as corresponding button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCorrespondingAuthor(author.name);
+                      if (author.email) setCorrespondingEmail(author.email);
+                      if (author.orcid) setOrcid(author.orcid);
+                      if (author.institution) setCorrespondingAddress(author.institution);
+                      setCorrFeedbackIdx(idx);
+                      setTimeout(() => setCorrFeedbackIdx(null), 2000);
+                    }}
+                    className={`text-[10px] font-semibold flex items-center gap-0.5 transition ${
+                      correspondingAuthor.trim() !== '' && correspondingAuthor.toLowerCase() === author.name.toLowerCase()
+                        ? 'text-violet-600 font-bold'
+                        : 'text-slate-400 hover:text-violet-600'
+                    }`}
+                  >
+                    {corrFeedbackIdx === idx ? (
+                      <span>⭐ {wizardLang === 'tr' ? 'Atandı!' : 'Assigned!'}</span>
+                    ) : (
+                      correspondingAuthor.trim() !== '' && correspondingAuthor.toLowerCase() === author.name.toLowerCase()
+                        ? <span>⭐ {wizardLang === 'tr' ? 'Sorumlu Yazar' : 'Corresponding'}</span>
+                        : <span>☆ {wizardLang === 'tr' ? 'Sorumlu Yap' : 'Set Corresponding'}</span>
+                    )}
+                  </button>
+
+                  {/* Save to pool button */}
+                  {author.name.trim() && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        saveAuthorToPool({
+                          name: author.name,
+                          email: author.email,
+                          orcid: author.orcid,
+                          address: author.institution
+                        });
+                        setSavedFeedback(prev => ({ ...prev, [idx]: true }));
+                        setTimeout(() => setSavedFeedback(prev => ({ ...prev, [idx]: false })), 2000);
+                      }}
+                      className="text-[10px] text-emerald-600 hover:text-emerald-700 font-semibold"
+                      title={tLocal('letters_save_pool')}
+                    >
+                      {savedFeedback[idx] ? '✅' : '💾'}
+                    </button>
+                  )}
+                  {/* Selector */}
+                  {renderAuthorSelectorForIndex(idx)}
+                  {/* Delete button */}
+                  {wizardAuthors.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => setWizardAuthors(wizardAuthors.filter((_, i) => i !== idx))}
+                      className="text-slate-400 hover:text-red-500 text-xs"
+                    >
+                      🗑️
+                    </button>
+                  )}
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <input
+                  className={inputCls}
+                  placeholder={wizardLang === 'tr' ? 'Adı Soyadı' : 'Full Name'}
+                  value={author.name}
+                  onChange={(e) => updateAuthorField(idx, 'name', e.target.value)}
+                />
+                <input
+                  className={inputCls}
+                  placeholder={wizardLang === 'tr' ? 'Kurum / Üniversite' : 'Institution / University'}
+                  value={author.institution}
+                  onChange={(e) => updateAuthorField(idx, 'institution', e.target.value)}
+                />
+                <input
+                  className={inputCls}
+                  placeholder={wizardLang === 'tr' ? 'E-posta' : 'Email'}
+                  value={author.email}
+                  onChange={(e) => updateAuthorField(idx, 'email', e.target.value)}
+                />
+                <input
+                  className={inputCls}
+                  placeholder="ORCID (e.g. 0000-0002-xxxx-xxxx)"
+                  value={author.orcid}
+                  onChange={(e) => updateAuthorField(idx, 'orcid', e.target.value)}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   // Compute stats of manuscript
   const manuscriptWordCount = getWordCount(project.bodyText || '');
   const citationCount = project.refs.length;
@@ -209,7 +425,7 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
     setCorrespondingEmail('');
     setCorrespondingAddress('');
     setOrcid('');
-    setAuthorsStr('');
+    setWizardAuthors([{ name: '', email: '', orcid: '', institution: '' }]);
     setManuscriptType(lang === 'tr' ? 'Özgün Araştırma Makalesi' : 'Original Article');
     setKeyFinding('');
     setReviewerRaw('');
@@ -260,13 +476,22 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
     let finalTitle = docTitle.trim();
     const currentLang: LetterLang = wizardLang;
 
+    const coAuthorsNames = wizardAuthors
+      .filter(a => a.name.trim().toLowerCase() !== correspondingAuthor.trim().toLowerCase())
+      .map(a => a.name.trim())
+      .filter(Boolean)
+      .join(', ');
+
+    const fullAuthorsStr = formatAuthorsList(wizardAuthors, correspondingAuthor);
+    const allAuthorNames = wizardAuthors.map(a => a.name.trim()).filter(Boolean);
+
     if (wizardType === 'cover') {
       if (!finalTitle) finalTitle = getDocTypeName('cover', wizardLang);
       generatedContent = buildCoverLetter({
         journalName,
         manuscriptTitle,
         correspondingAuthor,
-        authors: authorsStr || undefined,
+        authors: coAuthorsNames || undefined,
         manuscriptType,
         keyFinding,
         lang: currentLang,
@@ -276,7 +501,7 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
       generatedContent = buildTitlePage({
         manuscriptTitle,
         runningTitle,
-        authorsStr,
+        authorsStr: fullAuthorsStr || undefined,
         correspondingAuthor,
         correspondingEmail,
         correspondingAddress,
@@ -300,16 +525,14 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
       });
     } else if (wizardType === 'contrib') {
       if (!finalTitle) finalTitle = getDocTypeName('contrib', wizardLang);
-      const authors = authorsStr.split(/[,;\n]/).map(a => a.trim()).filter(Boolean);
       generatedContent = buildAuthorContributions({
-        authors,
+        authors: allAuthorNames,
         lang: currentLang,
       });
     } else if (wizardType === 'coi') {
       if (!finalTitle) finalTitle = getDocTypeName('coi', wizardLang);
-      const authors = authorsStr.split(/[,;\n]/).map(a => a.trim()).filter(Boolean);
       generatedContent = buildConflictOfInterest({
-        authors,
+        authors: allAuthorNames,
         hasConflict,
         lang: currentLang,
       });
@@ -333,7 +556,19 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
       updatedAt: Date.now(),
     };
 
-    if (correspondingAuthor.trim()) {
+    // Auto-save all authors in the wizard to the pool
+    wizardAuthors.forEach(a => {
+      if (a.name.trim()) {
+        saveAuthorToPool({
+          name: a.name,
+          email: a.email,
+          orcid: a.orcid,
+          address: a.institution
+        });
+      }
+    });
+
+    if (correspondingAuthor.trim() && !wizardAuthors.some(a => a.name.trim().toLowerCase() === correspondingAuthor.trim().toLowerCase())) {
       saveAuthorToPool({
         name: correspondingAuthor,
         email: correspondingEmail,
@@ -876,15 +1111,7 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
                       />
                     </div>
                   </div>
-                  <div className="flex flex-col gap-1">
-                    <label className={labelCls}>{tLocal('letters_authors')}</label>
-                    <input
-                      className={inputCls}
-                      placeholder="Ahmet Yılmaz, Ayşe Demir"
-                      value={authorsStr}
-                      onChange={(e) => setAuthorsStr(e.target.value)}
-                    />
-                  </div>
+                  {renderAuthorsManager()}
                   <div className="flex flex-col gap-1">
                     <label className={labelCls}>{tLocal('letters_key_finding')}</label>
                     <textarea
@@ -976,15 +1203,7 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
                         onChange={(e) => setCorrespondingAddress(e.target.value)}
                       />
                     </div>
-                    <div className="sm:col-span-2 flex flex-col gap-1">
-                      <label className={labelCls}>{tLocal('letters_authors_list')} & Affiliations</label>
-                      <textarea
-                        className={`${inputCls} h-20 resize-none`}
-                        placeholder={`Ahmet Yılmaz 1*, Ayşe Demir 2\n1 Department of X, Y University, City, Country\n2 Institution Z, City, Country`}
-                        value={authorsStr}
-                        onChange={(e) => setAuthorsStr(e.target.value)}
-                      />
-                    </div>
+                    {renderAuthorsManager()}
                     <div className="flex flex-col gap-1">
                       <label className={labelCls}>{tLocal('letters_abs_wc')}</label>
                       <input
@@ -1061,15 +1280,7 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
               {/* Author Contributions & COI Fields */}
               {(wizardType === 'contrib' || wizardType === 'coi') && (
                 <div className="space-y-4 pt-2 border-t border-slate-100">
-                  <div className="flex flex-col gap-1">
-                    <label className={labelCls}>{tLocal('letters_authors_list')}</label>
-                    <textarea
-                      className={`${inputCls} h-28 resize-none`}
-                      placeholder="Ahmet Yılmaz, Ayşe Demir, Fatma Çelik"
-                      value={authorsStr}
-                      onChange={(e) => setAuthorsStr(e.target.value)}
-                    />
-                  </div>
+                  {renderAuthorsManager()}
 
                   {wizardType === 'coi' && (
                     <div className="space-y-3">
