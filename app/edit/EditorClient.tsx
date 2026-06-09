@@ -1600,6 +1600,13 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
       setTitle(p.title ?? title);
       setRefs(p.refs ?? []);
       setDoc(p.doc ?? null);
+
+      editorRegistry.current.forEach((ed) => {
+        if (ed && !ed.isDestroyed && p.doc) {
+          ed.commands.setContent(p.doc);
+        }
+      });
+
       setImportError(null);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -1642,6 +1649,19 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
       setRefs((prev) => [...prev, ...newRefs]);
       setDoc((prev: any) => mergeTipTapDocs(prev, newDoc));
     }
+
+    editorRegistry.current.forEach((ed) => {
+      if (ed && !ed.isDestroyed) {
+        if (replace) {
+          ed.commands.setContent(newDoc);
+        } else {
+          const currentDoc = ed.getJSON();
+          const merged = mergeTipTapDocs(currentDoc, newDoc);
+          ed.commands.setContent(merged);
+        }
+      }
+    });
+
     setShowImportModal(false);
     setImportPreview(null);
     setImportPasteText('');
