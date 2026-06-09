@@ -15,6 +15,7 @@ import {
   parseReviewerComments,
   type LetterLang,
 } from '@/lib/letters/templates';
+import { t as tI18n } from '@/lib/i18n';
 
 interface ProjectWorkspaceProps {
   project: Project;
@@ -33,6 +34,10 @@ function getWordCount(text: string): number {
 
 export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, initialView }: ProjectWorkspaceProps) {
   const { t, lang } = useLang();
+
+  const tLocal = (key: Parameters<typeof tI18n>[0]) => {
+    return tI18n(key, wizardLang);
+  };
   
   // Workspace views: 'dashboard' or 'edit-doc'
   const [view, setView] = useState<'dashboard' | 'edit-doc'>('dashboard');
@@ -41,6 +46,7 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
   // Template wizard states
   const [showWizard, setShowWizard] = useState(false);
   const [wizardType, setWizardType] = useState<DocType>('cover');
+  const [wizardLang, setWizardLang] = useState<LetterLang>('tr');
   
   // Wizard fields
   const [docTitle, setDocTitle] = useState('');
@@ -82,6 +88,7 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
   // Reset wizard inputs
   const resetWizardFields = (type: DocType) => {
     setWizardType(type);
+    setWizardLang(lang === 'tr' ? 'tr' : 'en');
     setDocTitle('');
     setJournalName('');
     setManuscriptTitle(project.title);
@@ -127,13 +134,21 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
     }
   }, [initialView]);
 
+  useEffect(() => {
+    if (wizardLang === 'tr') {
+      if (manuscriptType === 'Original Article') setManuscriptType('Özgün Araştırma Makalesi');
+    } else {
+      if (manuscriptType === 'Özgün Araştırma Makalesi') setManuscriptType('Original Article');
+    }
+  }, [wizardLang]);
+
   const handleCreateDocument = async () => {
     let generatedContent = '';
     let finalTitle = docTitle.trim();
-    const currentLang: LetterLang = lang === 'tr' ? 'tr' : 'en';
+    const currentLang: LetterLang = wizardLang;
 
     if (wizardType === 'cover') {
-      if (!finalTitle) finalTitle = t('letters_cover');
+      if (!finalTitle) finalTitle = getDocTypeName('cover', wizardLang);
       generatedContent = buildCoverLetter({
         journalName,
         manuscriptTitle,
@@ -144,7 +159,7 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
         lang: currentLang,
       });
     } else if (wizardType === 'title-page') {
-      if (!finalTitle) finalTitle = t('letters_title_page');
+      if (!finalTitle) finalTitle = getDocTypeName('title-page', wizardLang);
       generatedContent = buildTitlePage({
         manuscriptTitle,
         runningTitle,
@@ -163,7 +178,7 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
         lang: currentLang,
       });
     } else if (wizardType === 'response') {
-      if (!finalTitle) finalTitle = t('letters_response');
+      if (!finalTitle) finalTitle = getDocTypeName('response', wizardLang);
       generatedContent = buildResponseToReviewers({
         journalName: journalName || undefined,
         manuscriptTitle: manuscriptTitle || undefined,
@@ -171,14 +186,14 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
         lang: currentLang,
       });
     } else if (wizardType === 'contrib') {
-      if (!finalTitle) finalTitle = t('letters_contrib');
+      if (!finalTitle) finalTitle = getDocTypeName('contrib', wizardLang);
       const authors = authorsStr.split(/[,;\n]/).map(a => a.trim()).filter(Boolean);
       generatedContent = buildAuthorContributions({
         authors,
         lang: currentLang,
       });
     } else if (wizardType === 'coi') {
-      if (!finalTitle) finalTitle = t('letters_coi');
+      if (!finalTitle) finalTitle = getDocTypeName('coi', wizardLang);
       const authors = authorsStr.split(/[,;\n]/).map(a => a.trim()).filter(Boolean);
       generatedContent = buildConflictOfInterest({
         authors,
@@ -306,14 +321,14 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
     }
   };
 
-  const getDocTypeName = (type: DocType) => {
+  const getDocTypeName = (type: DocType, l: LetterLang = lang === 'tr' ? 'tr' : 'en') => {
     switch (type) {
-      case 'cover': return t('letters_cover');
-      case 'title-page': return t('letters_title_page');
-      case 'response': return t('letters_response');
-      case 'contrib': return t('letters_contrib');
-      case 'coi': return t('letters_coi');
-      default: return lang === 'tr' ? 'Özel Belge' : 'Custom';
+      case 'cover': return tI18n('letters_cover', l);
+      case 'title-page': return tI18n('letters_title_page', l);
+      case 'response': return tI18n('letters_response', l);
+      case 'contrib': return tI18n('letters_contrib', l);
+      case 'coi': return tI18n('letters_coi', l);
+      default: return l === 'tr' ? 'Özel Belge' : 'Custom';
     }
   };
 
@@ -518,11 +533,13 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
               </div>
 
               <div className="bg-slate-50 border border-border p-3 rounded-lg text-left">
-                <div className="text-[10px] font-bold text-muted uppercase tracking-wider mb-1">Döküman İstatistikleri</div>
+                <div className="text-[10px] font-bold text-muted uppercase tracking-wider mb-1">
+                  {lang === 'tr' ? 'Doküman İstatistikleri' : 'Document Statistics'}
+                </div>
                 <div className="text-xs text-secondary space-y-1">
                   <div>• {t('ws_word_count')}: <strong className="text-primary">{getWordCount(editContent)}</strong></div>
-                  <div>• Karakter sayısı: <strong className="text-primary">{editContent.length}</strong></div>
-                  <div>• Tür: <strong className="text-primary">{getDocTypeName(documentsList.find(d => d.id === selectedDocId)?.type || 'custom')}</strong></div>
+                  <div>• {lang === 'tr' ? 'Karakter sayısı' : 'Character count'}: <strong className="text-primary">{editContent.length}</strong></div>
+                  <div>• {lang === 'tr' ? 'Tür' : 'Type'}: <strong className="text-primary">{getDocTypeName(documentsList.find(d => d.id === selectedDocId)?.type || 'custom')}</strong></div>
                 </div>
               </div>
             </div>
@@ -530,18 +547,18 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
             {/* Right Column: Full Document Editor */}
             <div className="md:col-span-2 card p-5 bg-white flex flex-col gap-4">
               <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] uppercase font-bold text-muted">Belge Başlığı</label>
+                <label className="text-[10px] uppercase font-bold text-muted">{lang === 'tr' ? 'Belge Başlığı' : 'Document Title'}</label>
                 <input
                   type="text"
                   value={editTitle}
                   onChange={(e) => setEditTitle(e.target.value)}
                   className="w-full text-sm font-bold border border-border rounded-lg px-3 py-2 bg-slate-50/30 text-primary focus:border-teal outline-none transition"
-                  placeholder="Belge Başlığı"
+                  placeholder={lang === 'tr' ? 'Belge Başlığı' : 'Document Title'}
                 />
               </div>
 
               <div className="flex-1 flex flex-col gap-1.5 min-h-[300px]">
-                <label className="text-[10px] uppercase font-bold text-muted">İçerik</label>
+                <label className="text-[10px] uppercase font-bold text-muted">{lang === 'tr' ? 'İçerik' : 'Content'}</label>
                 <textarea
                   value={editContent}
                   onChange={(e) => setEditContent(e.target.value)}
@@ -619,13 +636,41 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
 
             {/* Fields Form */}
             <div className="p-5 overflow-y-auto flex-1 space-y-4">
+              {/* Language Selection */}
+              <div className="bg-slate-50 p-3 rounded-lg border border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h4 className="text-xs font-bold text-primary">{lang === 'tr' ? 'Yazışma / Şablon Dili' : 'Correspondence / Template Language'}</h4>
+                  <p className="text-[10px] text-muted">{lang === 'tr' ? 'Oluşturulacak belgenin ve şablon alanlarının dilini seçin.' : 'Select the language for the generated document and template fields.'}</p>
+                </div>
+                <div className="flex gap-1 bg-white p-0.5 rounded-lg border border-border w-fit shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setWizardLang('tr')}
+                    className={`px-3 py-1 text-xs rounded-md font-semibold transition ${
+                      wizardLang === 'tr' ? 'bg-violet-600 text-white shadow-sm' : 'text-secondary hover:bg-slate-50'
+                    }`}
+                  >
+                    Türkçe
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setWizardLang('en')}
+                    className={`px-3 py-1 text-xs rounded-md font-semibold transition ${
+                      wizardLang === 'en' ? 'bg-violet-600 text-white shadow-sm' : 'text-secondary hover:bg-slate-50'
+                    }`}
+                  >
+                    English
+                  </button>
+                </div>
+              </div>
+
               {/* Common Fields */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="sm:col-span-2 flex flex-col gap-1">
-                  <label className={labelCls}>Mektup / Belge Adı (İsteğe Bağlı)</label>
+                  <label className={labelCls}>{wizardLang === 'tr' ? 'Mektup / Belge Adı (İsteğe Bağlı)' : 'Letter / Document Title (Optional)'}</label>
                   <input
                     className={inputCls}
-                    placeholder={`${getDocTypeName(wizardType)} ${documentsList.length + 1}`}
+                    placeholder={`${getDocTypeName(wizardType, wizardLang)} ${documentsList.length + 1}`}
                     value={docTitle}
                     onChange={(e) => setDocTitle(e.target.value)}
                   />
@@ -633,7 +678,7 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
 
                 {(wizardType === 'cover' || wizardType === 'response') && (
                   <div className="flex flex-col gap-1">
-                    <label className={labelCls}>{t('letters_journal')}</label>
+                    <label className={labelCls}>{tLocal('letters_journal')}</label>
                     <input
                       className={inputCls}
                       placeholder="e.g. Nature, IEEE Access"
@@ -645,7 +690,7 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
 
                 {wizardType !== 'custom' && wizardType !== 'contrib' && wizardType !== 'coi' && (
                   <div className="flex flex-col gap-1">
-                    <label className={labelCls}>{t('letters_ms_title')}</label>
+                    <label className={labelCls}>{tLocal('letters_ms_title')}</label>
                     <input
                       className={inputCls}
                       placeholder="e.g. A Deep Learning Approach..."
@@ -661,7 +706,7 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
                 <div className="space-y-4 pt-2 border-t border-slate-100">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="flex flex-col gap-1">
-                      <label className={labelCls}>{t('letters_corresponding')}</label>
+                      <label className={labelCls}>{tLocal('letters_corresponding')}</label>
                       <input
                         className={inputCls}
                         placeholder="Dr. Ahmet Yılmaz"
@@ -670,7 +715,7 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
                       />
                     </div>
                     <div className="flex flex-col gap-1">
-                      <label className={labelCls}>{t('letters_ms_type')}</label>
+                      <label className={labelCls}>{tLocal('letters_ms_type')}</label>
                       <input
                         className={inputCls}
                         placeholder="e.g. Original Article, Review"
@@ -680,7 +725,7 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
                     </div>
                   </div>
                   <div className="flex flex-col gap-1">
-                    <label className={labelCls}>{t('letters_authors')}</label>
+                    <label className={labelCls}>{tLocal('letters_authors')}</label>
                     <input
                       className={inputCls}
                       placeholder="Ahmet Yılmaz, Ayşe Demir"
@@ -689,7 +734,7 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
                     />
                   </div>
                   <div className="flex flex-col gap-1">
-                    <label className={labelCls}>{t('letters_key_finding')}</label>
+                    <label className={labelCls}>{tLocal('letters_key_finding')}</label>
                     <textarea
                       className={`${inputCls} h-20 resize-none`}
                       placeholder="Describe the significance and main contribution of this study..."
@@ -705,7 +750,7 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
                 <div className="space-y-4 pt-2 border-t border-slate-100">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="flex flex-col gap-1">
-                      <label className={labelCls}>{t('letters_running_title')}</label>
+                      <label className={labelCls}>{tLocal('letters_running_title')}</label>
                       <input
                         className={inputCls}
                         placeholder="e.g. Deep Learning in Healthcare"
@@ -714,7 +759,7 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
                       />
                     </div>
                     <div className="flex flex-col gap-1">
-                      <label className={labelCls}>{t('letters_corresponding')}</label>
+                      <label className={labelCls}>{tLocal('letters_corresponding')}</label>
                       <input
                         className={inputCls}
                         placeholder="Dr. Ahmet Yılmaz"
@@ -723,7 +768,7 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
                       />
                     </div>
                     <div className="flex flex-col gap-1">
-                      <label className={labelCls}>{t('letters_corresponding_email')}</label>
+                      <label className={labelCls}>{tLocal('letters_corresponding_email')}</label>
                       <input
                         className={inputCls}
                         placeholder="ahmet@university.edu"
@@ -732,7 +777,7 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
                       />
                     </div>
                     <div className="flex flex-col gap-1">
-                      <label className={labelCls}>{t('letters_orcid')}</label>
+                      <label className={labelCls}>{tLocal('letters_orcid')}</label>
                       <input
                         className={inputCls}
                         placeholder="0000-0002-XXXX-XXXX"
@@ -741,7 +786,7 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
                       />
                     </div>
                     <div className="sm:col-span-2 flex flex-col gap-1">
-                      <label className={labelCls}>{t('letters_corresponding_address')}</label>
+                      <label className={labelCls}>{tLocal('letters_corresponding_address')}</label>
                       <input
                         className={inputCls}
                         placeholder="Department of Computer Science, University of X, City, Country"
@@ -750,7 +795,7 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
                       />
                     </div>
                     <div className="sm:col-span-2 flex flex-col gap-1">
-                      <label className={labelCls}>{t('letters_authors_list')} & Affiliations</label>
+                      <label className={labelCls}>{tLocal('letters_authors_list')} & Affiliations</label>
                       <textarea
                         className={`${inputCls} h-20 resize-none`}
                         placeholder={`Ahmet Yılmaz 1*, Ayşe Demir 2\n1 Department of X, Y University, City, Country\n2 Institution Z, City, Country`}
@@ -759,7 +804,7 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
                       />
                     </div>
                     <div className="flex flex-col gap-1">
-                      <label className={labelCls}>{t('letters_abs_wc')}</label>
+                      <label className={labelCls}>{tLocal('letters_abs_wc')}</label>
                       <input
                         className={inputCls}
                         placeholder="e.g. 250"
@@ -768,7 +813,7 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
                       />
                     </div>
                     <div className="flex flex-col gap-1">
-                      <label className={labelCls}>{t('letters_ms_wc')}</label>
+                      <label className={labelCls}>{tLocal('letters_ms_wc')}</label>
                       <input
                         className={inputCls}
                         placeholder="e.g. 4500"
@@ -777,7 +822,7 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
                       />
                     </div>
                     <div className="flex flex-col gap-1">
-                      <label className={labelCls}>{t('letters_figs')}</label>
+                      <label className={labelCls}>{tLocal('letters_figs')}</label>
                       <input
                         className={inputCls}
                         placeholder="e.g. 5"
@@ -786,7 +831,7 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
                       />
                     </div>
                     <div className="flex flex-col gap-1">
-                      <label className={labelCls}>{t('letters_tbls')}</label>
+                      <label className={labelCls}>{tLocal('letters_tbls')}</label>
                       <input
                         className={inputCls}
                         placeholder="e.g. 2"
@@ -796,7 +841,7 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
                     </div>
                   </div>
                   <div className="flex flex-col gap-1">
-                    <label className={labelCls}>{t('letters_funding')}</label>
+                    <label className={labelCls}>{tLocal('letters_funding')}</label>
                     <input
                       className={inputCls}
                       placeholder="This work was supported by X Grant No. Y..."
@@ -805,7 +850,7 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
                     />
                   </div>
                   <div className="flex flex-col gap-1">
-                    <label className={labelCls}>{t('letters_ack')}</label>
+                    <label className={labelCls}>{tLocal('letters_ack')}</label>
                     <input
                       className={inputCls}
                       placeholder="We thank our colleagues for their feedback..."
@@ -820,7 +865,7 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
               {wizardType === 'response' && (
                 <div className="space-y-4 pt-2 border-t border-slate-100">
                   <div className="flex flex-col gap-1">
-                    <label className={labelCls}>{t('letters_reviewer_paste')}</label>
+                    <label className={labelCls}>{tLocal('letters_reviewer_paste')}</label>
                     <textarea
                       className={`${inputCls} h-40 resize-none font-mono text-xs`}
                       placeholder={`1. Revise the introduction.\n2. Add more dataset details.\nComment 3: Explain equation 4.`}
@@ -835,7 +880,7 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
               {(wizardType === 'contrib' || wizardType === 'coi') && (
                 <div className="space-y-4 pt-2 border-t border-slate-100">
                   <div className="flex flex-col gap-1">
-                    <label className={labelCls}>{t('letters_authors_list')}</label>
+                    <label className={labelCls}>{tLocal('letters_authors_list')}</label>
                     <textarea
                       className={`${inputCls} h-28 resize-none`}
                       placeholder="Ahmet Yılmaz, Ayşe Demir, Fatma Çelik"
@@ -853,11 +898,11 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
                           onChange={(e) => setHasConflict(e.target.checked)}
                           className="rounded border-border text-violet-600 focus:ring-violet-500"
                         />
-                        {t('letters_has_conflict')}
+                        {tLocal('letters_has_conflict')}
                       </label>
                       {hasConflict && (
                         <div className="flex flex-col gap-1">
-                          <label className={labelCls}>Açıklama</label>
+                          <label className={labelCls}>{wizardLang === 'tr' ? 'Açıklama' : 'Description'}</label>
                           <textarea
                             className={`${inputCls} h-20 resize-none`}
                             placeholder="Dr. X has received funding from company Y..."
@@ -874,7 +919,9 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
               {/* Custom / Blank Document */}
               {wizardType === 'custom' && (
                 <div className="py-4 text-center text-xs text-muted">
-                  Yeni bir boş belge oluşturulacak. Oluşturduktan sonra dilediğiniz gibi yazabilirsiniz.
+                  {wizardLang === 'tr'
+                    ? 'Yeni bir boş belge oluşturulacak. Oluşturduktan sonra dilediğiniz gibi yazabilirsiniz.'
+                    : 'A new empty document will be created. You can write whatever you want after creating it.'}
                 </div>
               )}
             </div>
@@ -884,13 +931,13 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
                 onClick={() => setShowWizard(false)}
                 className="btn-secondary text-xs px-4 py-2 font-semibold hover:bg-slate-100 border-border text-secondary transition"
               >
-                {t('app_close') ?? 'Kapat'}
+                {wizardLang === 'tr' ? 'Kapat' : 'Close'}
               </button>
               <button
                 onClick={handleCreateDocument}
                 className="btn-primary text-xs px-4 py-2 font-semibold shadow-sm bg-violet-600 hover:bg-violet-700 transition"
               >
-                ⚙️ {t('letters_generate')}
+                ⚙️ {tLocal('letters_generate')}
               </button>
             </div>
           </div>
