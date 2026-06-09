@@ -12,6 +12,7 @@ export type BuildInput = {
   mode: BuildMode;
   title?: string;
   style?: StyleId;
+  lineNumbers?: boolean;
 };
 
 // Assign EndNote record numbers (sequential, starting from 1).
@@ -64,6 +65,8 @@ function buildDocumentXml(input: BuildInput, refs: Ref[]): string {
     paragraphs.push(paragraphXml(runXml(formatted)));
   });
 
+  const lineNumXml = input.lineNumbers ? '<w:lnNumType w:countBy="1" w:restart="continuous"/>' : '';
+
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
             xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
@@ -72,7 +75,7 @@ function buildDocumentXml(input: BuildInput, refs: Ref[]): string {
             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006">
 <w:body>
 ${paragraphs.join('\n')}
-<w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="720" w:footer="720" w:gutter="0"/></w:sectPr>
+<w:sectPr>${lineNumXml}<w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="720" w:footer="720" w:gutter="0"/></w:sectPr>
 </w:body>
 </w:document>`;
 }

@@ -16,11 +16,12 @@ export function ExportPanel({ bodyText, refs, markers }: Props) {
   const [mode, setMode] = useState<'active' | 'placeholder'>('active');
   const [style, setStyle] = useState<CitationStyle>('vancouver');
   const [busy, setBusy] = useState(false);
+  const [lineNumbers, setLineNumbers] = useState(false);
 
   async function downloadDocx() {
     setBusy(true);
     try {
-      const blob = await buildDocx({ bodyText, refs, markers, mode, style });
+      const blob = await buildDocx({ bodyText, refs, markers, mode, style, lineNumbers });
       triggerDownload(
         blob,
         `article-editor-${style}-${mode === 'active' ? 'aktif' : 'placeholder'}.docx`,
@@ -82,6 +83,17 @@ export function ExportPanel({ bodyText, refs, markers }: Props) {
           <div className="text-xs text-muted mt-1">
             {`{Yazar, Yıl #Rec}`} biçimi. EndNote "Update Citations" gerektirir.
           </div>
+        </label>
+      </div>
+      <div className="mb-4">
+        <label className="flex items-center gap-2 text-xs font-semibold text-secondary cursor-pointer">
+          <input
+            type="checkbox"
+            checked={lineNumbers}
+            onChange={(e) => setLineNumbers(e.target.checked)}
+            className="rounded border-border text-teal focus:ring-teal"
+          />
+          Sürekli satır numaraları ekle (Continuous line numbers)
         </label>
       </div>
       <div className="flex gap-2 flex-wrap">

@@ -128,6 +128,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
     };
   }, []);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [exportLineNumbers, setExportLineNumbers] = useState(false);
   const [importPreview, setImportPreview] = useState<ImportPreview>(null);
   const [importPasteText, setImportPasteText] = useState('');
   const [importError, setImportError] = useState<string | null>(null);
@@ -1530,7 +1531,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
 
   async function exportDocx(mode: 'active' | 'placeholder'): Promise<void> {
     const { bodyText, markers, orderedRefs } = tiptapToBuildInput(doc as any, refsById, refOrder, style);
-    const blob = await buildDocx({ bodyText, markers, refs: orderedRefs, mode, title, style });
+    const blob = await buildDocx({ bodyText, markers, refs: orderedRefs, mode, title, style, lineNumbers: exportLineNumbers });
     download(blob, `${slugify(title)}-${style}-${mode}.docx`);
   }
 
@@ -1809,6 +1810,10 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
               }}
             />
             <HeaderDropdown label={`📤 ${t('ed_export')} ▾`} primary>
+              <DropItem onClick={(e) => { e.stopPropagation(); setExportLineNumbers(!exportLineNumbers); }}>
+                {exportLineNumbers ? '☑️' : '☐'} {lang === 'tr' ? 'Sürekli Satır Numaraları' : 'Continuous Line Numbers'}
+              </DropItem>
+              <hr className="border-border my-1" />
               <DropItem onClick={() => exportDocx('active')}>📝 {t('ed_export_docx_active')}</DropItem>
               <DropItem onClick={() => exportDocx('placeholder')}>📝 {t('ed_export_docx_placeholder')}</DropItem>
               <DropItem onClick={exportRis}>🗂️ {t('ed_export_ris')}</DropItem>
@@ -2599,7 +2604,7 @@ function DropItem({
   onClick,
   children,
 }: {
-  onClick: () => void;
+  onClick: (e: React.MouseEvent<HTMLButtonElement>) => void;
   children: React.ReactNode;
 }): JSX.Element {
   return (
