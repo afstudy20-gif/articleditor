@@ -224,7 +224,7 @@ const tr: Dict = {
   ed_ai_disabled: 'AI yapılandırılmamış',
 
   // Editor formatting
-  ed_placeholder: 'Makalenizi yazmaya başlayın…',
+  ed_placeholder: 'Metinden kaynaklarınızın ayrıştırılması için import ile dosya ekleyiniz',
   ed_insert_table: 'Tablo ekle',
   ed_insert_image: 'Resim ekle',
   ed_image_url: 'Resim URL\'si',
@@ -881,7 +881,7 @@ const en: Dict = {
   ed_ai_disabled: 'AI not configured',
 
   // Editor formatting
-  ed_placeholder: 'Start writing your article…',
+  ed_placeholder: 'Please import a file to parse your references from the text',
   ed_insert_table: 'Insert table',
   ed_insert_image: 'Insert image',
   ed_image_url: 'Image URL',

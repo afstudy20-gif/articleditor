@@ -312,7 +312,7 @@ export function ArticleEditor({
       >
         <EditorContent
           editor={editor}
-          className="prose max-w-none p-6 min-h-full focus-within:outline-none [&_p]:my-2 [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:mt-4 [&_h2]:text-xl [&_h2]:font-bold [&_h3]:text-lg [&_h3]:font-semibold [&_.ProseMirror]:min-h-[50vh]"
+          className="prose max-w-none p-2 min-h-full focus-within:outline-none [&_p]:my-2 [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:mt-4 [&_h2]:text-xl [&_h2]:font-bold [&_h3]:text-lg [&_h3]:font-semibold [&_.ProseMirror]:min-h-[50vh]"
         />
       </div>
     </div>
