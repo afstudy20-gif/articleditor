@@ -1729,87 +1729,6 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
               >
                 📁 {t('ws_title') || 'Çalışma Alanı'}
               </button>
-              <span className="text-muted/30">|</span>
-              <button
-                onClick={() => {
-                  setTablesOpen(false);
-                  setFiguresOpen(false);
-                  setSuppOpen(false);
-                  setLettersOpen(false);
-                }}
-                className={`${
-                  (!tablesOpen && !figuresOpen && !suppOpen && !lettersOpen)
-                    ? 'text-teal font-extrabold bg-teal/10 px-1.5 py-0.5 rounded'
-                    : 'text-secondary hover:text-primary font-semibold hover:bg-slate-50 px-1.5 py-0.5 rounded'
-                } flex items-center gap-1 transition`}
-              >
-                📝 {lang === 'tr' ? 'Ana Yazı' : 'Main Text'}
-              </button>
-              <span className="text-muted/30">|</span>
-              <button
-                onClick={() => {
-                  setTablesOpen(false);
-                  setFiguresOpen(false);
-                  setSuppOpen(false);
-                  if (onGoToDocuments) onGoToDocuments();
-                  else setLettersOpen(true);
-                }}
-                className={`${
-                  lettersOpen
-                    ? 'text-teal font-extrabold bg-teal/10 px-1.5 py-0.5 rounded'
-                    : 'text-secondary hover:text-primary font-semibold hover:bg-slate-50 px-1.5 py-0.5 rounded'
-                } flex items-center gap-1 transition`}
-              >
-                ✉️ {lang === 'tr' ? 'Diğer Yazılar' : 'Letters'}
-              </button>
-              <span className="text-muted/30">|</span>
-              <button
-                onClick={() => {
-                  setTablesOpen(true);
-                  setFiguresOpen(false);
-                  setSuppOpen(false);
-                  setLettersOpen(false);
-                }}
-                className={`${
-                  tablesOpen
-                    ? 'text-teal font-extrabold bg-teal/10 px-1.5 py-0.5 rounded'
-                    : 'text-secondary hover:text-primary font-semibold hover:bg-slate-50 px-1.5 py-0.5 rounded'
-                } flex items-center gap-1 transition`}
-              >
-                ⊞ {lang === 'tr' ? 'Tablolar' : 'Tables'}
-              </button>
-              <span className="text-muted/30">|</span>
-              <button
-                onClick={() => {
-                  setFiguresOpen(true);
-                  setTablesOpen(false);
-                  setSuppOpen(false);
-                  setLettersOpen(false);
-                }}
-                className={`${
-                  figuresOpen
-                    ? 'text-teal font-extrabold bg-teal/10 px-1.5 py-0.5 rounded'
-                    : 'text-secondary hover:text-primary font-semibold hover:bg-slate-50 px-1.5 py-0.5 rounded'
-                } flex items-center gap-1 transition`}
-              >
-                🖼️ {lang === 'tr' ? 'Şekiller' : 'Figures'}
-              </button>
-              <span className="text-muted/30">|</span>
-              <button
-                onClick={() => {
-                  setSuppOpen(true);
-                  setTablesOpen(false);
-                  setFiguresOpen(false);
-                  setLettersOpen(false);
-                }}
-                className={`${
-                  suppOpen
-                    ? 'text-teal font-extrabold bg-teal/10 px-1.5 py-0.5 rounded'
-                    : 'text-secondary hover:text-primary font-semibold hover:bg-slate-50 px-1.5 py-0.5 rounded'
-                } flex items-center gap-1 transition`}
-              >
-                📎 {lang === 'tr' ? 'Ek Materyaller' : 'Supplementary'}
-              </button>
             </div>
             <input
               value={title}
@@ -1915,6 +1834,85 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
               badge={aiConfigured === false}
             />
           </div>
+        </div>
+        <div className="w-full border-t border-border bg-slate-50 px-4 sm:px-6 py-1.5 flex items-center gap-2 overflow-x-auto scrollbar-none text-xs">
+          <span className="text-muted/60 font-semibold mr-1 shrink-0 uppercase tracking-wider text-[9px]">{lang === 'tr' ? 'Bölümler:' : 'Sub-groups:'}</span>
+          <button
+            onClick={() => {
+              setTablesOpen(false);
+              setFiguresOpen(false);
+              setSuppOpen(false);
+              setLettersOpen(false);
+            }}
+            className={`px-3 py-1 rounded-md text-xs font-bold transition flex items-center gap-1 shrink-0 ${
+              (!tablesOpen && !figuresOpen && !suppOpen && !lettersOpen)
+                ? 'bg-teal text-white shadow-sm'
+                : 'text-secondary hover:text-primary hover:bg-slate-100'
+            }`}
+          >
+            📝 {lang === 'tr' ? 'Ana Yazı' : 'Main Text'}
+          </button>
+          <button
+            onClick={() => {
+              setTablesOpen(false);
+              setFiguresOpen(false);
+              setSuppOpen(false);
+              if (onGoToDocuments) onGoToDocuments();
+              else setLettersOpen(true);
+            }}
+            className={`px-3 py-1 rounded-md text-xs font-bold transition flex items-center gap-1 shrink-0 ${
+              lettersOpen
+                ? 'bg-teal text-white shadow-sm'
+                : 'text-secondary hover:text-primary hover:bg-slate-100'
+            }`}
+          >
+            ✉️ {lang === 'tr' ? 'Diğer Yazılar' : 'Letters'}
+          </button>
+          <button
+            onClick={() => {
+              setTablesOpen(true);
+              setFiguresOpen(false);
+              setSuppOpen(false);
+              setLettersOpen(false);
+            }}
+            className={`px-3 py-1 rounded-md text-xs font-bold transition flex items-center gap-1 shrink-0 ${
+              tablesOpen
+                ? 'bg-teal text-white shadow-sm'
+                : 'text-secondary hover:text-primary hover:bg-slate-100'
+            }`}
+          >
+            ⊞ {lang === 'tr' ? 'Tablolar' : 'Tables'}
+          </button>
+          <button
+            onClick={() => {
+              setFiguresOpen(true);
+              setTablesOpen(false);
+              setSuppOpen(false);
+              setLettersOpen(false);
+            }}
+            className={`px-3 py-1 rounded-md text-xs font-bold transition flex items-center gap-1 shrink-0 ${
+              figuresOpen
+                ? 'bg-teal text-white shadow-sm'
+                : 'text-secondary hover:text-primary hover:bg-slate-100'
+            }`}
+          >
+            🖼️ {lang === 'tr' ? 'Şekiller' : 'Figures'}
+          </button>
+          <button
+            onClick={() => {
+              setSuppOpen(true);
+              setTablesOpen(false);
+              setFiguresOpen(false);
+              setLettersOpen(false);
+            }}
+            className={`px-3 py-1 rounded-md text-xs font-bold transition flex items-center gap-1 shrink-0 ${
+              suppOpen
+                ? 'bg-teal text-white shadow-sm'
+                : 'text-secondary hover:text-primary hover:bg-slate-100'
+            }`}
+          >
+            📎 {lang === 'tr' ? 'Ek Materyaller' : 'Supplementary'}
+          </button>
         </div>
       </header>
 
@@ -2205,7 +2203,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
       )}
 
       {aiReview.open && (
-        <div className="fixed left-4 top-20 bottom-4 w-[380px] z-40 shadow-2xl">
+        <div className="fixed left-4 top-24 bottom-4 w-[380px] z-40 shadow-2xl">
           <IssuesPanel
             issues={aiReview.issues}
             summary={aiReview.summary ?? undefined}
@@ -2226,7 +2224,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
       />
 
       {aiSuggest.open && (
-        <div className="fixed left-4 top-20 bottom-4 w-[400px] z-40 shadow-2xl">
+        <div className="fixed left-4 top-24 bottom-4 w-[400px] z-40 shadow-2xl">
           <CitationSuggestionsPanel
             query={aiSuggest.query}
             suggestions={aiSuggest.suggestions}
@@ -2243,7 +2241,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
       )}
 
       {aiGaps.open && (
-        <div className="fixed left-4 top-20 bottom-4 w-[400px] z-40 shadow-2xl">
+        <div className="fixed left-4 top-24 bottom-4 w-[400px] z-40 shadow-2xl">
           <GapDetectPanel
             claims={aiGaps.items}
             loading={aiGaps.loading}
@@ -2288,7 +2286,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
       )}
 
       {researchOpen && (
-        <div className="fixed left-4 top-20 bottom-4 w-[440px] z-40 shadow-2xl">
+        <div className="fixed left-4 top-24 bottom-4 w-[440px] z-40 shadow-2xl">
           <DeepResearchPanel
             initialAbstract={detectAbstract()}
             onClose={() => setResearchOpen(false)}
@@ -2301,7 +2299,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
       )}
 
       {aiScore.open && (
-        <div className="fixed left-4 top-20 bottom-4 w-[380px] z-40 shadow-2xl">
+        <div className="fixed left-4 top-24 bottom-4 w-[380px] z-40 shadow-2xl">
           <ScorePanel
             result={aiScore.result}
             loading={aiScore.loading}
@@ -2315,7 +2313,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} commands={commands} t={t} />
 
       {statsOpen && (
-        <div className="fixed right-4 top-20 w-[320px] z-40 shadow-2xl">
+        <div className="fixed right-4 top-24 w-[320px] z-40 shadow-2xl">
           <StatsPanel
             stats={writingStats}
             goal={wordGoal}
@@ -2327,7 +2325,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
       )}
 
       {snapshotsOpen && (
-        <div className="fixed right-4 top-20 bottom-4 w-[360px] z-40 shadow-2xl">
+        <div className="fixed right-4 top-24 bottom-4 w-[360px] z-40 shadow-2xl">
           <SnapshotsPanel
             projectId={project.id}
             currentDoc={doc}
@@ -2341,19 +2339,19 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
       )}
 
       {figuresOpen && editorInstance.current && (
-        <div className="fixed right-4 top-20 bottom-4 w-[340px] z-40 shadow-2xl">
+        <div className="fixed right-4 top-24 bottom-4 w-[340px] z-40 shadow-2xl">
           <FiguresPanel editor={editorInstance.current} onClose={() => setFiguresOpen(false)} t={t} />
         </div>
       )}
 
       {tablesOpen && editorInstance.current && (
-        <div className="fixed right-4 top-20 bottom-4 w-[380px] z-40 shadow-2xl">
+        <div className="fixed right-4 top-24 bottom-4 w-[380px] z-40 shadow-2xl">
           <TablePanel editor={editorInstance.current} onClose={() => setTablesOpen(false)} t={t} />
         </div>
       )}
 
       {suppOpen && (
-        <div className="fixed right-4 top-20 bottom-4 w-[360px] z-40 shadow-2xl">
+        <div className="fixed right-4 top-24 bottom-4 w-[360px] z-40 shadow-2xl">
           <SupplementaryPanel
             value={supplementary}
             onChange={setSupplementary}
@@ -2366,7 +2364,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
       )}
 
       {journalOpen && (
-        <div className="fixed right-4 top-20 bottom-4 w-[360px] z-40 shadow-2xl">
+        <div className="fixed right-4 top-24 bottom-4 w-[360px] z-40 shadow-2xl">
           <JournalCheckPanel
             docJson={doc}
             stats={writingStats}
@@ -2408,7 +2406,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
       )}
 
       {phrasebankOpen && (
-        <div className="fixed right-4 top-20 bottom-4 w-[420px] max-w-[calc(100vw-2rem)] z-40 shadow-2xl">
+        <div className="fixed right-4 top-24 bottom-4 w-[420px] max-w-[calc(100vw-2rem)] z-40 shadow-2xl">
           <PhrasebankPanel
             onInsert={insertAcademicPhrase}
             onClose={() => setPhrasebankOpen(false)}
