@@ -27,6 +27,14 @@ interface ProjectWorkspaceProps {
 
 type DocType = 'cover' | 'title-page' | 'response' | 'contrib' | 'coi' | 'custom';
 
+interface SavedAuthor {
+  id: string;
+  name: string;
+  email?: string;
+  orcid?: string;
+  address?: string;
+}
+
 function getWordCount(text: string): number {
   if (!text) return 0;
   return text.trim().split(/\s+/).filter(Boolean).length;
@@ -78,6 +86,111 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
   const [aiBusy, setAiBusy] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
+
+  // Author Pool states
+  const [savedAuthors, setSavedAuthors] = useState<SavedAuthor[]>([]);
+  const [showAuthorDropdown, setShowAuthorDropdown] = useState(false);
+  const [justSavedAuthor, setJustSavedAuthor] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const raw = localStorage.getItem('endnotere-author-pool');
+      if (raw) {
+        try {
+          setSavedAuthors(JSON.parse(raw));
+        } catch (e) {
+          console.error('Failed to parse author pool', e);
+        }
+      }
+    }
+  }, []);
+
+  const saveAuthorToPool = (author: Omit<SavedAuthor, 'id'>) => {
+    if (!author.name.trim()) return;
+    const newAuthors = [...savedAuthors];
+    const existingIdx = newAuthors.findIndex(
+      a => a.name.toLowerCase() === author.name.toLowerCase() || 
+           (author.email && a.email?.toLowerCase() === author.email.toLowerCase())
+    );
+    
+    const updatedAuthor: SavedAuthor = {
+      id: existingIdx >= 0 ? newAuthors[existingIdx].id : newId('auth'),
+      name: author.name.trim(),
+      email: author.email?.trim() || '',
+      orcid: author.orcid?.trim() || '',
+      address: author.address?.trim() || '',
+    };
+
+    if (existingIdx >= 0) {
+      newAuthors[existingIdx] = updatedAuthor;
+    } else {
+      newAuthors.push(updatedAuthor);
+    }
+
+    setSavedAuthors(newAuthors);
+    localStorage.setItem('endnotere-author-pool', JSON.stringify(newAuthors));
+  };
+
+  const deleteAuthorFromPool = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const newAuthors = savedAuthors.filter(a => a.id !== id);
+    setSavedAuthors(newAuthors);
+    localStorage.setItem('endnotere-author-pool', JSON.stringify(newAuthors));
+  };
+
+  const renderAuthorPoolSelector = () => {
+    if (savedAuthors.length === 0) return null;
+    return (
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => setShowAuthorDropdown(!showAuthorDropdown)}
+          className="text-[10px] text-violet-600 hover:text-violet-700 font-semibold flex items-center gap-1 transition"
+        >
+          👤 {tLocal('letters_saved_authors')}
+        </button>
+        {showAuthorDropdown && (
+          <>
+            <div 
+              className="fixed inset-0 z-40" 
+              onClick={() => setShowAuthorDropdown(false)}
+            />
+            <div className="absolute right-0 mt-1 w-64 bg-white border border-slate-200 rounded-md shadow-lg py-1 z-50 max-h-48 overflow-y-auto">
+              <div className="px-2 py-1 text-[10px] font-semibold text-slate-400 border-b border-slate-100">
+                {tLocal('letters_author_pool')}
+              </div>
+              {savedAuthors.map((author) => (
+                <div
+                  key={author.id}
+                  onClick={() => {
+                    setCorrespondingAuthor(author.name);
+                    if (author.email) setCorrespondingEmail(author.email);
+                    if (author.orcid) setOrcid(author.orcid);
+                    if (author.address) setCorrespondingAddress(author.address);
+                    setShowAuthorDropdown(false);
+                  }}
+                  className="flex justify-between items-center px-3 py-1.5 text-xs hover:bg-slate-50 cursor-pointer text-left transition"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-slate-700 truncate">{author.name}</p>
+                    {author.email && <p className="text-[10px] text-slate-400 truncate">{author.email}</p>}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => deleteAuthorFromPool(author.id, e)}
+                    className="text-slate-300 hover:text-red-500 p-1 rounded transition ml-2 text-[10px]"
+                    title={wizardLang === 'tr' ? 'Sil' : 'Delete'}
+                  >
+                    🗑️
+                  </button>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    );
+  };
 
   // Compute stats of manuscript
   const manuscriptWordCount = getWordCount(project.bodyText || '');
@@ -219,6 +332,15 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
       documents: [...documentsList, newDoc],
       updatedAt: Date.now(),
     };
+
+    if (correspondingAuthor.trim()) {
+      saveAuthorToPool({
+        name: correspondingAuthor,
+        email: correspondingEmail,
+        orcid: orcid,
+        address: correspondingAddress,
+      });
+    }
 
     await saveProject(updatedProject);
     onSaved(updatedProject);
@@ -706,7 +828,37 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
                 <div className="space-y-4 pt-2 border-t border-slate-100">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="flex flex-col gap-1">
-                      <label className={labelCls}>{tLocal('letters_corresponding')}</label>
+                      <div className="flex justify-between items-center w-full">
+                        <label className={labelCls}>{tLocal('letters_corresponding')}</label>
+                        <div className="flex items-center gap-2">
+                          {justSavedAuthor ? (
+                            <span className="text-[10px] text-emerald-600 font-semibold animate-pulse flex items-center gap-0.5">
+                              ✅ {tLocal('letters_saved_success')}
+                            </span>
+                          ) : (
+                            correspondingAuthor.trim() && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  saveAuthorToPool({
+                                    name: correspondingAuthor,
+                                    email: correspondingEmail,
+                                    orcid: orcid,
+                                    address: correspondingAddress,
+                                  });
+                                  setJustSavedAuthor(true);
+                                  setTimeout(() => setJustSavedAuthor(false), 2000);
+                                }}
+                                className="text-[10px] text-emerald-600 hover:text-emerald-700 font-semibold flex items-center gap-0.5 transition"
+                                title={tLocal('letters_save_pool')}
+                              >
+                                💾 {tLocal('letters_save_pool')}
+                              </button>
+                            )
+                          )}
+                          {renderAuthorPoolSelector()}
+                        </div>
+                      </div>
                       <input
                         className={inputCls}
                         placeholder="Dr. Ahmet Yılmaz"
@@ -759,7 +911,37 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
                       />
                     </div>
                     <div className="flex flex-col gap-1">
-                      <label className={labelCls}>{tLocal('letters_corresponding')}</label>
+                      <div className="flex justify-between items-center w-full">
+                        <label className={labelCls}>{tLocal('letters_corresponding')}</label>
+                        <div className="flex items-center gap-2">
+                          {justSavedAuthor ? (
+                            <span className="text-[10px] text-emerald-600 font-semibold animate-pulse flex items-center gap-0.5">
+                              ✅ {tLocal('letters_saved_success')}
+                            </span>
+                          ) : (
+                            correspondingAuthor.trim() && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  saveAuthorToPool({
+                                    name: correspondingAuthor,
+                                    email: correspondingEmail,
+                                    orcid: orcid,
+                                    address: correspondingAddress,
+                                  });
+                                  setJustSavedAuthor(true);
+                                  setTimeout(() => setJustSavedAuthor(false), 2000);
+                                }}
+                                className="text-[10px] text-emerald-600 hover:text-emerald-700 font-semibold flex items-center gap-0.5 transition"
+                                title={tLocal('letters_save_pool')}
+                              >
+                                💾 {tLocal('letters_save_pool')}
+                              </button>
+                            )
+                          )}
+                          {renderAuthorPoolSelector()}
+                        </div>
+                      </div>
                       <input
                         className={inputCls}
                         placeholder="Dr. Ahmet Yılmaz"
