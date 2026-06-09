@@ -61,6 +61,7 @@ function EditPageInner() {
       const open = searchParams.get('open');
       if (open && ps.some((p) => p.id === open)) {
         setActiveId(open);
+        setActiveSubView('workspace');
         router.replace('/edit');
       }
     });
@@ -83,9 +84,7 @@ function EditPageInner() {
     };
   }, [searchParams, router]);
 
-  useEffect(() => {
-    setActiveSubView('workspace');
-  }, [activeId]);
+
 
 
   async function newProject(): Promise<void> {
@@ -94,6 +93,7 @@ function EditPageInner() {
     gdrive.markDirty(p.id);
     await refreshList();
     setActiveId(p.id);
+    setActiveSubView('workspace');
   }
 
   async function refreshList(): Promise<void> {
@@ -197,6 +197,7 @@ function EditPageInner() {
     gdrive.markDirty(p.id);
     await refreshList();
     setActiveId(p.id);
+    setActiveSubView('workspace');
   }
 
   function paragraphToInlineContent(para: string, refs: Ref[]): Array<Record<string, unknown>> {

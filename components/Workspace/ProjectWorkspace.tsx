@@ -1124,7 +1124,10 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
         <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 w-full flex-1 flex flex-col gap-8">
           <div className="grid md:grid-cols-2 gap-6 items-stretch">
             {/* Branch 1: Ana Yazı (Manuscript Editor) */}
-            <div className="card p-6 flex flex-col justify-between hover:shadow-md transition border-2 border-transparent hover:border-teal/20 group relative overflow-hidden bg-white">
+            <div
+              onClick={onOpenManuscript}
+              className="card p-6 flex flex-col justify-between hover:shadow-md transition border-2 border-transparent hover:border-teal/20 cursor-pointer group relative overflow-hidden bg-white"
+            >
               <div className="absolute top-0 right-0 p-3 text-3xl opacity-10 group-hover:scale-110 transition duration-300">✍️</div>
               <div>
                 <span className="inline-block text-[10px] uppercase font-extrabold tracking-widest text-teal bg-teal-bg px-2.5 py-1 rounded-full mb-3">
