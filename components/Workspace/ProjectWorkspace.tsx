@@ -26,7 +26,7 @@ interface ProjectWorkspaceProps {
 }
 
 type DocType = 'cover' | 'title-page' | 'response' | 'contrib' | 'coi' | 'custom';
-type WizardTab = DocType | 'author-pool';
+type WizardTab = DocType | 'author-pool' | 'custom-templates';
 
 interface SavedAuthor {
   id: string;
@@ -34,6 +34,13 @@ interface SavedAuthor {
   email?: string;
   orcid?: string;
   address?: string;
+}
+
+interface CustomTemplate {
+  id: string;
+  title: string;
+  content: string;
+  createdAt: number;
 }
 
 interface WizardAuthor {
@@ -54,6 +61,9 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
   const tLocal = (key: Parameters<typeof tI18n>[0]) => {
     return tI18n(key, wizardLang);
   };
+
+  const inputCls = 'w-full text-xs border border-border rounded-lg px-3 py-2 bg-surface text-primary focus:border-teal outline-none transition';
+  const labelCls = 'block text-[10px] uppercase font-bold text-muted mb-1';
   
   // Workspace views: 'dashboard' or 'edit-doc'
   const [view, setView] = useState<'dashboard' | 'edit-doc'>('dashboard');
@@ -104,6 +114,25 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
   const [savedAuthors, setSavedAuthors] = useState<SavedAuthor[]>([]);
   const [showAuthorDropdown, setShowAuthorDropdown] = useState(false);
   const [justSavedAuthor, setJustSavedAuthor] = useState(false);
+
+  // Custom Templates states
+  const [customTemplates, setCustomTemplates] = useState<CustomTemplate[]>([]);
+  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
+  const [templateName, setTemplateName] = useState('');
+  const [templateContent, setTemplateContent] = useState('');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const rawTemplates = localStorage.getItem('endnotere-custom-templates');
+      if (rawTemplates) {
+        try {
+          setCustomTemplates(JSON.parse(rawTemplates));
+        } catch (e) {
+          console.error('Failed to parse custom templates', e);
+        }
+      }
+    }
+  }, []);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -319,6 +348,243 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
     });
     setSavedAuthors(updated);
     localStorage.setItem('endnotere-author-pool', JSON.stringify(updated));
+  };
+
+  const handleSaveAsTemplate = () => {
+    const name = prompt(lang === 'tr' ? 'Şablon adı girin:' : 'Enter template name:', editTitle);
+    if (!name || !name.trim()) return;
+    
+    const newTemplate: CustomTemplate = {
+      id: newId('tmpl'),
+      title: name.trim(),
+      content: editContent,
+      createdAt: Date.now()
+    };
+    
+    const updatedTemplates = [...customTemplates, newTemplate];
+    setCustomTemplates(updatedTemplates);
+    localStorage.setItem('endnotere-custom-templates', JSON.stringify(updatedTemplates));
+    alert(lang === 'tr' ? 'Şablon başarıyla kaydedildi!' : 'Template saved successfully!');
+  };
+
+  const handleRecallTemplate = async (template: CustomTemplate) => {
+    const newDoc: ProjectDocument = {
+      id: newId('doc'),
+      type: 'custom',
+      title: template.title,
+      content: template.content,
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    };
+    
+    const updatedProject: Project = {
+      ...project,
+      documents: [...documentsList, newDoc],
+      updatedAt: Date.now()
+    };
+    
+    await saveProject(updatedProject);
+    onSaved(updatedProject);
+    setShowWizard(false);
+    openDoc(newDoc);
+  };
+
+  const handleDeleteTemplate = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm(lang === 'tr' ? 'Bu şablonu silmek istediğinize emin misiniz?' : 'Are you sure you want to delete this template?')) return;
+    const updatedTemplates = customTemplates.filter(t => t.id !== id);
+    setCustomTemplates(updatedTemplates);
+    localStorage.setItem('endnotere-custom-templates', JSON.stringify(updatedTemplates));
+    if (editingTemplateId === id) {
+      setEditingTemplateId(null);
+      setTemplateName('');
+      setTemplateContent('');
+    }
+  };
+
+  const handleUpdateTemplate = () => {
+    if (!editingTemplateId) return;
+    
+    if (!templateName.trim()) {
+      alert(lang === 'tr' ? 'Şablon adı boş olamaz!' : 'Template name cannot be empty!');
+      return;
+    }
+
+    let updatedTemplates;
+    if (editingTemplateId === 'new') {
+      const newTemplate: CustomTemplate = {
+        id: newId('tmpl'),
+        title: templateName.trim(),
+        content: templateContent,
+        createdAt: Date.now()
+      };
+      updatedTemplates = [...customTemplates, newTemplate];
+    } else {
+      updatedTemplates = customTemplates.map(t => {
+        if (t.id === editingTemplateId) {
+          return {
+            ...t,
+            title: templateName.trim(),
+            content: templateContent,
+          };
+        }
+        return t;
+      });
+    }
+
+    setCustomTemplates(updatedTemplates);
+    localStorage.setItem('endnotere-custom-templates', JSON.stringify(updatedTemplates));
+    setEditingTemplateId(null);
+    setTemplateName('');
+    setTemplateContent('');
+    alert(lang === 'tr' ? 'Şablon kaydedildi!' : 'Template saved!');
+  };
+
+  const renderCustomTemplatesManager = () => {
+    if (editingTemplateId) {
+      return (
+        <div className="space-y-4 pt-2">
+          <div>
+            <h3 className="text-sm font-bold text-primary">
+              {wizardLang === 'tr' ? 'Şablonu Düzenle' : 'Edit Template'}
+            </h3>
+            <p className="text-[10px] text-muted">
+              {wizardLang === 'tr' 
+                ? 'Şablon başlığını ve içeriğini düzenleyebilirsiniz.' 
+                : 'You can edit the template title and content.'}
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex flex-col gap-1">
+              <label className={labelCls}>
+                {wizardLang === 'tr' ? 'Şablon Adı' : 'Template Title'}
+              </label>
+              <input
+                className={inputCls}
+                value={templateName}
+                onChange={(e) => setTemplateName(e.target.value)}
+                placeholder={wizardLang === 'tr' ? 'örn. Benim Kapak Mektubum' : 'e.g. My Cover Letter'}
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className={labelCls}>
+                {wizardLang === 'tr' ? 'Şablon İçeriği' : 'Template Content'}
+              </label>
+              <textarea
+                className={`${inputCls} h-64 font-mono text-xs`}
+                value={templateContent}
+                onChange={(e) => setTemplateContent(e.target.value)}
+                placeholder={wizardLang === 'tr' ? 'Şablon metnini buraya yazın...' : 'Write template text here...'}
+              />
+            </div>
+          </div>
+
+          <div className="flex gap-2 justify-end">
+            <button
+              type="button"
+              onClick={() => {
+                setEditingTemplateId(null);
+                setTemplateName('');
+                setTemplateContent('');
+              }}
+              className="px-3 py-1.5 text-xs border border-border rounded-lg text-secondary hover:bg-slate-50 transition"
+            >
+              {wizardLang === 'tr' ? 'Vazgeç' : 'Cancel'}
+            </button>
+            <button
+              type="button"
+              onClick={handleUpdateTemplate}
+              className="px-3 py-1.5 text-xs bg-violet-600 text-white hover:bg-violet-700 rounded-lg font-semibold shadow-sm transition"
+            >
+              {wizardLang === 'tr' ? 'Güncelle' : 'Update'}
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-4 pt-2">
+        <div className="flex justify-between items-center">
+          <div>
+            <h3 className="text-sm font-bold text-primary">
+              {wizardLang === 'tr' ? 'Kayıtlı Şablonlarım' : 'My Saved Templates'}
+            </h3>
+            <p className="text-[10px] text-muted">
+              {wizardLang === 'tr' 
+                ? 'Kaydettiğiniz şablonları geri çağırarak yeni belgeler oluşturabilir veya şablonları düzenleyebilirsiniz.' 
+                : 'Recall your saved templates to create new documents, or edit them.'}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setEditingTemplateId('new');
+              setTemplateName('');
+              setTemplateContent('');
+            }}
+            className="text-xs bg-violet-600 text-white hover:bg-violet-700 px-3 py-1.5 rounded-lg font-semibold flex items-center gap-1.5 shadow-sm transition"
+          >
+            ➕ {wizardLang === 'tr' ? 'Yeni Şablon Ekle' : 'Add New Template'}
+          </button>
+        </div>
+
+        <div className="space-y-3 max-h-[450px] overflow-y-auto pr-1">
+          {customTemplates.length === 0 ? (
+            <div className="text-center py-8 border border-dashed border-border rounded-xl bg-slate-50/50">
+              <span className="text-3xl">🗂️</span>
+              <p className="text-xs text-muted mt-2">
+                {wizardLang === 'tr' ? 'Henüz kayıtlı şablonunuz yok.' : 'No saved templates yet.'}
+              </p>
+            </div>
+          ) : (
+            customTemplates.map((tmpl) => (
+              <div key={tmpl.id} className="p-3 bg-slate-50/70 rounded-lg border border-slate-150 relative space-y-2 hover:border-slate-300 transition">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h4 className="text-xs font-bold text-primary">{tmpl.title}</h4>
+                    <p className="text-[10px] text-muted mt-1 max-w-md overflow-hidden text-ellipsis whitespace-nowrap">
+                      {tmpl.content ? tmpl.content.substring(0, 120) + (tmpl.content.length > 120 ? '...' : '') : ''}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handleRecallTemplate(tmpl)}
+                      className="text-[10px] bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-1 rounded font-semibold transition"
+                      title={wizardLang === 'tr' ? 'Belge Olarak Oluştur' : 'Create as Document'}
+                    >
+                      🚀 {wizardLang === 'tr' ? 'Kullan' : 'Use'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingTemplateId(tmpl.id);
+                        setTemplateName(tmpl.title);
+                        setTemplateContent(tmpl.content);
+                      }}
+                      className="text-[10px] bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded font-semibold transition"
+                      title={wizardLang === 'tr' ? 'Şablonu Düzenle' : 'Edit Template'}
+                    >
+                      ✏️ {wizardLang === 'tr' ? 'Düzenle' : 'Edit'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => handleDeleteTemplate(tmpl.id, e)}
+                      className="text-[10px] bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded font-semibold transition"
+                      title={wizardLang === 'tr' ? 'Şablonu Sil' : 'Delete Template'}
+                    >
+                      🗑️ {wizardLang === 'tr' ? 'Sil' : 'Delete'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    );
   };
 
   const renderAuthorPoolManager = () => {
@@ -808,6 +1074,7 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
       case 'contrib': return '👥';
       case 'coi': return '⚖️';
       case 'author-pool': return '👥';
+      case 'custom-templates': return '🗂️';
       default: return '📝';
     }
   };
@@ -820,12 +1087,12 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
       case 'contrib': return tI18n('letters_contrib', l);
       case 'coi': return tI18n('letters_coi', l);
       case 'author-pool': return l === 'tr' ? 'Yazar Listesi' : 'Author List';
+      case 'custom-templates': return l === 'tr' ? 'Şablonlarım' : 'My Templates';
       default: return l === 'tr' ? 'Özel Belge' : 'Custom';
     }
   };
 
-  const inputCls = 'w-full text-xs border border-border rounded-lg px-3 py-2 bg-surface text-primary focus:border-teal outline-none transition';
-  const labelCls = 'block text-[10px] uppercase font-bold text-muted mb-1';
+
 
   return (
     <div className="min-h-screen bg-slate-50/50 flex flex-col">
@@ -1077,6 +1344,14 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
                   💾 .txt
                 </button>
                 <button
+                  onClick={handleSaveAsTemplate}
+                  disabled={!editContent}
+                  className="btn-secondary text-xs px-3 py-2 flex-1 disabled:opacity-40 flex items-center justify-center gap-1 hover:bg-slate-50 transition"
+                  title={lang === 'tr' ? 'Şablon olarak kaydet' : 'Save as template'}
+                >
+                  🗂️ {lang === 'tr' ? 'Şablon Kaydet' : 'Save Template'}
+                </button>
+                <button
                   onClick={handleImproveAI}
                   disabled={!editContent || aiBusy}
                   className="text-xs px-3 py-2 flex-1 rounded-lg bg-violet-600 text-white font-semibold hover:bg-violet-700 disabled:opacity-40 flex items-center justify-center gap-1 shadow-sm transition"
@@ -1113,7 +1388,7 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
 
             {/* Template Selectors */}
             <div className="flex gap-1 px-4 py-2 bg-slate-50 border-b border-border overflow-x-auto whitespace-nowrap">
-              {(['cover', 'title-page', 'response', 'contrib', 'coi', 'custom', 'author-pool'] as WizardTab[]).map((type) => (
+              {(['cover', 'title-page', 'response', 'contrib', 'coi', 'custom', 'author-pool', 'custom-templates'] as WizardTab[]).map((type) => (
                 <button
                   key={type}
                   onClick={() => resetWizardFields(type)}
@@ -1129,7 +1404,7 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
             {/* Fields Form */}
             <div className="p-5 overflow-y-auto flex-1 space-y-4">
               {/* Language Selection */}
-              {wizardType !== 'author-pool' && (
+              {wizardType !== 'author-pool' && wizardType !== 'custom-templates' && (
                 <div className="bg-slate-50 p-3 rounded-lg border border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
                     <h4 className="text-xs font-bold text-primary">{lang === 'tr' ? 'Yazışma / Şablon Dili' : 'Correspondence / Template Language'}</h4>
@@ -1159,7 +1434,7 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
               )}
 
               {/* Common Fields */}
-              {wizardType !== 'author-pool' && (
+              {wizardType !== 'author-pool' && wizardType !== 'custom-templates' && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="sm:col-span-2 flex flex-col gap-1">
                     <label className={labelCls}>{wizardLang === 'tr' ? 'Mektup / Belge Adı (İsteğe Bağlı)' : 'Letter / Document Title (Optional)'}</label>
@@ -1459,6 +1734,9 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
 
               {/* Author Pool / Saved List Editor */}
               {wizardType === 'author-pool' && renderAuthorPoolManager()}
+
+              {/* Custom Templates Manager */}
+              {wizardType === 'custom-templates' && renderCustomTemplatesManager()}
             </div>
 
             <div className="px-5 py-3 border-t border-border bg-slate-50/50 flex gap-2 justify-end">
@@ -1468,7 +1746,7 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
               >
                 {wizardLang === 'tr' ? 'Kapat' : 'Close'}
               </button>
-              {wizardType !== 'author-pool' && (
+              {wizardType !== 'author-pool' && wizardType !== 'custom-templates' && (
                 <button
                   onClick={handleCreateDocument}
                   className="btn-primary text-xs px-4 py-2 font-semibold shadow-sm bg-violet-600 hover:bg-violet-700 transition"
