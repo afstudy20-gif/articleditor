@@ -47,6 +47,7 @@ import { TablePanel } from '@/components/Tables/TablePanel';
 import { JournalCheckPanel } from '@/components/Journal/JournalCheckPanel';
 import { LettersPanel } from '@/components/Letters/LettersPanel';
 import { PhrasebankPanel } from '@/components/Phrasebank/PhrasebankPanel';
+import { SupplementaryPanel } from '@/components/Supplementary/SupplementaryPanel';
 import { useTabSync } from '@/lib/hooks/useTabSync';
 import { computeWritingStats } from '@/lib/stats/writing-stats';
 import {
@@ -189,6 +190,8 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
   const [journalOpen, setJournalOpen] = useState(false);
   const [lettersOpen, setLettersOpen] = useState(false);
   const [phrasebankOpen, setPhrasebankOpen] = useState(false);
+  const [supplementary, setSupplementary] = useState<string>(project.supplementary ?? '');
+  const [suppOpen, setSuppOpen] = useState(false);
   const [phrasebankSection, setPhrasebankSection] = useState<string | null>(null);
   const [wordGoal, setWordGoal] = useState(0);
 
@@ -215,6 +218,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
           label,
           doc: liveDoc,
           refs,
+          supplementary,
           auto: true,
           wordCount: computeWritingStats(liveDoc).words,
         });
@@ -223,7 +227,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
       }
     },
     // editorInstance is a stable ref-like object
-    [doc, refs, project.id],
+    [doc, refs, supplementary, project.id],
   );
 
   const restoreSnapshot = useCallback(
@@ -231,6 +235,9 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
       if (!confirm(t('snap_restore_confirm'))) return;
       setRefs(snap.refs);
       setDoc(snap.doc);
+      if (snap.supplementary !== undefined) {
+        setSupplementary(snap.supplementary ?? '');
+      }
       const ed = editorInstance.current;
       if (ed && !ed.isDestroyed && snap.doc) {
         ed.commands.setContent(snap.doc as Record<string, unknown>);
@@ -523,6 +530,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
         title,
         refs,
         doc,
+        supplementary,
         settings: { ...(project.settings ?? {}), style },
       });
       setSavedAt(Date.now());
@@ -532,7 +540,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
       setTimeout(() => setSavingState('idle'), 1200);
     }, 600);
     return () => clearTimeout(t);
-  }, [title, refs, doc, style, project, onSaved, notifyTabSaved]);
+  }, [title, refs, doc, style, supplementary, project, onSaved, notifyTabSaved]);
 
   async function callLookup(ref: Ref): Promise<Ref | null> {
     const res = await fetch('/api/lookup', {
@@ -1713,7 +1721,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
               >
                 🏠 {lang === 'tr' ? 'Projelerim' : 'Projects'}
               </button>
-              <span className="text-muted/40">|</span>
+              <span className="text-muted/30">|</span>
               <button
                 onClick={onExit}
                 className="text-secondary hover:text-primary font-bold flex items-center gap-1 transition"
@@ -1721,13 +1729,86 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
               >
                 📁 {t('ws_title') || 'Çalışma Alanı'}
               </button>
-              <span className="text-muted/40">|</span>
+              <span className="text-muted/30">|</span>
               <button
-                onClick={onGoToDocuments || onExit}
-                className="text-teal hover:text-teal-dark font-bold flex items-center gap-1 transition"
-                title="Mektuplar & Ek Belgeler"
+                onClick={() => {
+                  setTablesOpen(false);
+                  setFiguresOpen(false);
+                  setSuppOpen(false);
+                  setLettersOpen(false);
+                }}
+                className={`${
+                  (!tablesOpen && !figuresOpen && !suppOpen && !lettersOpen)
+                    ? 'text-teal font-extrabold bg-teal/10 px-1.5 py-0.5 rounded'
+                    : 'text-secondary hover:text-primary font-semibold hover:bg-slate-50 px-1.5 py-0.5 rounded'
+                } flex items-center gap-1 transition`}
+              >
+                📝 {lang === 'tr' ? 'Ana Yazı' : 'Main Text'}
+              </button>
+              <span className="text-muted/30">|</span>
+              <button
+                onClick={() => {
+                  setTablesOpen(false);
+                  setFiguresOpen(false);
+                  setSuppOpen(false);
+                  if (onGoToDocuments) onGoToDocuments();
+                  else setLettersOpen(true);
+                }}
+                className={`${
+                  lettersOpen
+                    ? 'text-teal font-extrabold bg-teal/10 px-1.5 py-0.5 rounded'
+                    : 'text-secondary hover:text-primary font-semibold hover:bg-slate-50 px-1.5 py-0.5 rounded'
+                } flex items-center gap-1 transition`}
               >
                 ✉️ {lang === 'tr' ? 'Diğer Yazılar' : 'Letters'}
+              </button>
+              <span className="text-muted/30">|</span>
+              <button
+                onClick={() => {
+                  setTablesOpen(true);
+                  setFiguresOpen(false);
+                  setSuppOpen(false);
+                  setLettersOpen(false);
+                }}
+                className={`${
+                  tablesOpen
+                    ? 'text-teal font-extrabold bg-teal/10 px-1.5 py-0.5 rounded'
+                    : 'text-secondary hover:text-primary font-semibold hover:bg-slate-50 px-1.5 py-0.5 rounded'
+                } flex items-center gap-1 transition`}
+              >
+                ⊞ {lang === 'tr' ? 'Tablolar' : 'Tables'}
+              </button>
+              <span className="text-muted/30">|</span>
+              <button
+                onClick={() => {
+                  setFiguresOpen(true);
+                  setTablesOpen(false);
+                  setSuppOpen(false);
+                  setLettersOpen(false);
+                }}
+                className={`${
+                  figuresOpen
+                    ? 'text-teal font-extrabold bg-teal/10 px-1.5 py-0.5 rounded'
+                    : 'text-secondary hover:text-primary font-semibold hover:bg-slate-50 px-1.5 py-0.5 rounded'
+                } flex items-center gap-1 transition`}
+              >
+                🖼️ {lang === 'tr' ? 'Şekiller' : 'Figures'}
+              </button>
+              <span className="text-muted/30">|</span>
+              <button
+                onClick={() => {
+                  setSuppOpen(true);
+                  setTablesOpen(false);
+                  setFiguresOpen(false);
+                  setLettersOpen(false);
+                }}
+                className={`${
+                  suppOpen
+                    ? 'text-teal font-extrabold bg-teal/10 px-1.5 py-0.5 rounded'
+                    : 'text-secondary hover:text-primary font-semibold hover:bg-slate-50 px-1.5 py-0.5 rounded'
+                } flex items-center gap-1 transition`}
+              >
+                📎 {lang === 'tr' ? 'Ek Materyaller' : 'Supplementary'}
               </button>
             </div>
             <input
@@ -1823,10 +1904,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
             <HeaderIcon onClick={openPhrasebank} title={t('pb_title')} label="§" caption={t('hdr_phrasebank')} />
             <HeaderIcon onClick={() => setStatsOpen(true)} title={t('ed_stats')} label="📊" caption={t('hdr_stats')} />
             <HeaderIcon onClick={() => setSnapshotsOpen(true)} title={t('ed_snapshots')} label="🕓" caption={t('hdr_versions')} />
-            <HeaderIcon onClick={() => setFiguresOpen(true)} title={t('ed_figures')} label="🖼" caption={t('hdr_figures')} />
-            <HeaderIcon onClick={() => setTablesOpen(true)} title={t('tbl_title')} label="⊞" caption={t('hdr_tables')} />
             <HeaderIcon onClick={() => setJournalOpen(true)} title={t('ed_journal_check')} label="📋" caption={t('hdr_journal')} />
-            <HeaderIcon onClick={() => { if (onGoToDocuments) onGoToDocuments(); else setLettersOpen(true); }} title={t('ed_letters')} label="✉️" caption={t('hdr_letters')} />
             <HeaderIcon onClick={() => setFocusMode(true)} title={`${t('ed_focus_mode')} (⌘.)`} label="🎯" caption={t('hdr_focus')} />
             <HeaderIcon
               onClick={() => setSettingsOpen(true)}
@@ -2271,6 +2349,19 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
       {tablesOpen && editorInstance.current && (
         <div className="fixed right-4 top-20 bottom-4 w-[380px] z-40 shadow-2xl">
           <TablePanel editor={editorInstance.current} onClose={() => setTablesOpen(false)} t={t} />
+        </div>
+      )}
+
+      {suppOpen && (
+        <div className="fixed right-4 top-20 bottom-4 w-[360px] z-40 shadow-2xl">
+          <SupplementaryPanel
+            value={supplementary}
+            onChange={setSupplementary}
+            refs={refs}
+            refOrder={refOrder}
+            onClose={() => setSuppOpen(false)}
+            lang={lang}
+          />
         </div>
       )}
 

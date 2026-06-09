@@ -40,7 +40,7 @@ const MAX_SNAPSHOTS_PER_PROJECT = 30;
 
 export async function createSnapshot(
   projectId: string,
-  data: { label: string; doc?: unknown; refs: Ref[]; auto?: boolean; wordCount?: number },
+  data: { label: string; doc?: unknown; refs: Ref[]; auto?: boolean; wordCount?: number; supplementary?: string },
 ): Promise<Snapshot> {
   const db = getDb();
   const snap: Snapshot = {
@@ -52,6 +52,7 @@ export async function createSnapshot(
     doc: data.doc,
     refs: data.refs,
     wordCount: data.wordCount,
+    supplementary: data.supplementary,
   };
   await db.snapshots.put(snap);
   // Prune oldest beyond the cap to bound storage.

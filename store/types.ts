@@ -83,6 +83,7 @@ export type Project = {
   };
   deleted?: number | null;
   documents?: ProjectDocument[];
+  supplementary?: string;
 };
 
 
@@ -96,6 +97,7 @@ export type Snapshot = {
   doc?: unknown;
   refs: Ref[];
   wordCount?: number;
+  supplementary?: string;
 };
 
 export type Phrase = {

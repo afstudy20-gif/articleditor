@@ -130,6 +130,59 @@ export function ArticleEditor({
         spellcheck: 'true',
         lang: 'auto',
       },
+      handlePaste(view, event) {
+        const items = event.clipboardData?.items;
+        if (!items) return false;
+
+        let hasImage = false;
+        for (let i = 0; i < items.length; i++) {
+          const item = items[i];
+          if (item.type.startsWith('image/')) {
+            const file = item.getAsFile();
+            if (file) {
+              hasImage = true;
+              const reader = new FileReader();
+              reader.onload = (e) => {
+                const src = e.target?.result as string;
+                if (src && view.state.schema.nodes.image) {
+                  view.dispatch(
+                    view.state.tr.replaceSelectionWith(
+                      view.state.schema.nodes.image.create({ src })
+                    )
+                  );
+                }
+              };
+              reader.readAsDataURL(file);
+            }
+          }
+        }
+        return hasImage;
+      },
+      handleDrop(view, event, slice, moved) {
+        const files = event.dataTransfer?.files;
+        if (!files) return false;
+
+        let hasImage = false;
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          if (file.type.startsWith('image/')) {
+            hasImage = true;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              const src = e.target?.result as string;
+              if (src && view.state.schema.nodes.image) {
+                view.dispatch(
+                  view.state.tr.replaceSelectionWith(
+                    view.state.schema.nodes.image.create({ src })
+                  )
+                );
+              }
+            };
+            reader.readAsDataURL(file);
+          }
+        }
+        return hasImage;
+      },
     },
     onUpdate({ editor }) {
       const json = editor.getJSON();
