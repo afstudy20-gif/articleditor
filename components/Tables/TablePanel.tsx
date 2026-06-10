@@ -162,10 +162,11 @@ export function TablePanel({
       const parsed = parseTable(text);
       setImportPreview(parsed);
       if (!parsed) setImportError(t('tbl_import_invalid'));
-    } catch {
+    } catch (err: unknown) {
       setImportPreview(null);
       setImportText('');
-      setImportError(t('tbl_import_failed'));
+      const errMsg = err instanceof Error ? err.message : String(err);
+      setImportError(`${t('tbl_import_failed')} (${errMsg})`);
     } finally {
       setImportBusy(false);
     }
