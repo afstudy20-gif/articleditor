@@ -10,6 +10,7 @@ export type TexBuildInput = {
   title?: string;
   style: StyleId;
   language?: 'tr' | 'en';
+  bibliographyTitle?: string;
 };
 
 export type TexAsset = {
@@ -77,6 +78,7 @@ export function buildLatex(input: TexBuildInput): TexBuildOutput {
     bibliography,
     bibFilename: 'refs',
     language: input.language ?? 'en',
+    bibliographyTitle: input.bibliographyTitle ?? 'References',
     exportDate: new Date().toISOString(),
   });
 
@@ -103,6 +105,7 @@ function buildTexSource(o: {
   bibliography: BibliographyConfig;
   bibFilename: string;
   language: 'tr' | 'en';
+  bibliographyTitle: string;
   exportDate: string;
 }): string {
   const babelLanguages = o.language === 'tr' ? 'english,turkish' : 'turkish,english';
@@ -155,7 +158,7 @@ function buildTexSource(o: {
 
 ${o.body}
 
-\\printbibliography
+\\printbibliography[title={${escapeTex(o.bibliographyTitle)}}]
 
 \\end{document}
 `;

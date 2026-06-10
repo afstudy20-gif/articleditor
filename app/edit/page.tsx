@@ -25,7 +25,11 @@ import { useLang } from '@/lib/i18n/hooks';
 import { newId } from '@/lib/id';
 import { parseDocx } from '@/lib/docx/parse';
 import { splitBodyAndBiblio, parseBiblioLines } from '@/lib/refs/parse-biblio';
-import { detectMarkers } from '@/lib/markers/detect';
+import {
+  buildDocWithCitations,
+  parseHtmlToParagraphs,
+  type ImportParagraph,
+} from '@/lib/editor/import-rich';
 
 const EditorClient = dynamic(() => import('./EditorClient').then((m) => m.EditorClient), {
   ssr: false,
@@ -142,8 +146,12 @@ function EditPageInner() {
     setConversionError(null);
     try {
       const buf = await file.arrayBuffer();
-      const { plainText } = await parseDocx(buf);
-      await convertAndOpen(plainText, file.name.replace(/\.docx$/i, '') || 'Dönüştürülen Makale');
+      const { paragraphs, plainText } = await parseDocx(buf);
+      await convertAndOpen(
+        plainText,
+        file.name.replace(/\.docx$/i, '') || 'Dönüştürülen Makale',
+        paragraphs,
+      );
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       setConversionError(`Dosya işlenemedi: ${msg}`);
@@ -152,11 +160,15 @@ function EditPageInner() {
     }
   }
 
-  async function handleConvertText(text: string): Promise<void> {
+  async function handleConvertText(text: string, html?: string): Promise<void> {
     setConversionBusy(true);
     setConversionError(null);
     try {
-      await convertAndOpen(text, 'Yapıştırılan Metin');
+      await convertAndOpen(
+        text,
+        'Yapıştırılan Metin',
+        html ? parseHtmlToParagraphs(html) : undefined,
+      );
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       setConversionError(`İşlenemedi: ${msg}`);
@@ -165,7 +177,11 @@ function EditPageInner() {
     }
   }
 
-  async function convertAndOpen(text: string, defaultTitle: string): Promise<void> {
+  async function convertAndOpen(
+    text: string,
+    defaultTitle: string,
+    richParagraphs?: ImportParagraph[],
+  ): Promise<void> {
     const split = splitBodyAndBiblio(text);
     const { refs: parsedRefs } = parseBiblioLines(split.refLines);
 
@@ -174,18 +190,16 @@ function EditPageInner() {
       id: newId('r'),
     }));
 
-    // Build TipTap doc: paragraphs with citation nodes inserted at [N], [N,M], [N-M] markers.
-    const paragraphs = split.bodyText.split(/\r?\n+/).filter((p) => p.trim().length > 0);
-    const tiptapDoc = {
-      type: 'doc',
-      content:
-        paragraphs.length > 0
-          ? paragraphs.map((para) => ({
-              type: 'paragraph',
-              content: paragraphToInlineContent(para, refsWithIds),
-            }))
-          : [{ type: 'paragraph' }],
-    };
+    const bibliographyStart = richParagraphs?.findIndex((paragraph) =>
+      isBibliographyHeading(paragraph.text),
+    ) ?? -1;
+    const bodyParagraphs = richParagraphs
+      ? richParagraphs.slice(0, bibliographyStart >= 0 ? bibliographyStart : undefined)
+      : split.bodyText
+        .split(/\r?\n+/)
+        .filter((paragraph) => paragraph.trim().length > 0)
+        .map((paragraph) => ({ text: paragraph }));
+    const tiptapDoc = buildDocWithCitations(bodyParagraphs, refsWithIds);
 
     const p: Project = createProject({
       title: defaultTitle,
@@ -198,34 +212,6 @@ function EditPageInner() {
     await refreshList();
     setActiveId(p.id);
     setActiveSubView('workspace');
-  }
-
-  function paragraphToInlineContent(para: string, refs: Ref[]): Array<Record<string, unknown>> {
-    const markers = detectMarkers(para);
-    if (markers.length === 0) {
-      return para.length > 0 ? [{ type: 'text', text: para }] : [];
-    }
-    const out: Array<Record<string, unknown>> = [];
-    let cursor = 0;
-    for (const m of markers) {
-      if (m.startIndex > cursor) {
-        out.push({ type: 'text', text: para.slice(cursor, m.startIndex) });
-      }
-      const refIds = m.refNumbers
-        .map((n) => refs[n - 1]?.id)
-        .filter((id): id is string => Boolean(id));
-      if (refIds.length > 0) {
-        out.push({ type: 'citation', attrs: { refIds } });
-      } else {
-        // Keep original marker text if no matching ref
-        out.push({ type: 'text', text: m.raw });
-      }
-      cursor = m.endIndex;
-    }
-    if (cursor < para.length) {
-      out.push({ type: 'text', text: para.slice(cursor) });
-    }
-    return out;
   }
 
   if (!loaded) {
@@ -645,6 +631,12 @@ function EditPageInner() {
         gdrive.markDirty(active.id);
       }}
     />
+  );
+}
+
+function isBibliographyHeading(text: string): boolean {
+  return /^(references|bibliography|kaynakça|kaynaklar|referanslar|literatür)\s*:?\s*$/i.test(
+    text.trim(),
   );
 }
 

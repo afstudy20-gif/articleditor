@@ -104,6 +104,8 @@ describe('buildLatex', () => {
     assert.ok(output.tex.includes('\\begin{tabularx}{\\linewidth}'));
     assert.ok(output.tex.includes('\\textbf{A} & \\textbf{B} \\\\'));
     assert.ok(output.tex.includes('\\begin{equation*}'));
+    assert.ok(output.tex.includes('\\printbibliography[title={References}]'));
+    assert.ok(!output.tex.includes('title={Kaynakça}'));
     assert.ok(output.bib.includes('@article{smith2024,'));
   });
 

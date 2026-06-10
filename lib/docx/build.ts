@@ -13,6 +13,7 @@ export type BuildInput = {
   title?: string;
   style?: StyleId;
   lineNumbers?: boolean;
+  bibHeading?: string;
 };
 
 // Assign EndNote record numbers (sequential, starting from 1).
@@ -74,9 +75,7 @@ function buildDocumentXml(input: BuildInput, refs: Ref[]): string {
     paragraphs.push(buildParagraph(para, paraMarkers, paraStart, refs, input.mode, style));
     cursor = paraEnd + 1; // +1 for the \n
   }
-  const bibHeading = style === 'apa' || style === 'mdpi-apa' || style === 'mdpi-chicago'
-    ? 'Kaynakça'
-    : 'Kaynaklar';
+  const bibHeading = input.bibHeading ?? 'References';
   paragraphs.push(paragraphXml(`<w:pPr><w:pStyle w:val="Heading1"/></w:pPr>${runXml(bibHeading)}`));
   refs.forEach((r, i) => {
     const formatted = formatBibEntry(style, r, i + 1);

@@ -21,7 +21,7 @@ export type RichBuildInput = {
   mode: BuildMode;
   title?: string;
   lineNumbers?: boolean;
-  /** Bibliography heading; defaults by style. */
+  /** Bibliography heading; defaults to "References". */
   bibHeading?: string;
   /** Add the title as the first body paragraph. Defaults to true. */
   includeDocumentTitle?: boolean;
@@ -178,10 +178,7 @@ ${this.rels.join('\n')}
       }
     }
     if (this.input.includeBibliography !== false) {
-      const authorYearStyle = this.input.style === 'apa'
-        || this.input.style === 'mdpi-apa'
-        || this.input.style === 'mdpi-chicago';
-      const bibHeading = this.input.bibHeading ?? (authorYearStyle ? 'Kaynakça' : 'Kaynaklar');
+      const bibHeading = this.input.bibHeading ?? 'References';
       paragraphs.push(`<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr>${textRun(bibHeading)}</w:p>`);
       this.orderedRefs.forEach((r, i) => {
         paragraphs.push(`<w:p>${textRun(formatBibEntry(this.input.style, r, i + 1))}</w:p>`);

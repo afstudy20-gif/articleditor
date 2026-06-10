@@ -9,7 +9,7 @@ import { RefsPanel } from '@/components/RefsPanel/RefsPanel';
 import { tiptapToBuildInput } from '@/lib/editor/to-export';
 import { buildRichDocx } from '@/lib/docx/build-rich';
 import { refsToRis } from '@/lib/refs/ris';
-import { parseDocx, type ImportRun } from '@/lib/docx/parse';
+import { parseDocx } from '@/lib/docx/parse';
 import { splitBodyAndBiblio, parseBiblioLines } from '@/lib/refs/parse-biblio';
 import { detectMarkers } from '@/lib/markers/detect';
 import { newId } from '@/lib/id';
@@ -51,8 +51,12 @@ import { SupplementaryPanel } from '@/components/Supplementary/SupplementaryPane
 import { AbbreviationsPanel } from '@/components/Abbreviations/AbbreviationsPanel';
 import { useTabSync } from '@/lib/hooks/useTabSync';
 import { useIsDesktop } from '@/lib/hooks/useIsDesktop';
-import { rowsToTiptapTable } from '@/lib/tables/parse-table';
 import { computeWritingStats } from '@/lib/stats/writing-stats';
+import {
+  buildDocWithCitations,
+  parseHtmlToParagraphs,
+  type ImportParagraph,
+} from '@/lib/editor/import-rich';
 import {
   encodeSelection,
   decodeToTipTapContent,
@@ -67,12 +71,6 @@ type Props = {
   onSaved: () => void;
   onExitToProjects?: () => void;
   onGoToDocuments?: () => void;
-};
-
-type ImportParagraph = {
-  text: string;
-  style?: string;
-  runs?: ImportRun[];
 };
 
 type ImportPreview = {
@@ -1616,6 +1614,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
       mode,
       title,
       lineNumbers: exportLineNumbers,
+      bibHeading: 'References',
     });
     download(blob, `${slugify(title)}-${style}-${mode}.docx`);
   }
@@ -1634,6 +1633,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
       title,
       style,
       language: lang,
+      bibliographyTitle: 'References',
     });
     const slug = slugify(title);
     const zip = new JSZip();
@@ -2812,296 +2812,6 @@ function isCommonHeading(line: string, index: number): number | null {
   }
 
   return null;
-}
-
-type ImportBlock = {
-  text: string;
-  style?: string;
-  runs?: ImportRun[];
-  list?: { type: 'bullet' | 'ordered'; level: number };
-  table?: string[][];
-};
-
-function buildDocWithCitations(paragraphs: ImportBlock[], refs: Ref[]): unknown {
-  const content: unknown[] = [];
-  let pendingList: { type: 'bullet' | 'ordered'; items: unknown[] } | null = null;
-
-  const flushList = (): void => {
-    if (!pendingList) return;
-    content.push({
-      type: pendingList.type === 'bullet' ? 'bulletList' : 'orderedList',
-      content: pendingList.items,
-    });
-    pendingList = null;
-  };
-
-  for (const p of paragraphs) {
-    // Tables become real TipTap tables.
-    if (p.table && p.table.length > 0) {
-      flushList();
-      const tableNode = rowsToTiptapTable(p.table, true);
-      if (tableNode) content.push(tableNode);
-      continue;
-    }
-
-    // Consecutive list paragraphs group into one bullet/ordered list.
-    if (p.list) {
-      const item = {
-        type: 'listItem',
-        content: [{ type: 'paragraph', content: paragraphToCitationInlineRich(p.text, p.runs, refs) }],
-      };
-      if (pendingList && pendingList.type === p.list.type) {
-        pendingList.items.push(item);
-      } else {
-        flushList();
-        pendingList = { type: p.list.type, items: [item] };
-      }
-      continue;
-    }
-    flushList();
-
-    let style = p.style?.toLowerCase() ?? '';
-    const text = p.text;
-
-    // Auto-detect heading from runs if style is not explicitly a heading style
-    if (!style.includes('heading') && style !== 'title' && style !== 'subtitle') {
-      const detected = detectHeadingFromRuns(text, p.runs);
-      if (detected) {
-        style = detected.toLowerCase();
-      }
-    }
-
-    let headingLevel: number | null = null;
-    if (style.includes('heading1') || style === 'title' || style === 'heading 1') {
-      headingLevel = 1;
-    } else if (style.includes('heading2') || style === 'subtitle' || style === 'heading 2') {
-      headingLevel = 2;
-    } else if (style.includes('heading3') || style === 'heading 3') {
-      headingLevel = 3;
-    }
-
-    if (headingLevel !== null) {
-      content.push({
-        type: 'heading',
-        attrs: { level: headingLevel },
-        content: paragraphToCitationInlineRich(text, p.runs, refs),
-      });
-      continue;
-    }
-
-    content.push({
-      type: 'paragraph',
-      content: paragraphToCitationInlineRich(text, p.runs, refs),
-    });
-  }
-  flushList();
-  return { type: 'doc', content: content.length > 0 ? content : [{ type: 'paragraph' }] };
-}
-
-function detectHeadingFromRuns(text: string, runs?: ImportRun[]): string | undefined {
-  if (!runs || runs.length === 0) return undefined;
-  const trimmed = text.trim();
-  if (trimmed.length === 0 || trimmed.length > 120 || /[.?!]$/.test(trimmed)) return undefined;
-
-  // Check if all non-whitespace text is bold
-  const nonWsChars = trimmed.replace(/\s+/g, '');
-  let boldCharsCount = 0;
-  for (const r of runs) {
-    if (r.bold) {
-      boldCharsCount += r.text.replace(/\s+/g, '').length;
-    }
-  }
-
-  if (boldCharsCount > 0 && boldCharsCount >= nonWsChars.length * 0.9) {
-    return 'Heading2';
-  }
-  return undefined;
-}
-
-function parseHtmlToParagraphs(html: string): ImportParagraph[] {
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(html, 'text/html');
-  const paragraphs: ImportParagraph[] = [];
-
-  const blockElements = doc.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li, blockquote');
-
-  if (blockElements.length === 0) {
-    const divs = doc.querySelectorAll('div');
-    if (divs.length > 0) {
-      divs.forEach((div) => {
-        if (!div.querySelector('div')) {
-          paragraphs.push(parseElementToParagraph(div));
-        }
-      });
-    }
-  } else {
-    blockElements.forEach((el) => {
-      paragraphs.push(parseElementToParagraph(el));
-    });
-  }
-
-  return paragraphs.filter((p) => p.text.trim().length > 0);
-}
-
-function parseElementToParagraph(el: Element): ImportParagraph {
-  const text = el.textContent || '';
-  const tagName = el.tagName.toLowerCase();
-
-  let style: string | undefined = undefined;
-  if (tagName === 'h1') style = 'Heading1';
-  else if (tagName === 'h2') style = 'Heading2';
-  else if (tagName === 'h3') style = 'Heading3';
-  else if (tagName === 'h4') style = 'Heading4';
-  else if (tagName === 'h5') style = 'Heading5';
-  else if (tagName === 'h6') style = 'Heading6';
-
-  const runs: ImportRun[] = [];
-
-  const traverse = (node: Node, boldActive: boolean, italicActive: boolean, underlineActive: boolean) => {
-    if (node.nodeType === Node.TEXT_NODE) {
-      const txt = node.textContent || '';
-      if (txt) {
-        runs.push({
-          text: txt,
-          bold: boldActive || undefined,
-          italic: italicActive || undefined,
-          underline: underlineActive || undefined,
-        });
-      }
-    } else if (node.nodeType === Node.ELEMENT_NODE) {
-      const childEl = node as Element;
-      const childTag = childEl.tagName.toLowerCase();
-
-      const isBold = boldActive || childTag === 'strong' || childTag === 'b' || childEl.getAttribute('style')?.includes('font-weight: bold') || childEl.getAttribute('style')?.includes('font-weight: 700') || childEl.getAttribute('style')?.includes('font-weight:bold');
-      const isItalic = italicActive || childTag === 'em' || childTag === 'i' || childEl.getAttribute('style')?.includes('font-style: italic') || childEl.getAttribute('style')?.includes('font-style:italic');
-      const isUnderline = underlineActive || childTag === 'u' || childEl.getAttribute('style')?.includes('text-decoration: underline') || childEl.getAttribute('style')?.includes('text-decoration:underline');
-
-      childEl.childNodes.forEach((child) => {
-        traverse(child, !!isBold, !!isItalic, !!isUnderline);
-      });
-    }
-  };
-
-  el.childNodes.forEach((child) => {
-    traverse(child, false, false, false);
-  });
-
-  if (!style) {
-    const isAllBold = runs.length > 0 && runs.every((r) => r.bold || /^\s*$/.test(r.text));
-    const isFirstBold = runs.length > 0 && runs[0].bold && runs[0].text.trim().length > 0;
-    const trimmedText = text.trim();
-
-    if (trimmedText.length > 0 && trimmedText.length < 120 && !/[.?!]$/.test(trimmedText)) {
-      if (isAllBold) {
-        style = 'Heading2';
-      } else if (isFirstBold && runs[0].text.trim().length === trimmedText.length) {
-        style = 'Heading2';
-      }
-    }
-  }
-
-  return {
-    text,
-    style,
-    runs,
-  };
-}
-
-function paragraphToCitationInlineRich(
-  paraText: string,
-  runs: ImportRun[] | undefined,
-  refs: Ref[]
-): Array<Record<string, unknown>> {
-  const activeRuns = runs && runs.length > 0 ? runs : [{ text: paraText }];
-  const markers = detectMarkers(paraText);
-  const charStyles: Array<{ bold?: boolean; italic?: boolean; underline?: boolean }> = [];
-  
-  for (const r of activeRuns) {
-    for (let i = 0; i < r.text.length; i++) {
-      charStyles.push({
-        bold: r.bold,
-        italic: r.italic,
-        underline: r.underline,
-      });
-    }
-  }
-  
-  while (charStyles.length < paraText.length) {
-    charStyles.push({});
-  }
-
-  const out: Array<Record<string, unknown>> = [];
-  let cursor = 0;
-
-  for (const m of markers) {
-    if (m.startIndex > cursor) {
-      const segmentText = paraText.slice(cursor, m.startIndex);
-      out.push(...makeTextNodesWithStyles(segmentText, cursor, charStyles));
-    }
-    const refIds = m.refNumbers
-      .map((n) => refs[n - 1]?.id)
-      .filter((id): id is string => Boolean(id));
-    if (refIds.length > 0) {
-      out.push({ type: 'citation', attrs: { refIds } });
-    } else {
-      const segmentText = m.raw;
-      out.push(...makeTextNodesWithStyles(segmentText, m.startIndex, charStyles));
-    }
-    cursor = m.endIndex;
-  }
-
-  if (cursor < paraText.length) {
-    const segmentText = paraText.slice(cursor);
-    out.push(...makeTextNodesWithStyles(segmentText, cursor, charStyles));
-  }
-
-  return out;
-}
-
-function makeTextNodesWithStyles(
-  text: string,
-  startOffset: number,
-  charStyles: Array<{ bold?: boolean; italic?: boolean; underline?: boolean }>
-): Array<Record<string, unknown>> {
-  if (text.length === 0) return [];
-  const nodes: Array<Record<string, unknown>> = [];
-  let currentText = '';
-  let prevStyleKey = '';
-
-  for (let i = 0; i < text.length; i++) {
-    const charIndex = startOffset + i;
-    const style = charStyles[charIndex] || {};
-    const styleKey = `${style.bold ? 'B' : ''}_${style.italic ? 'I' : ''}_${style.underline ? 'U' : ''}`;
-
-    if (i === 0) {
-      currentText = text[i];
-      prevStyleKey = styleKey;
-    } else if (styleKey === prevStyleKey) {
-      currentText += text[i];
-    } else {
-      nodes.push(createTextNode(currentText, charStyles[startOffset + i - currentText.length]));
-      currentText = text[i];
-      prevStyleKey = styleKey;
-    }
-  }
-
-  if (currentText.length > 0) {
-    nodes.push(createTextNode(currentText, charStyles[startOffset + text.length - currentText.length]));
-  }
-
-  return nodes;
-}
-
-function createTextNode(text: string, style: { bold?: boolean; italic?: boolean; underline?: boolean }): Record<string, unknown> {
-  const node: Record<string, unknown> = { type: 'text', text };
-  const marks: Array<Record<string, unknown>> = [];
-  if (style.bold) marks.push({ type: 'bold' });
-  if (style.italic) marks.push({ type: 'italic' });
-  if (style.underline) marks.push({ type: 'underline' });
-  if (marks.length > 0) {
-    node.marks = marks;
-  }
-  return node;
 }
 
 function mergeTipTapDocs(prev: any, incoming: any): unknown {

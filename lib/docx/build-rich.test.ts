@@ -88,10 +88,17 @@ describe('buildRichDocx', () => {
     assert.ok(xml.includes('<w:tbl>'), 'table element');
     assert.ok(xml.includes('ADDIN EN.CITE'), 'active EndNote field');
     assert.ok(xml.includes('<w:jc w:val="both"/>'), 'justified alignment');
+    assert.ok(xml.includes('References'), 'English bibliography heading');
+    assert.ok(!xml.includes('Kaynakça'), 'no localized bibliography heading');
 
     const zip = await JSZip.loadAsync(await blob.arrayBuffer());
     const styles = await zip.file('word/styles.xml')!.async('string');
     assert.ok(styles.includes('Times New Roman'), 'editor font, not Calibri');
+    assert.match(
+      styles,
+      /w:styleId="Heading2"[\s\S]*?<w:rPr><w:b\/><\/w:rPr>/,
+      'heading style remains bold',
+    );
     assert.ok(zip.file('word/numbering.xml'), 'numbering part present');
   });
 

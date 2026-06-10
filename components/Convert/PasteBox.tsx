@@ -3,11 +3,12 @@
 import { useState } from 'react';
 
 type Props = {
-  onSubmit: (text: string) => void;
+  onSubmit: (text: string, html?: string) => void;
 };
 
 export function PasteBox({ onSubmit }: Props) {
   const [text, setText] = useState('');
+  const [html, setHtml] = useState<string>();
   return (
     <div className="card p-4">
       <label className="tool-label block mb-2">Metin yapıştır</label>
@@ -15,13 +16,23 @@ export function PasteBox({ onSubmit }: Props) {
         className="w-full min-h-[200px] font-mono text-sm border border-border rounded-lg p-3 outline-none focus:border-teal focus:ring-2 focus:ring-teal/10"
         placeholder="Belge metnini yapıştır. Kaynakça bölümü otomatik algılanacak."
         value={text}
-        onChange={(e) => setText(e.target.value)}
+        onChange={(e) => {
+          setText(e.target.value);
+          setHtml(undefined);
+        }}
+        onPaste={(event) => {
+          const richHtml = event.clipboardData.getData('text/html');
+          if (!richHtml) return;
+          event.preventDefault();
+          setText(event.clipboardData.getData('text/plain'));
+          setHtml(richHtml);
+        }}
       />
       <div className="mt-3 flex justify-end">
         <button
           className="btn-primary"
           disabled={text.trim().length < 20}
-          onClick={() => onSubmit(text)}
+          onClick={() => onSubmit(text, html)}
         >
           Algıla & Önizle
         </button>
