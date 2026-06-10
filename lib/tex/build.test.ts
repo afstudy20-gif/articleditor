@@ -146,6 +146,33 @@ describe('buildLatex', () => {
     assert.ok(output.warnings[0].includes('numeric-comp'));
   });
 
+  it('can place figure legends after the bibliography without duplicate captions', () => {
+    const doc = {
+      type: 'doc',
+      content: [{
+        type: 'figure',
+        attrs: {
+          src: onePixelPng,
+          caption: 'Primary outcome by treatment group.',
+          kind: 'figure',
+          figId: 'primary',
+        },
+      }],
+    };
+    const output = buildLatex({
+      doc,
+      refs: [],
+      style: 'vancouver',
+      figureCaptionPlacement: 'after-bibliography',
+    });
+
+    assert.ok(output.tex.includes('\\section*{Figure Legends}'));
+    assert.ok(output.tex.indexOf('\\printbibliography') < output.tex.indexOf('\\section*{Figure Legends}'));
+    assert.ok(output.tex.includes('\\textbf{Figure 1.} Primary outcome by treatment group.'));
+    assert.ok(!output.tex.includes('\\caption{Primary outcome by treatment group.}'));
+    assert.ok(output.tex.includes('\\refstepcounter{figure}'));
+  });
+
   it('uses portable author-year biblatex commands for APA citation options', () => {
     const doc = {
       type: 'doc',
@@ -180,12 +207,20 @@ describe('buildLatex', () => {
     const acs = buildLatex({ doc, refs: [ref], style: 'mdpi-acs' });
     assert.ok(acs.tex.includes('style=numeric-comp'));
     assert.ok(acs.tex.includes('sorting=none'));
+    assert.ok(acs.tex.includes('maxbibnames=10'));
+    assert.ok(acs.tex.includes('minbibnames=10'));
     assert.ok(acs.tex.includes('\\cite{smith2024}'));
 
     const chicago = buildLatex({ doc, refs: [ref], style: 'mdpi-chicago' });
     assert.ok(chicago.tex.includes('style=authoryear'));
     assert.ok(chicago.tex.includes('sorting=nyt'));
+    assert.ok(chicago.tex.includes('maxbibnames=10'));
+    assert.ok(chicago.tex.includes('minbibnames=10'));
     assert.ok(chicago.tex.includes('\\parencite{smith2024}'));
+
+    const apa = buildLatex({ doc, refs: [ref], style: 'mdpi-apa' });
+    assert.ok(apa.tex.includes('style=apa'));
+    assert.ok(apa.tex.includes('sorting=nyt'));
   });
 
   it('reports unsupported external images instead of emitting a broken includegraphics path', () => {

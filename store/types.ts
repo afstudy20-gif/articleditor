@@ -80,6 +80,7 @@ export type Project = {
     // Built-in citation style id or a 'custom:<id>' style.
     style?: string;
     aiProvider?: 'anthropic' | 'openai';
+    figureCaptionPlacement?: 'inline' | 'after-bibliography';
   };
   deleted?: number | null;
   documents?: ProjectDocument[];

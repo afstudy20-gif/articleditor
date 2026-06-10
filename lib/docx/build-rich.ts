@@ -7,6 +7,10 @@ import {
   orderRefsForBib,
   type StyleId,
 } from '@/lib/refs/styles';
+import {
+  collectFigureLegends,
+  type FigureCaptionPlacement,
+} from '@/lib/figures/export-layout';
 import { assignRecNums, activeEndNoteField, placeholderText, type BuildMode } from './build';
 
 type Json = any;
@@ -27,6 +31,8 @@ export type RichBuildInput = {
   includeDocumentTitle?: boolean;
   /** Add the bibliography heading and entries. Defaults to true. */
   includeBibliography?: boolean;
+  /** Keep figure captions inline or collect them after the bibliography. */
+  figureCaptionPlacement?: FigureCaptionPlacement;
 };
 
 const WORD_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
@@ -183,6 +189,23 @@ ${this.rels.join('\n')}
       this.orderedRefs.forEach((r, i) => {
         paragraphs.push(`<w:p>${textRun(formatBibEntry(this.input.style, r, i + 1))}</w:p>`);
       });
+    }
+    if (this.input.figureCaptionPlacement === 'after-bibliography') {
+      const legends = collectFigureLegends(doc);
+      if (legends.length > 0) {
+        paragraphs.push(
+          '<w:p><w:pPr><w:pStyle w:val="Heading1"/><w:pageBreakBefore/></w:pPr>'
+          + `${textRun('Figure Legends')}</w:p>`,
+        );
+        legends.forEach((legend) => {
+          paragraphs.push(
+            '<w:p>'
+            + `<w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">${escapeXml(`Figure ${legend.number}.`)}</w:t></w:r>`
+            + (legend.caption ? textRun(` ${legend.caption}`) : '')
+            + '</w:p>',
+          );
+        });
+      }
     }
 
     const lineNumXml = this.input.lineNumbers
@@ -384,9 +407,13 @@ ${paragraphs.join('\n')}
       if (drawing) out.push(`<w:p><w:pPr><w:jc w:val="center"/></w:pPr>${drawing}</w:p>`);
     }
     const label = figId ? this.figureLabel(figId) : `${kind} ?`;
-    out.push(
-      `<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">${escapeXml(`${label}.`)}</w:t></w:r>${caption ? textRun(` ${caption}`) : ''}</w:p>`,
-    );
+    const moveFigureCaption = kind === 'Figure'
+      && this.input.figureCaptionPlacement === 'after-bibliography';
+    if (!moveFigureCaption) {
+      out.push(
+        `<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">${escapeXml(`${label}.`)}</w:t></w:r>${caption ? textRun(` ${caption}`) : ''}</w:p>`,
+      );
+    }
     return out;
   }
 

@@ -8,7 +8,7 @@ describe('Journal of Clinical Medicine template', () => {
   it('is bundled with source metadata and the original-research abstract rules', () => {
     assert.ok(template);
     assert.equal(template.sourceUrl, 'https://www.mdpi.com/journal/jcm/instructions');
-    assert.equal(template.rulesUpdatedAt, '2026-06-10');
+    assert.equal(template.rulesUpdatedAt, '2026-06-11');
     assert.equal(template.referenceStyle, 'mdpi-acs');
     assert.equal(template.referenceStylePolicy, 'preferred');
     assert.deepEqual(template.publisherReferenceStyles, [
@@ -60,6 +60,8 @@ describe('Journal of Clinical Medicine template', () => {
     assert.ok(template.referenceRules?.some((rule) => rule.includes('square brackets')));
     assert.ok(template.referenceRules?.some((rule) => rule.includes('before punctuation')));
     assert.ok(template.referenceRules?.some((rule) => rule.includes('full article title')));
+    assert.ok(template.referenceRules?.some((rule) => rule.includes('three house styles')));
+    assert.ok(template.referenceRules?.some((rule) => rule.includes('first 10 authors')));
     assert.ok(template.referenceRules?.some((rule) => rule.includes('DOIs')));
     assert.ok(template.referenceRules?.some((rule) => rule.includes('supplementary files')));
   });

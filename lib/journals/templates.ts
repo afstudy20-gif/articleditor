@@ -268,7 +268,7 @@ export const JOURNAL_TEMPLATES: readonly JournalTemplate[] = [
   {
     id: 'jcm',
     sourceUrl: 'https://www.mdpi.com/journal/jcm/instructions',
-    rulesUpdatedAt: '2026-06-10',
+    rulesUpdatedAt: '2026-06-11',
     name: 'Journal of Clinical Medicine (JCM)',
     publisher: 'MDPI',
     description:
@@ -279,6 +279,7 @@ export const JOURNAL_TEMPLATES: readonly JournalTemplate[] = [
     referenceGuideUrl: 'https://www.mdpi.com/authors/layout',
     referenceRules: [
       'JCM accepts any consistently formatted reference style at initial submission; MDPI ACS is the recommended final layout.',
+      'MDPI provides three house styles: ACS, Chicago author-date, and APA. For lists longer than 10 authors, ACS and Chicago use the first 10 authors followed by et al.; MDPI APA follows the APA 7 author-list rule.',
       'Number references individually in order of first appearance, including citations in figure legends and table captions.',
       'Place citation numbers in square brackets before punctuation; use an en dash for ranges.',
       'Put page locators after the citation, for example [5] (p. 10) or [6] (pp. 101–105).',

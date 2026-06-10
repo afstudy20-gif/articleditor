@@ -130,6 +130,34 @@ describe('buildRichDocx', () => {
     assert.ok(xml.includes('Title Zeta'));
     assert.ok(xml.includes('Zeta, A.'));
   });
+
+  it('can move figure captions into Figure Legends after References', async () => {
+    const figureDoc = {
+      type: 'doc',
+      content: [{
+        type: 'figure',
+        attrs: {
+          src: '',
+          caption: 'Primary outcome by treatment group.',
+          kind: 'figure',
+          figId: 'primary',
+        },
+      }],
+    };
+    const blob = await buildRichDocx({
+      doc: figureDoc,
+      refsById: new Map(),
+      refOrder: new Map(),
+      style: 'vancouver',
+      mode: 'plain',
+      figureCaptionPlacement: 'after-bibliography',
+    });
+    const xml = await documentXml(blob);
+
+    assert.ok(xml.indexOf('References') < xml.indexOf('Figure Legends'));
+    assert.ok(xml.indexOf('Figure Legends') < xml.indexOf('Primary outcome by treatment group.'));
+    assert.equal(xml.match(/Primary outcome by treatment group\./g)?.length, 1);
+  });
 });
 
 describe('sniffDimensions', () => {

@@ -1,6 +1,10 @@
 import type { Ref } from '@/store/types';
 import { buildCitationKeyMap, generateBibtex } from '@/lib/refs/bibtex-out';
 import { isNumericStyle, type CitationStyle, type StyleId } from '@/lib/refs/styles';
+import {
+  collectFigureLegends,
+  type FigureCaptionPlacement,
+} from '@/lib/figures/export-layout';
 
 type Json = any;
 
@@ -11,6 +15,7 @@ export type TexBuildInput = {
   style: StyleId;
   language?: 'tr' | 'en';
   bibliographyTitle?: string;
+  figureCaptionPlacement?: FigureCaptionPlacement;
 };
 
 export type TexAsset = {
@@ -29,6 +34,8 @@ export type TexBuildOutput = {
 type BibliographyConfig = {
   biblatexStyle: string;
   sorting: string;
+  maxBibNames?: number;
+  minBibNames?: number;
 };
 
 const STYLE_PACKAGE: Record<CitationStyle, BibliographyConfig> = {
@@ -38,9 +45,19 @@ const STYLE_PACKAGE: Record<CitationStyle, BibliographyConfig> = {
   ama: { biblatexStyle: 'numeric-comp', sorting: 'none' },
   ieee: { biblatexStyle: 'numeric-comp', sorting: 'none' },
   apa: { biblatexStyle: 'authoryear', sorting: 'nyt' },
-  'mdpi-acs': { biblatexStyle: 'numeric-comp', sorting: 'none' },
-  'mdpi-chicago': { biblatexStyle: 'authoryear', sorting: 'nyt' },
-  'mdpi-apa': { biblatexStyle: 'authoryear', sorting: 'nyt' },
+  'mdpi-acs': {
+    biblatexStyle: 'numeric-comp',
+    sorting: 'none',
+    maxBibNames: 10,
+    minBibNames: 10,
+  },
+  'mdpi-chicago': {
+    biblatexStyle: 'authoryear',
+    sorting: 'nyt',
+    maxBibNames: 10,
+    minBibNames: 10,
+  },
+  'mdpi-apa': { biblatexStyle: 'apa', sorting: 'nyt' },
 };
 
 export function buildLatex(input: TexBuildInput): TexBuildOutput {
@@ -48,7 +65,8 @@ export function buildLatex(input: TexBuildInput): TexBuildOutput {
   const keyMap = buildCitationKeyMap(input.refs);
   const bib = generateBibtex(input.refs);
   const bibliography = bibliographyConfig(input.style);
-  const renderer = new LatexRenderer(input.doc, keyMap, input.style);
+  const figureCaptionPlacement = input.figureCaptionPlacement ?? 'inline';
+  const renderer = new LatexRenderer(input.doc, keyMap, input.style, figureCaptionPlacement);
   if (
     input.style === 'ama'
     || input.style === 'ieee'
@@ -58,11 +76,11 @@ export function buildLatex(input: TexBuildInput): TexBuildOutput {
     renderer.addExportWarning(
       `The ${input.style.toUpperCase()} export uses biblatex's portable numeric-comp style; verify journal-specific bibliography punctuation.`,
     );
-  } else if (
-    input.style === 'apa'
-    || input.style === 'mdpi-apa'
-    || input.style === 'mdpi-chicago'
-  ) {
+  } else if (input.style === 'mdpi-apa') {
+    renderer.addExportWarning(
+      'The MDPI-APA export uses biblatex-apa; verify the final bibliography with the target journal template.',
+    );
+  } else if (input.style === 'apa' || input.style === 'mdpi-chicago') {
     renderer.addExportWarning(
       `The ${input.style.toUpperCase()} export uses biblatex's portable authoryear style; verify journal-specific bibliography punctuation.`,
     );
@@ -79,6 +97,9 @@ export function buildLatex(input: TexBuildInput): TexBuildOutput {
     bibFilename: 'refs',
     language: input.language ?? 'en',
     bibliographyTitle: input.bibliographyTitle ?? 'References',
+    figureLegends: figureCaptionPlacement === 'after-bibliography'
+      ? renderer.renderFigureLegends()
+      : '',
     exportDate: new Date().toISOString(),
   });
 
@@ -106,9 +127,18 @@ function buildTexSource(o: {
   bibFilename: string;
   language: 'tr' | 'en';
   bibliographyTitle: string;
+  figureLegends: string;
   exportDate: string;
 }): string {
   const babelLanguages = o.language === 'tr' ? 'english,turkish' : 'turkish,english';
+  const bibliographyNameOptions = [
+    o.bibliography.maxBibNames != null
+      ? `  maxbibnames=${o.bibliography.maxBibNames},`
+      : '',
+    o.bibliography.minBibNames != null
+      ? `  minbibnames=${o.bibliography.minBibNames},`
+      : '',
+  ].filter(Boolean).join('\n');
 
   return `% !TEX TS-program = LuaLaTeX
 % !TEX encoding = UTF-8 Unicode
@@ -138,6 +168,7 @@ function buildTexSource(o: {
   backend=biber,
   style=${o.bibliography.biblatexStyle},
   sorting=${o.bibliography.sorting},
+${bibliographyNameOptions ? `${bibliographyNameOptions}\n` : ''}  maxcitenames=2,
   giveninits=true,
   doi=true,
   url=true
@@ -158,7 +189,10 @@ function buildTexSource(o: {
 
 ${o.body}
 
+\\clearpage
 \\printbibliography[title={${escapeTex(o.bibliographyTitle)}}]
+
+${o.figureLegends}
 
 \\end{document}
 `;
@@ -177,6 +211,7 @@ class LatexRenderer {
     private readonly doc: Json,
     private readonly keyMap: Map<string, string>,
     private readonly style: StyleId,
+    private readonly figureCaptionPlacement: FigureCaptionPlacement,
   ) {
     this.collectFigureLabels(doc);
   }
@@ -186,6 +221,19 @@ class LatexRenderer {
       ? this.doc.content.map((node: Json) => this.renderBlock(node)).filter(Boolean)
       : [];
     return blocks.join('\n').trim();
+  }
+
+  renderFigureLegends(): string {
+    const legends = collectFigureLegends(this.doc);
+    if (legends.length === 0) return '';
+    const entries = legends.map((legend) =>
+      `\\noindent\\textbf{Figure ${legend.number}.}`
+      + `${legend.caption ? ` ${escapeTex(legend.caption)}` : ''}\\par`,
+    );
+    return `\\clearpage
+\\section*{Figure Legends}
+
+${entries.join('\n\n')}`;
   }
 
   private renderBlock(node: Json): string {
@@ -352,7 +400,9 @@ ${latex}
     } else if (src) {
       body.push(`  ${this.externalImagePlaceholder(src)}`);
     }
-    if (caption) body.push(`  \\caption{${escapeTex(caption)}}`);
+    const moveFigureCaption = kind === 'figure'
+      && this.figureCaptionPlacement === 'after-bibliography';
+    if (caption && !moveFigureCaption) body.push(`  \\caption{${escapeTex(caption)}}`);
     else if (label) body.push(`  \\refstepcounter{${kind}}`);
     if (label) body.push(`  \\label{${label}}`);
 

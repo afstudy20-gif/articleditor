@@ -1,7 +1,12 @@
 'use client';
 
 import type { Ref } from '@/store/types';
-import { formatBibEntry, orderRefsForBib, type StyleId } from '@/lib/refs/styles';
+import {
+  formatBibEntry,
+  isNumericStyle,
+  orderRefsForBib,
+  type StyleId,
+} from '@/lib/refs/styles';
 import { useLang } from '@/lib/i18n/hooks';
 
 type Props = {
@@ -53,7 +58,9 @@ export function BibliographyPreview({
                         isSelected ? 'bg-teal-bg text-primary font-medium' : 'hover:bg-slate-50'
                       }`}
                     >
-                      <span className="text-faint text-xs mr-1">#{n}</span>
+                      {!isNumericStyle(style) && (
+                        <span className="text-faint text-xs mr-1">#{n}</span>
+                      )}
                       {formatBibEntry(style, r, n)}
                     </li>
                   );

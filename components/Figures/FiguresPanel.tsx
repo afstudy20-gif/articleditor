@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import type { FigureCaptionPlacement } from '@/lib/figures/export-layout';
 
 interface FigureEntry {
   figId: string;
@@ -14,6 +15,8 @@ interface FiguresPanelProps {
   editor: any;
   onClose: () => void;
   t: (k: string) => string;
+  captionPlacement: FigureCaptionPlacement;
+  onCaptionPlacementChange: (placement: FigureCaptionPlacement) => void;
 }
 
 function collect(editor: any): FigureEntry[] {
@@ -37,7 +40,13 @@ function collect(editor: any): FigureEntry[] {
   });
 }
 
-export function FiguresPanel({ editor, onClose, t }: FiguresPanelProps): JSX.Element {
+export function FiguresPanel({
+  editor,
+  onClose,
+  t,
+  captionPlacement,
+  onCaptionPlacementChange,
+}: FiguresPanelProps): JSX.Element {
   const [items, setItems] = useState<FigureEntry[]>(() => collect(editor));
 
   useEffect(() => {
@@ -59,6 +68,36 @@ export function FiguresPanel({ editor, onClose, t }: FiguresPanelProps): JSX.Ele
         <button onClick={onClose} className="text-muted hover:text-primary text-lg leading-none">
           ×
         </button>
+      </div>
+      <div className="p-3 border-b border-border bg-slate-50">
+        <div className="text-[11px] font-semibold text-primary mb-2">{t('fig_export_order')}</div>
+        <div className="grid grid-cols-1 gap-1.5">
+          <button
+            type="button"
+            onClick={() => onCaptionPlacementChange('inline')}
+            className={`text-left rounded-md border px-2.5 py-2 text-[11px] ${
+              captionPlacement === 'inline'
+                ? 'border-teal bg-teal-bg text-primary'
+                : 'border-border bg-white text-secondary'
+            }`}
+          >
+            <strong>{t('fig_export_inline')}</strong>
+            <span className="block mt-0.5 text-muted">{t('fig_export_inline_hint')}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => onCaptionPlacementChange('after-bibliography')}
+            className={`text-left rounded-md border px-2.5 py-2 text-[11px] ${
+              captionPlacement === 'after-bibliography'
+                ? 'border-teal bg-teal-bg text-primary'
+                : 'border-border bg-white text-secondary'
+            }`}
+          >
+            <strong>{t('fig_export_after_refs')}</strong>
+            <span className="block mt-0.5 text-muted">{t('fig_export_after_refs_hint')}</span>
+          </button>
+        </div>
+        <p className="text-[10px] leading-relaxed text-muted mt-2">{t('fig_export_note')}</p>
       </div>
       <div className="flex-1 overflow-auto">
         {items.length === 0 && (

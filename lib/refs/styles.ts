@@ -266,7 +266,8 @@ function formatMdpiAcsEntry(r: Ref, n: number): string {
 }
 
 function mdpiAcsAuthorList(r: Ref): string {
-  return r.authors
+  const truncated = r.authors.length > 10;
+  const authors = (truncated ? r.authors.slice(0, 10) : r.authors)
     .map((author) => {
       if (author.literal) return author.literal;
       const family = author.family ?? '';
@@ -280,6 +281,7 @@ function mdpiAcsAuthorList(r: Ref): string {
     })
     .filter(Boolean)
     .join('; ');
+  return truncated ? `${authors}; et al.` : authors;
 }
 
 function formatMdpiChicagoEntry(r: Ref): string {
@@ -309,7 +311,8 @@ function formatMdpiChicagoEntry(r: Ref): string {
 }
 
 function chicagoAuthorList(r: Ref): string {
-  const names = r.authors.map((author, index) => {
+  const truncated = r.authors.length > 10;
+  const names = (truncated ? r.authors.slice(0, 10) : r.authors).map((author, index) => {
     if (author.literal) return author.literal;
     const family = author.family ?? '';
     const given = author.given ?? '';
@@ -317,6 +320,7 @@ function chicagoAuthorList(r: Ref): string {
     return given && family ? `${given} ${family}` : family || given;
   }).filter(Boolean);
 
+  if (truncated) return `${names.join(', ')}, et al.`;
   if (names.length <= 1) return names[0] ?? '';
   if (names.length === 2) return `${names[0]}, and ${names[1]}`;
   return `${names.slice(0, -1).join(', ')}, and ${names[names.length - 1]}`;

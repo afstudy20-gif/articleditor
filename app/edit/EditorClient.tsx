@@ -64,6 +64,7 @@ import {
   type CitationNodeJSON,
 } from '@/lib/editor/mixed-content';
 import { useLang } from '@/lib/i18n/hooks';
+import type { FigureCaptionPlacement } from '@/lib/figures/export-layout';
 
 type Props = {
   project: Project;
@@ -146,6 +147,9 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
   }, []);
   const [showImportModal, setShowImportModal] = useState(false);
   const [exportLineNumbers, setExportLineNumbers] = useState(false);
+  const [figureCaptionPlacement, setFigureCaptionPlacement] = useState<FigureCaptionPlacement>(
+    project.settings?.figureCaptionPlacement ?? 'inline',
+  );
   const [importPreview, setImportPreview] = useState<ImportPreview>(null);
   const [importPasteText, setImportPasteText] = useState('');
   const [pastedHtmlParagraphs, setPastedHtmlParagraphs] = useState<ImportParagraph[] | null>(null);
@@ -555,7 +559,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
         refs,
         doc,
         supplementary,
-        settings: { ...(project.settings ?? {}), style },
+        settings: { ...(project.settings ?? {}), style, figureCaptionPlacement },
       });
       setSavedAt(Date.now());
       setSavingState('saved');
@@ -564,7 +568,18 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
       setTimeout(() => setSavingState('idle'), 1200);
     }, 600);
     return () => clearTimeout(t);
-  }, [title, refs, doc, style, supplementary, project, onSaved, notifyTabSaved, tabConflict]);
+  }, [
+    title,
+    refs,
+    doc,
+    style,
+    supplementary,
+    figureCaptionPlacement,
+    project,
+    onSaved,
+    notifyTabSaved,
+    tabConflict,
+  ]);
 
   // Conflict resolution: reload the project as saved by the other tab.
   const reloadFromDisk = useCallback(async (): Promise<void> => {
@@ -1615,6 +1630,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
       title,
       lineNumbers: exportLineNumbers,
       bibHeading: 'References',
+      figureCaptionPlacement,
     });
     download(blob, `${slugify(title)}-${style}-${mode}.docx`);
   }
@@ -1634,6 +1650,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
       style,
       language: lang,
       bibliographyTitle: 'References',
+      figureCaptionPlacement,
     });
     const slug = slugify(title);
     const zip = new JSZip();
@@ -1970,6 +1987,17 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
             <HeaderDropdown label={`📤 ${t('ed_export')} ▾`} primary>
               <DropItem onClick={(e) => { e.stopPropagation(); setExportLineNumbers(!exportLineNumbers); }}>
                 {exportLineNumbers ? '☑️' : '☐'} {lang === 'tr' ? 'Sürekli Satır Numaraları' : 'Continuous Line Numbers'}
+              </DropItem>
+              <DropItem
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setFigureCaptionPlacement((current) =>
+                    current === 'inline' ? 'after-bibliography' : 'inline',
+                  );
+                }}
+              >
+                {figureCaptionPlacement === 'after-bibliography' ? '☑️' : '☐'}{' '}
+                {lang === 'tr' ? 'Figure Legends, References sonrasında' : 'Figure Legends after References'}
               </DropItem>
               <hr className="border-border my-1" />
               <DropItem onClick={() => exportDocx('active')}>📝 {t('ed_export_docx_active')}</DropItem>
@@ -2547,7 +2575,13 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
 
       {figuresOpen && editorInstance.current && (
         <div className="fixed right-4 top-24 bottom-4 w-[340px] z-40 shadow-2xl">
-          <FiguresPanel editor={editorInstance.current} onClose={() => setFiguresOpen(false)} t={t} />
+          <FiguresPanel
+            editor={editorInstance.current}
+            onClose={() => setFiguresOpen(false)}
+            t={t}
+            captionPlacement={figureCaptionPlacement}
+            onCaptionPlacementChange={setFigureCaptionPlacement}
+          />
         </div>
       )}
 
