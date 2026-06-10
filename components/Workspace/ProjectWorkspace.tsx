@@ -13,10 +13,13 @@ import {
   buildResponseToReviewers,
   buildAuthorContributions,
   buildConflictOfInterest,
+  buildCopyrightTransfer,
   buildTitlePage,
   parseReviewerComments,
+  type CopyrightVariant,
   type LetterLang,
 } from '@/lib/letters/templates';
+import { fillTemplateVars, hasTemplateVars } from '@/lib/letters/fill-template';
 import { t as tI18n } from '@/lib/i18n';
 
 interface ProjectWorkspaceProps {
@@ -27,7 +30,7 @@ interface ProjectWorkspaceProps {
   initialView?: 'dashboard' | 'documents';
 }
 
-type DocType = 'cover' | 'title-page' | 'response' | 'contrib' | 'coi' | 'custom';
+type DocType = 'cover' | 'title-page' | 'response' | 'contrib' | 'coi' | 'copyright' | 'custom';
 type WizardTab = DocType | 'author-pool' | 'custom-templates';
 
 interface SavedAuthor {
@@ -55,6 +58,11 @@ interface WizardAuthor {
 function getWordCount(text: string): number {
   if (!text) return 0;
   return text.trim().split(/\s+/).filter(Boolean).length;
+}
+
+function localDateInputValue(date = new Date()): string {
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 10);
 }
 
 export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, initialView }: ProjectWorkspaceProps) {
@@ -94,6 +102,8 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
   const [keyFinding, setKeyFinding] = useState('');
   const [reviewerRaw, setReviewerRaw] = useState('');
   const [hasConflict, setHasConflict] = useState(false);
+  const [copyrightVariant, setCopyrightVariant] = useState<CopyrightVariant>('cc-by');
+  const [copyrightDate, setCopyrightDate] = useState(localDateInputValue);
   
   // Title Page specific fields
   const [runningTitle, setRunningTitle] = useState('');
@@ -124,6 +134,7 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
   const [templateName, setTemplateName] = useState('');
   const [templateContent, setTemplateContent] = useState('');
+  const [templateAuthors, setTemplateAuthors] = useState('');
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -372,11 +383,24 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
   };
 
   const handleRecallTemplate = async (template: CustomTemplate) => {
+    const locale = wizardLang === 'tr' ? 'tr-TR' : 'en-US';
+    const now = new Date();
+    const filledContent = fillTemplateVars(template.content, {
+      title: manuscriptTitle || project.title,
+      journal: journalName,
+      authors: templateAuthors,
+      corresponding: correspondingAuthor,
+      email: correspondingEmail,
+      address: correspondingAddress,
+      orcid,
+      date: now.toLocaleDateString(locale),
+      year: String(now.getFullYear()),
+    });
     const newDoc: ProjectDocument = {
       id: newId('doc'),
       type: 'custom',
       title: template.title,
-      content: template.content,
+      content: filledContent,
       createdAt: Date.now(),
       updatedAt: Date.now()
     };
@@ -481,6 +505,10 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
                 onChange={(e) => setTemplateContent(e.target.value)}
                 placeholder={wizardLang === 'tr' ? 'Şablon metnini buraya yazın...' : 'Write template text here...'}
               />
+              <p className="text-[10px] leading-relaxed text-muted">
+                {wizardLang === 'tr' ? 'Kullanılabilir değişkenler' : 'Available variables'}:{' '}
+                <code>{'{{title}} {{journal}} {{authors}} {{corresponding}} {{email}} {{address}} {{orcid}} {{date}} {{year}}'}</code>
+              </p>
             </div>
           </div>
 
@@ -534,6 +562,61 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
           </button>
         </div>
 
+        <div className="rounded-xl border border-violet-200 bg-violet-50/50 p-3">
+          <h4 className="text-xs font-bold text-primary">
+            {wizardLang === 'tr' ? 'Şablon değişkenleri' : 'Template variables'}
+          </h4>
+          <p className="mt-0.5 text-[10px] leading-relaxed text-muted">
+            {wizardLang === 'tr'
+              ? '“Kullan” dediğinizde şablondaki alanlar aşağıdaki proje bilgileriyle otomatik doldurulur. Boş bıraktığınız değişkenler belgede görünür kalır.'
+              : 'When you click “Use”, placeholders are filled from the project details below. Variables without a value remain visible in the document.'}
+          </p>
+          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <input
+              className={inputCls}
+              value={journalName}
+              onChange={(e) => setJournalName(e.target.value)}
+              placeholder={wizardLang === 'tr' ? 'Dergi adı' : 'Journal name'}
+            />
+            <input
+              className={inputCls}
+              value={manuscriptTitle}
+              onChange={(e) => setManuscriptTitle(e.target.value)}
+              placeholder={wizardLang === 'tr' ? 'Makale başlığı' : 'Manuscript title'}
+            />
+            <input
+              className={inputCls}
+              value={templateAuthors}
+              onChange={(e) => setTemplateAuthors(e.target.value)}
+              placeholder={wizardLang === 'tr' ? 'Tüm yazarlar' : 'All authors'}
+            />
+            <input
+              className={inputCls}
+              value={correspondingAuthor}
+              onChange={(e) => setCorrespondingAuthor(e.target.value)}
+              placeholder={wizardLang === 'tr' ? 'Sorumlu yazar' : 'Corresponding author'}
+            />
+            <input
+              className={inputCls}
+              value={correspondingEmail}
+              onChange={(e) => setCorrespondingEmail(e.target.value)}
+              placeholder={wizardLang === 'tr' ? 'E-posta' : 'Email'}
+            />
+            <input
+              className={inputCls}
+              value={orcid}
+              onChange={(e) => setOrcid(e.target.value)}
+              placeholder="ORCID"
+            />
+            <input
+              className={`${inputCls} sm:col-span-2`}
+              value={correspondingAddress}
+              onChange={(e) => setCorrespondingAddress(e.target.value)}
+              placeholder={wizardLang === 'tr' ? 'Kurum / adres' : 'Institution / address'}
+            />
+          </div>
+        </div>
+
         <div className="space-y-3 max-h-[450px] overflow-y-auto pr-1">
           {customTemplates.length === 0 ? (
             <div className="text-center py-8 border border-dashed border-border rounded-xl bg-slate-50/50">
@@ -547,7 +630,14 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
               <div key={tmpl.id} className="p-3 bg-slate-50/70 rounded-lg border border-slate-150 relative space-y-2 hover:border-slate-300 transition">
                 <div className="flex justify-between items-start">
                   <div>
-                    <h4 className="text-xs font-bold text-primary">{tmpl.title}</h4>
+                    <h4 className="flex items-center gap-2 text-xs font-bold text-primary">
+                      {tmpl.title}
+                      {hasTemplateVars(tmpl.content) && (
+                        <span className="rounded-full bg-violet-100 px-1.5 py-0.5 text-[9px] font-semibold text-violet-700">
+                          {wizardLang === 'tr' ? 'Değişkenli' : 'Variables'}
+                        </span>
+                      )}
+                    </h4>
                     <p className="text-[10px] text-muted mt-1 max-w-md overflow-hidden text-ellipsis whitespace-nowrap">
                       {tmpl.content ? tmpl.content.substring(0, 120) + (tmpl.content.length > 120 ? '...' : '') : ''}
                     </p>
@@ -833,6 +923,8 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
     setKeyFinding('');
     setReviewerRaw('');
     setHasConflict(false);
+    setCopyrightVariant('cc-by');
+    setCopyrightDate(localDateInputValue());
     setRunningTitle('');
     setAbsWordCount('');
     setMsWordCount(manuscriptWordCount.toString());
@@ -841,6 +933,7 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
     setConflictDesc('');
     setFunding('');
     setAcknowledgements('');
+    setTemplateAuthors('');
   };
 
   const openDoc = (doc: ProjectDocument) => {
@@ -888,6 +981,15 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
 
     const fullAuthorsStr = formatAuthorsList(wizardAuthors, correspondingAuthor);
     const allAuthorNames = wizardAuthors.map(a => a.name.trim()).filter(Boolean);
+    const copyrightAuthors = [...allAuthorNames];
+    if (
+      correspondingAuthor.trim()
+      && !copyrightAuthors.some(
+        (name) => name.toLowerCase() === correspondingAuthor.trim().toLowerCase(),
+      )
+    ) {
+      copyrightAuthors.push(correspondingAuthor.trim());
+    }
 
     if (wizardType === 'cover') {
       if (!finalTitle) finalTitle = getDocTypeName('cover', wizardLang);
@@ -938,6 +1040,17 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
       generatedContent = buildConflictOfInterest({
         authors: allAuthorNames,
         hasConflict,
+        lang: currentLang,
+      });
+    } else if (wizardType === 'copyright') {
+      if (!finalTitle) finalTitle = getDocTypeName('copyright', wizardLang);
+      generatedContent = buildCopyrightTransfer({
+        journalName,
+        manuscriptTitle,
+        authors: copyrightAuthors,
+        correspondingAuthor,
+        date: copyrightDate,
+        variant: copyrightVariant,
         lang: currentLang,
       });
     } else {
@@ -1111,6 +1224,7 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
       case 'response': return '💬';
       case 'contrib': return '👥';
       case 'coi': return '⚖️';
+      case 'copyright': return '©️';
       case 'author-pool': return '👥';
       case 'custom-templates': return '🗂️';
       default: return '📝';
@@ -1124,6 +1238,7 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
       case 'response': return tI18n('letters_response', l);
       case 'contrib': return tI18n('letters_contrib', l);
       case 'coi': return tI18n('letters_coi', l);
+      case 'copyright': return l === 'tr' ? 'Telif / Yayın Lisansı' : 'Copyright / Publishing License';
       case 'author-pool': return l === 'tr' ? 'Yazar Listesi' : 'Author List';
       case 'custom-templates': return l === 'tr' ? 'Şablonlarım' : 'My Templates';
       default: return l === 'tr' ? 'Özel Belge' : 'Custom';
@@ -1440,7 +1555,7 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
 
             {/* Template Selectors */}
             <div className="flex gap-1 px-4 py-2 bg-slate-50 border-b border-border overflow-x-auto scrollbar-none whitespace-nowrap">
-              {(['cover', 'title-page', 'response', 'contrib', 'coi', 'custom', 'author-pool', 'custom-templates'] as WizardTab[]).map((type) => (
+              {(['cover', 'title-page', 'response', 'contrib', 'coi', 'copyright', 'custom', 'author-pool', 'custom-templates'] as WizardTab[]).map((type) => (
                 <button
                   key={type}
                   onClick={() => resetWizardFields(type)}
@@ -1498,7 +1613,7 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
                     />
                   </div>
 
-                  {(wizardType === 'cover' || wizardType === 'response') && (
+                  {(wizardType === 'cover' || wizardType === 'response' || wizardType === 'copyright') && (
                     <div className="flex flex-col gap-1">
                       <label className={labelCls}>{tLocal('letters_journal')}</label>
                       <input
@@ -1743,9 +1858,61 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
                 </div>
               )}
 
-              {/* Author Contributions & COI Fields */}
-              {(wizardType === 'contrib' || wizardType === 'coi') && (
+              {/* Author Contributions, COI & Copyright Fields */}
+              {(wizardType === 'contrib' || wizardType === 'coi' || wizardType === 'copyright') && (
                 <div className="space-y-4 pt-2 border-t border-slate-100">
+                  {wizardType === 'copyright' && (
+                    <>
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div className="flex flex-col gap-1">
+                          <label className={labelCls}>
+                            {wizardLang === 'tr' ? 'Sorumlu Yazar' : 'Corresponding Author'}
+                          </label>
+                          <input
+                            className={inputCls}
+                            value={correspondingAuthor}
+                            onChange={(e) => setCorrespondingAuthor(e.target.value)}
+                            placeholder={wizardLang === 'tr' ? 'Ad Soyad' : 'Full name'}
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <label className={labelCls}>{wizardLang === 'tr' ? 'Tarih' : 'Date'}</label>
+                          <input
+                            type="date"
+                            className={inputCls}
+                            value={copyrightDate}
+                            onChange={(e) => setCopyrightDate(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className={labelCls}>
+                          {wizardLang === 'tr' ? 'Sözleşme / Lisans Türü' : 'Agreement / License Type'}
+                        </label>
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                          {([
+                            ['cc-by', wizardLang === 'tr' ? 'CC BY 4.0' : 'CC BY 4.0'],
+                            ['license', wizardLang === 'tr' ? 'Yayın lisansı' : 'License to publish'],
+                            ['transfer', wizardLang === 'tr' ? 'Telif devri' : 'Copyright transfer'],
+                          ] as Array<[CopyrightVariant, string]>).map(([variant, label]) => (
+                            <button
+                              key={variant}
+                              type="button"
+                              onClick={() => setCopyrightVariant(variant)}
+                              className={`rounded-lg border px-3 py-2 text-left text-xs font-semibold transition ${
+                                copyrightVariant === variant
+                                  ? 'border-violet-600 bg-violet-50 text-violet-700'
+                                  : 'border-border bg-white text-secondary hover:bg-slate-50'
+                              }`}
+                            >
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
+
                   {renderAuthorsManager()}
 
                   {wizardType === 'coi' && (
@@ -1771,6 +1938,14 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
                         </div>
                       )}
                     </div>
+                  )}
+
+                  {wizardType === 'copyright' && (
+                    <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[10px] leading-relaxed text-amber-800">
+                      {wizardLang === 'tr'
+                        ? 'Bu belge düzenlenebilir bir taslaktır. Gönderimden önce derginin resmi telif/lisans formundaki metin ve imza koşullarıyla karşılaştırın.'
+                        : 'This is an editable draft. Before submission, compare it with the journal’s official copyright/license form and signature requirements.'}
+                    </p>
                   )}
                 </div>
               )}

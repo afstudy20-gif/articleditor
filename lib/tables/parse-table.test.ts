@@ -38,8 +38,15 @@ describe('parseTable', () => {
 describe('roundtrip', () => {
   it('rows → tiptap → rows', () => {
     const rows = [['A', 'B'], ['1', '2'], ['3', '4']];
-    const json = rowsToTiptapTable(rows, true);
+    const json = rowsToTiptapTable(rows, true, {
+      title: 'Baseline characteristics',
+      footnote: 'Values are mean ± standard deviation.',
+    });
     assert.ok(json);
+    assert.deepEqual(json.attrs, {
+      title: 'Baseline characteristics',
+      footnote: 'Values are mean ± standard deviation.',
+    });
     const back = tiptapTableToRows(json);
     assert.deepEqual(back.rows, rows);
     assert.equal(back.hasHeader, true);

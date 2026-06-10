@@ -317,6 +317,8 @@ ${entries.join('\n\n')}`;
   }
 
   private renderTable(node: Json): string {
+    const title = cleanOptionalText(node.attrs?.title);
+    const footnote = cleanOptionalText(node.attrs?.footnote);
     const rows: Json[] = (node.content ?? []).filter((row: Json) => row.type === 'tableRow');
     const columnCount = rows.reduce((max: number, row: Json) => {
       const count = (row.content ?? []).reduce(
@@ -353,12 +355,13 @@ ${entries.join('\n\n')}`;
     const columnSpec = `@{}${Array(columnCount).fill('>{\\RaggedRight\\arraybackslash}X').join('')}@{}`;
     return `\\begin{table}[htbp]
   \\centering
+  \\caption{${escapeTex(title ?? '')}}
   \\begin{tabularx}{\\linewidth}{${columnSpec}}
     \\toprule
 ${renderedRows.join('\n')}
     \\bottomrule
   \\end{tabularx}
-\\end{table}
+${footnote ? `  \\par\\vspace{0.35em}\n  \\begin{minipage}{\\linewidth}\\footnotesize ${escapeTex(footnote)}\\end{minipage}\n` : ''}\\end{table}
 `;
   }
 

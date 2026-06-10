@@ -44,6 +44,10 @@ const doc = {
     },
     {
       type: 'table',
+      attrs: {
+        title: 'Baseline characteristics',
+        footnote: 'Values are presented as mean ± standard deviation.',
+      },
       content: [
         {
           type: 'tableRow',
@@ -88,6 +92,8 @@ describe('buildRichDocx', () => {
     assert.ok(xml.includes('<w:tbl>'), 'table element');
     // Publication three-line table look
     assert.ok(xml.includes('Table 1.'), 'numbered table caption');
+    assert.ok(xml.includes('Baseline characteristics'), 'table title');
+    assert.ok(xml.includes('Values are presented as mean ± standard deviation.'), 'table footnote');
     assert.ok(xml.includes('<w:tblW w:w="5000" w:type="pct"/>'), 'full-width table');
     assert.ok(!xml.includes('insideV'), 'no vertical grid lines');
     assert.ok(!xml.includes('F2F2F2'), 'no grey header shading');

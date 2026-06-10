@@ -226,7 +226,11 @@ function extractText(node: any): string {
 }
 
 /** Build TipTap JSON content for a table from parsed rows. */
-export function rowsToTiptapTable(rows: string[][], hasHeader: boolean): any {
+export function rowsToTiptapTable(
+  rows: string[][],
+  hasHeader: boolean,
+  metadata?: { title?: string; footnote?: string },
+): any {
   if (rows.length === 0) return null;
 
   const content = rows.map((row, ri) => ({
@@ -238,5 +242,12 @@ export function rowsToTiptapTable(rows: string[][], hasHeader: boolean): any {
     })),
   }));
 
-  return { type: 'table', content };
+  return {
+    type: 'table',
+    attrs: {
+      title: metadata?.title?.trim() ?? '',
+      footnote: metadata?.footnote?.trim() ?? '',
+    },
+    content,
+  };
 }

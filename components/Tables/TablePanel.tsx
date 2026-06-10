@@ -20,6 +20,8 @@ interface TableEntry {
   index: number;        // 1-based
   rows: string[][];
   hasHeader: boolean;
+  title: string;
+  footnote: string;
   node: any;
 }
 
@@ -27,6 +29,7 @@ interface TablePanelProps {
   editor: any;
   onClose: () => void;
   t: (k: string) => string;
+  initialView?: ViewMode;
 }
 
 type ViewMode = 'list' | 'edit' | 'import';
@@ -41,7 +44,15 @@ function collectTables(editor: any): TableEntry[] {
     if (node.type?.name === 'table') {
       tableIndex++;
       const { rows, hasHeader } = tiptapTableToRows(node.toJSON());
-      items.push({ pos, index: tableIndex, rows, hasHeader, node });
+      items.push({
+        pos,
+        index: tableIndex,
+        rows,
+        hasHeader,
+        title: node.attrs?.title ?? '',
+        footnote: node.attrs?.footnote ?? '',
+        node,
+      });
       return false; // don't descend into table
     }
     return true;
@@ -55,19 +66,28 @@ function rowsToPlainText(rows: string[][]): string {
 
 // ─── Main Panel ─────────────────────────────────────────────
 
-export function TablePanel({ editor, onClose, t }: TablePanelProps): JSX.Element {
+export function TablePanel({
+  editor,
+  onClose,
+  t,
+  initialView = 'list',
+}: TablePanelProps): JSX.Element {
   const [tables, setTables] = useState<TableEntry[]>(() => collectTables(editor));
-  const [view, setView] = useState<ViewMode>('list');
+  const [view, setView] = useState<ViewMode>(initialView);
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [importText, setImportText] = useState('');
   const [importPreview, setImportPreview] = useState<ParsedTable | null>(null);
+  const [importTitle, setImportTitle] = useState('');
+  const [importFootnote, setImportFootnote] = useState('');
+  const [blankRows, setBlankRows] = useState(3);
+  const [blankCols, setBlankCols] = useState(3);
   const [wordTables, setWordTables] = useState<ParsedTable[]>([]);
   const [wordTableIndex, setWordTableIndex] = useState(0);
   const [importBusy, setImportBusy] = useState(false);
   const [importError, setImportError] = useState('');
   const [exportStyle, setExportStyle] = useState<TableStyle>('three-line');
-  const [exportTitle, setExportTitle] = useState('');
-  const [exportFootnote, setExportFootnote] = useState('');
+  const [editTitle, setEditTitle] = useState('');
+  const [editFootnote, setEditFootnote] = useState('');
   const [copyMsg, setCopyMsg] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -79,6 +99,10 @@ export function TablePanel({ editor, onClose, t }: TablePanelProps): JSX.Element
     refresh();
     return () => editor.off('update', refresh);
   }, [editor]);
+
+  useEffect(() => {
+    setView(initialView);
+  }, [initialView]);
 
   // ─── Import ───────────────────────────────────────────────
 
@@ -165,16 +189,35 @@ export function TablePanel({ editor, onClose, t }: TablePanelProps): JSX.Element
 
   const insertImportedTable = useCallback(() => {
     if (!importPreview || !editor) return;
-    const tableJson = rowsToTiptapTable(importPreview.rows, importPreview.hasHeader);
+    const tableJson = rowsToTiptapTable(importPreview.rows, importPreview.hasHeader, {
+      title: importTitle,
+      footnote: importFootnote,
+    });
     if (!tableJson) return;
     editor.chain().focus().insertContent(tableJson).run();
     setView('list');
     setImportText('');
     setImportPreview(null);
+    setImportTitle('');
+    setImportFootnote('');
     setWordTables([]);
     setWordTableIndex(0);
     setImportError('');
-  }, [importPreview, editor]);
+  }, [importPreview, importTitle, importFootnote, editor]);
+
+  const createBlankTablePreview = useCallback(() => {
+    const rows = Math.min(Math.max(blankRows, 1), 50);
+    const cols = Math.min(Math.max(blankCols, 1), 20);
+    setWordTables([]);
+    setWordTableIndex(0);
+    setImportError('');
+    setImportText('');
+    setImportPreview({
+      rows: Array.from({ length: rows }, () => Array.from({ length: cols }, () => '')),
+      hasHeader: true,
+      format: 'text',
+    });
+  }, [blankRows, blankCols]);
 
   // ─── Export ───────────────────────────────────────────────
 
@@ -183,12 +226,36 @@ export function TablePanel({ editor, onClose, t }: TablePanelProps): JSX.Element
   const exportOpts = useCallback(
     (tbl: TableEntry): StyledTableOptions => ({
       style: exportStyle,
-      title: exportTitle || `Table ${tbl.index}`,
-      footnote: exportFootnote || undefined,
+      title: editTitle || `Table ${tbl.index}`,
+      footnote: editFootnote || undefined,
       hasHeader: tbl.hasHeader,
     }),
-    [exportStyle, exportTitle, exportFootnote],
+    [exportStyle, editTitle, editFootnote],
   );
+
+  const openTableEditor = (tbl: TableEntry) => {
+    setEditIndex(tbl.index);
+    setEditTitle(tbl.title);
+    setEditFootnote(tbl.footnote);
+    setView('edit');
+  };
+
+  const updateTableMetadata = (
+    tbl: TableEntry,
+    field: 'title' | 'footnote',
+    value: string,
+  ) => {
+    const node = editor.state.doc.nodeAt(tbl.pos);
+    if (!node || node.type?.name !== 'table') return;
+    editor.view.dispatch(
+      editor.state.tr.setNodeMarkup(tbl.pos, undefined, {
+        ...node.attrs,
+        [field]: value,
+      }),
+    );
+    if (field === 'title') setEditTitle(value);
+    else setEditFootnote(value);
+  };
 
   const flashCopy = (msg: string) => {
     setCopyMsg(msg);
@@ -359,7 +426,7 @@ export function TablePanel({ editor, onClose, t }: TablePanelProps): JSX.Element
                       {t('tbl_jump')}
                     </button>
                     <button
-                      onClick={() => { setEditIndex(tbl.index); setView('edit'); }}
+                      onClick={() => openTableEditor(tbl)}
                       className="text-[10px] text-secondary hover:text-primary"
                     >
                       {t('tbl_export')}
@@ -435,17 +502,17 @@ export function TablePanel({ editor, onClose, t }: TablePanelProps): JSX.Element
             <input
               type="text"
               placeholder={t('tbl_title_placeholder')}
-              value={exportTitle}
-              onChange={(e) => setExportTitle(e.target.value)}
+              value={editTitle}
+              onChange={(e) => updateTableMetadata(activeTable, 'title', e.target.value)}
               className="w-full text-xs px-2 py-1 border border-border rounded"
             />
-            <input
-              type="text"
+            <textarea
               placeholder={t('tbl_footnote_placeholder')}
-              value={exportFootnote}
-              onChange={(e) => setExportFootnote(e.target.value)}
-              className="w-full text-xs px-2 py-1 border border-border rounded"
+              value={editFootnote}
+              onChange={(e) => updateTableMetadata(activeTable, 'footnote', e.target.value)}
+              className="w-full min-h-16 resize-y text-xs px-2 py-1 border border-border rounded"
             />
+            <p className="text-[10px] leading-relaxed text-muted">{t('tbl_metadata_hint')}</p>
           </div>
 
           {/* Preview */}
@@ -494,6 +561,55 @@ export function TablePanel({ editor, onClose, t }: TablePanelProps): JSX.Element
 
           <div className="px-3 py-2 space-y-2">
             <p className="text-xs text-muted">{t('tbl_import_desc')}</p>
+
+            <input
+              type="text"
+              value={importTitle}
+              onChange={(e) => setImportTitle(e.target.value)}
+              placeholder={t('tbl_title_placeholder')}
+              className="w-full text-xs px-2 py-1.5 border border-border rounded"
+            />
+            <textarea
+              value={importFootnote}
+              onChange={(e) => setImportFootnote(e.target.value)}
+              placeholder={t('tbl_footnote_placeholder')}
+              className="w-full min-h-16 resize-y text-xs px-2 py-1.5 border border-border rounded"
+            />
+
+            <div className="rounded-md border border-border bg-slate-50 p-2">
+              <div className="mb-1.5 text-[10px] font-semibold text-primary">{t('tbl_blank_table')}</div>
+              <div className="flex items-center gap-1.5">
+                <label className="flex items-center gap-1 text-[10px] text-secondary">
+                  {t('tbl_rows')}
+                  <input
+                    type="number"
+                    min={1}
+                    max={50}
+                    value={blankRows}
+                    onChange={(e) => setBlankRows(Number(e.target.value) || 1)}
+                    className="w-14 rounded border border-border bg-white px-1.5 py-1 text-xs"
+                  />
+                </label>
+                <label className="flex items-center gap-1 text-[10px] text-secondary">
+                  {t('tbl_columns')}
+                  <input
+                    type="number"
+                    min={1}
+                    max={20}
+                    value={blankCols}
+                    onChange={(e) => setBlankCols(Number(e.target.value) || 1)}
+                    className="w-14 rounded border border-border bg-white px-1.5 py-1 text-xs"
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={createBlankTablePreview}
+                  className="ml-auto rounded bg-white px-2 py-1 text-[10px] font-semibold text-teal border border-teal/40 hover:bg-teal-bg"
+                >
+                  {t('tbl_create_blank')}
+                </button>
+              </div>
+            </div>
 
             <textarea
               value={importText}

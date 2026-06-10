@@ -508,6 +508,8 @@ ${paragraphs.join('\n')}
    */
   private table(n: Json): string[] {
     const out: string[] = [];
+    const title = typeof n.attrs?.title === 'string' ? n.attrs.title.trim() : '';
+    const footnote = typeof n.attrs?.footnote === 'string' ? n.attrs.footnote.trim() : '';
 
     // Caption: "Table N." (continues the shared counter with figure[kind=table]).
     const num = this.nextPlainTableNumber();
@@ -517,7 +519,9 @@ ${paragraphs.join('\n')}
         ? `<w:pPr><w:pStyle w:val="${capStyle}"/></w:pPr>`
         : '';
       out.push(
-        `<w:p>${capPPr}<w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">${escapeXml(`Table ${num}.`)}</w:t></w:r><w:r><w:t xml:space="preserve"> </w:t></w:r></w:p>`,
+        `<w:p>${capPPr}<w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">${escapeXml(`Table ${num}.`)}</w:t></w:r>`
+        + (title ? textRun(` ${title}`) : '')
+        + '</w:p>',
       );
     }
 
@@ -586,6 +590,16 @@ ${paragraphs.join('\n')}
       + '</w:tblPr>';
 
     out.push(`<w:tbl>${tblPr}${tblGrid}${rows.join('')}</w:tbl>`);
+    if (footnote) {
+      const normalStyle = this.sid('normal');
+      const pPr = normalStyle
+        ? `<w:pPr><w:pStyle w:val="${normalStyle}"/><w:spacing w:before="80"/></w:pPr>`
+        : '<w:pPr><w:spacing w:before="80"/></w:pPr>';
+      out.push(
+        `<w:p>${pPr}<w:r><w:rPr><w:sz w:val="18"/><w:szCs w:val="18"/></w:rPr>`
+        + `<w:t xml:space="preserve">${escapeXml(footnote)}</w:t></w:r></w:p>`,
+      );
+    }
     return out;
   }
 }

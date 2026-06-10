@@ -5,7 +5,6 @@ import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import Link from '@tiptap/extension-link';
-import { Table } from '@tiptap/extension-table';
 import { TableRow } from '@tiptap/extension-table-row';
 import { TableHeader } from '@tiptap/extension-table-header';
 import { TableCell } from '@tiptap/extension-table-cell';
@@ -20,6 +19,7 @@ import { Highlight } from '@tiptap/extension-highlight';
 import { CitationWithView } from './extensions/citation-view';
 import { Equation } from './extensions/equation';
 import { Figure, FigureRef } from './extensions/figure';
+import { ManuscriptTable, ManuscriptTableView } from './extensions/manuscript-table';
 import type { Ref } from '@/store/types';
 import { useLang } from '@/lib/i18n/hooks';
 import { getNextNumbering, isNumberingPrefix } from '@/lib/editor/numbering';
@@ -29,6 +29,7 @@ type Props = {
   refs: Ref[];
   onChange: (json: unknown, plainText: string) => void;
   onInsertRequest?: () => void;
+  onTableInsertRequest?: () => void;
   onReady?: (editor: any) => void;
   onAIReview?: () => void;
   onAIScore?: () => void;
@@ -80,6 +81,7 @@ export function ArticleEditor({
   refs,
   onChange,
   onInsertRequest,
+  onTableInsertRequest,
   onReady,
   onAIReview,
   onAIScore,
@@ -104,7 +106,7 @@ export function ArticleEditor({
       StarterKit.configure({ heading: { levels: [1, 2, 3] } }),
       Placeholder.configure({ placeholder: t('ed_placeholder') }),
       Link.configure({ openOnClick: false }),
-      Table.configure({ resizable: true }),
+      ManuscriptTable.configure({ resizable: true, View: ManuscriptTableView }),
       TableRow,
       TableHeader,
       TableCell,
@@ -315,7 +317,7 @@ export function ArticleEditor({
           ≡R
         </ToolbarButton>
         <Sep />
-        <TableMenu editor={editor} t={t} />
+        <TableMenu editor={editor} t={t} onInsertRequest={onTableInsertRequest} />
         <EquationButton editor={editor} t={t} />
         <SymbolPool editor={editor} t={t} />
         <Sep />
@@ -746,7 +748,15 @@ function HighlightPicker({ editor, t }: { editor: any; t: (k: string) => string 
   );
 }
 
-function TableMenu({ editor, t }: { editor: any; t: (k: string) => string }): JSX.Element {
+function TableMenu({
+  editor,
+  t,
+  onInsertRequest,
+}: {
+  editor: any;
+  t: (k: string) => string;
+  onInsertRequest?: () => void;
+}): JSX.Element {
   const [open, setOpen] = useState(false);
   const inTable = editor.isActive('table');
   return (
@@ -754,7 +764,8 @@ function TableMenu({ editor, t }: { editor: any; t: (k: string) => string }): JS
       <button
         onClick={() => {
           if (!inTable) {
-            editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
+            if (onInsertRequest) onInsertRequest();
+            else editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
           } else {
             setOpen((v) => !v);
           }

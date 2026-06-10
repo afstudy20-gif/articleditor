@@ -350,6 +350,159 @@ function buildConflictTr(input: ConflictOfInterestInput): string {
 }
 
 // ---------------------------------------------------------------------------
+// Copyright transfer / license-to-publish forms
+// ---------------------------------------------------------------------------
+
+/**
+ * Common legal shapes a journal asks for. Most journal-specific forms are a
+ * variant of one of these three; journal-unique wording is handled by saving
+ * the journal's own text as a custom template with {{placeholders}}.
+ */
+export type CopyrightVariant = 'transfer' | 'license' | 'cc-by';
+
+export interface CopyrightTransferInput {
+  journalName: string;
+  manuscriptTitle: string;
+  authors: string[];
+  correspondingAuthor?: string;
+  /** Pre-filled date string; falls back to a fill-in slot. */
+  date?: string;
+  variant: CopyrightVariant;
+  lang: LetterLang;
+}
+
+export function buildCopyrightTransfer(input: CopyrightTransferInput): string {
+  return input.lang === 'tr'
+    ? buildCopyrightTr(input)
+    : buildCopyrightEn(input);
+}
+
+function signatureBlock(authors: ReadonlyArray<string>, dateLabel: string, nameLabel: string, signLabel: string, date: string): string {
+  const list = cleanAuthorList(authors);
+  const rows = (list.length > 0 ? list : [`[${nameLabel}]`]).map(
+    (name) =>
+      `${nameLabel}: ${name}\n${signLabel}: ____________________\n${dateLabel}: ${date}`,
+  );
+  return rows.join('\n\n');
+}
+
+function buildCopyrightEn(input: CopyrightTransferInput): string {
+  const journal = orPlaceholder(input.journalName, '[Journal Name]');
+  const title = orPlaceholder(input.manuscriptTitle, '[Manuscript Title]');
+  const corr = orPlaceholder(input.correspondingAuthor, '[Corresponding Author]');
+  const date = orPlaceholder(input.date, '____ / ____ / ________');
+  const authorsLine = cleanAuthorList(input.authors).join(', ') || '[All Author Names]';
+
+  const header =
+    input.variant === 'cc-by'
+      ? 'OPEN ACCESS LICENSE STATEMENT (CC BY 4.0)'
+      : input.variant === 'license'
+        ? 'EXCLUSIVE LICENSE TO PUBLISH'
+        : 'COPYRIGHT TRANSFER AGREEMENT';
+
+  const identification =
+    `Manuscript title: "${title}"\n` +
+    `Journal: ${journal}\n` +
+    `Author(s): ${authorsLine}\n` +
+    `Corresponding author: ${corr}`;
+
+  const grant =
+    input.variant === 'cc-by'
+      ? 'The author(s) confirm that the article, upon acceptance, will be published ' +
+        'open access under the terms of the Creative Commons Attribution (CC BY 4.0) ' +
+        'license. The author(s) retain copyright; any third party may reuse the ' +
+        'published material provided the original work is properly cited.'
+      : input.variant === 'license'
+        ? `The undersigned author(s) hereby grant ${journal} an exclusive, ` +
+          'irrevocable, worldwide license to publish, reproduce, distribute, and ' +
+          'display the above manuscript in all forms, languages, and media now ' +
+          'known or later developed. Copyright remains with the author(s).'
+        : `The undersigned author(s) hereby transfer and assign to ${journal} all ` +
+          'copyright in and to the above manuscript, including the exclusive right ' +
+          'to publish, reproduce, distribute, translate, and display the work in ' +
+          'all forms, languages, and media now known or later developed, effective ' +
+          'upon acceptance for publication.';
+
+  const warranties =
+    'The author(s) warrant that the manuscript is original, has not been published ' +
+    'previously, is not under consideration elsewhere, contains nothing unlawful or ' +
+    'defamatory, does not infringe any third-party rights, and that all listed ' +
+    'authors have made substantial contributions, approved the submitted version, ' +
+    'and agreed to this statement. Written permission has been obtained for any ' +
+    'previously published material reproduced in the manuscript.';
+
+  const retained =
+    input.variant === 'transfer'
+      ? 'The author(s) retain the right to use the work for non-commercial personal ' +
+        'and academic purposes (teaching, theses, institutional repositories, and ' +
+        'sharing with colleagues), provided the published source is acknowledged.'
+      : '';
+
+  const signatures = signatureBlock(input.authors, 'Date', 'Name', 'Signature', date);
+
+  return joinParagraphs([header, identification, grant, warranties, retained, 'SIGNATURES', signatures]);
+}
+
+function buildCopyrightTr(input: CopyrightTransferInput): string {
+  const journal = orPlaceholder(input.journalName, '[Dergi Adı]');
+  const title = orPlaceholder(input.manuscriptTitle, '[Makale Başlığı]');
+  const corr = orPlaceholder(input.correspondingAuthor, '[Sorumlu Yazar]');
+  const date = orPlaceholder(input.date, '____ / ____ / ________');
+  const authorsLine = cleanAuthorList(input.authors).join(', ') || '[Tüm Yazar Adları]';
+
+  const header =
+    input.variant === 'cc-by'
+      ? 'AÇIK ERİŞİM LİSANS BEYANI (CC BY 4.0)'
+      : input.variant === 'license'
+        ? 'MÜNHASIR YAYIN LİSANSI SÖZLEŞMESİ'
+        : 'TELİF HAKKI DEVİR SÖZLEŞMESİ';
+
+  const identification =
+    `Makale başlığı: "${title}"\n` +
+    `Dergi: ${journal}\n` +
+    `Yazar(lar): ${authorsLine}\n` +
+    `Sorumlu yazar: ${corr}`;
+
+  const grant =
+    input.variant === 'cc-by'
+      ? 'Yazar(lar), makalenin kabul edilmesi halinde Creative Commons Atıf ' +
+        '(CC BY 4.0) lisansı kapsamında açık erişimli olarak yayımlanacağını kabul ' +
+        'eder. Telif hakkı yazar(lar)da kalır; yayımlanan içerik, esere usulüne ' +
+        'uygun atıf yapılması koşuluyla üçüncü kişilerce yeniden kullanılabilir.'
+      : input.variant === 'license'
+        ? `Aşağıda imzası bulunan yazar(lar), yukarıda belirtilen makalenin bilinen ` +
+          `ve ileride geliştirilecek tüm biçim, dil ve ortamlarda yayımlanması, ` +
+          `çoğaltılması, dağıtılması ve görüntülenmesi için ${journal} dergisine ` +
+          'münhasır, gayrikabili rücu ve dünya çapında bir yayın lisansı verir. ' +
+          'Telif hakkı yazar(lar)da kalır.'
+        : `Aşağıda imzası bulunan yazar(lar), yukarıda belirtilen makaleye ilişkin ` +
+          `tüm telif haklarını; eserin bilinen ve ileride geliştirilecek tüm biçim, ` +
+          `dil ve ortamlarda yayımlanması, çoğaltılması, dağıtılması, çevrilmesi ve ` +
+          `görüntülenmesine ilişkin münhasır hakları da kapsayacak şekilde, yayına ` +
+          `kabul edildiği andan itibaren geçerli olmak üzere ${journal} dergisine ` +
+          'devreder.';
+
+  const warranties =
+    'Yazar(lar); makalenin özgün olduğunu, daha önce yayımlanmadığını, başka bir ' +
+    'yerde değerlendirme sürecinde bulunmadığını, hukuka aykırı veya hakaret içeren ' +
+    'bir unsur taşımadığını, üçüncü kişilerin haklarını ihlal etmediğini; tüm ' +
+    'yazarların çalışmaya önemli katkı sağladığını, gönderilen sürümü onayladığını ' +
+    've bu beyanı kabul ettiğini taahhüt eder. Makalede yer alan, daha önce ' +
+    'yayımlanmış her türlü materyal için yazılı izin alınmıştır.';
+
+  const retained =
+    input.variant === 'transfer'
+      ? 'Yazar(lar); yayımlanan kaynağa atıf yapılması koşuluyla, eseri ticari ' +
+        'olmayan kişisel ve akademik amaçlarla (eğitim, tez, kurumsal arşiv ve ' +
+        'meslektaşlarla paylaşım) kullanma hakkını saklı tutar.'
+      : '';
+
+  const signatures = signatureBlock(input.authors, 'Tarih', 'Ad Soyad', 'İmza', date);
+
+  return joinParagraphs([header, identification, grant, warranties, retained, 'İMZALAR', signatures]);
+}
+
+// ---------------------------------------------------------------------------
 // Parsing pasted reviewer text into numbered points
 // ---------------------------------------------------------------------------
 
@@ -523,4 +676,3 @@ function buildTitlePageTr(input: TitlePageInput): string {
 
   return joinParagraphs([header, mainTitleBlock, authorBlock, corrBlock, statsBlock, declarations]);
 }
-

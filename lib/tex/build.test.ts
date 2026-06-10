@@ -58,6 +58,10 @@ describe('buildLatex', () => {
         },
         {
           type: 'table',
+          attrs: {
+            title: 'Baseline characteristics',
+            footnote: 'Values are mean ± standard deviation.',
+          },
           content: [
             {
               type: 'tableRow',
@@ -102,6 +106,8 @@ describe('buildLatex', () => {
     assert.ok(output.tex.includes('\\begin{itemize}'));
     assert.ok(output.tex.includes('\\begin{enumerate}'));
     assert.ok(output.tex.includes('\\begin{tabularx}{\\linewidth}'));
+    assert.ok(output.tex.includes('\\caption{Baseline characteristics}'));
+    assert.ok(output.tex.includes('\\footnotesize Values are mean ± standard deviation.'));
     assert.ok(output.tex.includes('\\textbf{A} & \\textbf{B} \\\\'));
     assert.ok(output.tex.includes('\\begin{equation*}'));
     assert.ok(output.tex.includes('\\printbibliography[title={References}]'));

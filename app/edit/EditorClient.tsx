@@ -210,6 +210,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
   const [snapshotsOpen, setSnapshotsOpen] = useState(false);
   const [figuresOpen, setFiguresOpen] = useState(false);
   const [tablesOpen, setTablesOpen] = useState(false);
+  const [tablePanelView, setTablePanelView] = useState<'list' | 'import'>('list');
   const [journalOpen, setJournalOpen] = useState(false);
   const [lettersOpen, setLettersOpen] = useState(false);
   const [phrasebankOpen, setPhrasebankOpen] = useState(false);
@@ -1889,7 +1890,15 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
     { id: 'stats', group: t('cmd_g_view'), label: t('ed_stats'), run: () => setStatsOpen(true) },
     { id: 'snapshots', group: t('cmd_g_view'), label: t('ed_snapshots'), run: () => setSnapshotsOpen(true) },
     { id: 'figures', group: t('cmd_g_view'), label: t('ed_figures'), run: () => setFiguresOpen(true) },
-    { id: 'tables', group: t('cmd_g_view'), label: t('tbl_title'), run: () => setTablesOpen(true) },
+    {
+      id: 'tables',
+      group: t('cmd_g_view'),
+      label: t('tbl_title'),
+      run: () => {
+        setTablePanelView('list');
+        setTablesOpen(true);
+      },
+    },
     { id: 'journal-check', group: t('cmd_g_doc'), label: t('ed_journal_check'), run: () => setJournalOpen(true) },
     { id: 'letters', group: t('cmd_g_doc'), label: t('ed_letters'), run: () => { if (onGoToDocuments) onGoToDocuments(); else setLettersOpen(true); } },
     { id: 'snapshot-now', group: t('cmd_g_doc'), label: t('snap_create'), run: () => { void autoSnapshot(t('snap_manual_label')); setSnapshotsOpen(true); } },
@@ -2103,6 +2112,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
           </button>
           <button
             onClick={() => {
+              setTablePanelView('list');
               setTablesOpen(true);
               setFiguresOpen(false);
               setSuppOpen(false);
@@ -2252,6 +2262,11 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
                 registerEditor(ed);
               }}
               onInsertRequest={insertFromLibrary}
+              onTableInsertRequest={() => {
+                setTablePanelView('import');
+                setTablesOpen(true);
+                setFiguresOpen(false);
+              }}
               onAIReview={runAIReview}
               onAIScore={runAIScore}
               onAIEnhance={runAIEnhance}
@@ -2369,6 +2384,11 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
             registerEditor(ed);
           }}
           onInsertRequest={insertFromLibrary}
+          onTableInsertRequest={() => {
+            setTablePanelView('import');
+            setTablesOpen(true);
+            setFiguresOpen(false);
+          }}
           onAIReview={runAIReview}
               onAIScore={runAIScore}
               onAIEnhance={runAIEnhance}
@@ -2616,7 +2636,12 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
 
       {tablesOpen && editorInstance.current && (
         <div className="fixed right-4 top-24 bottom-4 w-[380px] z-40 shadow-2xl">
-          <TablePanel editor={editorInstance.current} onClose={() => setTablesOpen(false)} t={t} />
+          <TablePanel
+            editor={editorInstance.current}
+            onClose={() => setTablesOpen(false)}
+            t={t}
+            initialView={tablePanelView}
+          />
         </div>
       )}
 

@@ -61,7 +61,7 @@ export type Citation = {
 
 export type ProjectDocument = {
   id: string;
-  type: 'cover' | 'title-page' | 'response' | 'contrib' | 'coi' | 'custom';
+  type: 'cover' | 'title-page' | 'response' | 'contrib' | 'coi' | 'copyright' | 'custom';
   title: string;
   content: string;
   createdAt: number;
