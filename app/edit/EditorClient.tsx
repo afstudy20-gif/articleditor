@@ -48,6 +48,7 @@ import { JournalCheckPanel } from '@/components/Journal/JournalCheckPanel';
 import { LettersPanel } from '@/components/Letters/LettersPanel';
 import { PhrasebankPanel } from '@/components/Phrasebank/PhrasebankPanel';
 import { SupplementaryPanel } from '@/components/Supplementary/SupplementaryPanel';
+import { AbbreviationsPanel } from '@/components/Abbreviations/AbbreviationsPanel';
 import { useTabSync } from '@/lib/hooks/useTabSync';
 import { useIsDesktop } from '@/lib/hooks/useIsDesktop';
 import { rowsToTiptapTable } from '@/lib/tables/parse-table';
@@ -211,6 +212,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
   const [phrasebankOpen, setPhrasebankOpen] = useState(false);
   const [supplementary, setSupplementary] = useState<string>(project.supplementary ?? '');
   const [suppOpen, setSuppOpen] = useState(false);
+  const [abbrOpen, setAbbrOpen] = useState(false);
   const [phrasebankSection, setPhrasebankSection] = useState<string | null>(null);
   const [wordGoal, setWordGoal] = useState(0);
 
@@ -1956,9 +1958,10 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
               setFiguresOpen(false);
               setSuppOpen(false);
               setLettersOpen(false);
+              setAbbrOpen(false);
             }}
             className={`px-3 py-1 rounded-md text-xs font-bold transition flex items-center gap-1 shrink-0 ${
-              (!tablesOpen && !figuresOpen && !suppOpen && !lettersOpen)
+              (!tablesOpen && !figuresOpen && !suppOpen && !lettersOpen && !abbrOpen)
                 ? 'bg-teal text-white shadow-sm'
                 : 'text-secondary hover:text-primary hover:bg-slate-100'
             }`}
@@ -1970,6 +1973,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
               setTablesOpen(false);
               setFiguresOpen(false);
               setSuppOpen(false);
+              setAbbrOpen(false);
               if (onGoToDocuments) onGoToDocuments();
               else setLettersOpen(true);
             }}
@@ -1987,6 +1991,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
               setFiguresOpen(false);
               setSuppOpen(false);
               setLettersOpen(false);
+              setAbbrOpen(false);
             }}
             className={`px-3 py-1 rounded-md text-xs font-bold transition flex items-center gap-1 shrink-0 ${
               tablesOpen
@@ -2002,6 +2007,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
               setTablesOpen(false);
               setSuppOpen(false);
               setLettersOpen(false);
+              setAbbrOpen(false);
             }}
             className={`px-3 py-1 rounded-md text-xs font-bold transition flex items-center gap-1 shrink-0 ${
               figuresOpen
@@ -2017,6 +2023,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
               setTablesOpen(false);
               setFiguresOpen(false);
               setLettersOpen(false);
+              setAbbrOpen(false);
             }}
             className={`px-3 py-1 rounded-md text-xs font-bold transition flex items-center gap-1 shrink-0 ${
               suppOpen
@@ -2025,6 +2032,22 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
             }`}
           >
             📎 {lang === 'tr' ? 'Ek Materyaller' : 'Supplementary'}
+          </button>
+          <button
+            onClick={() => {
+              setAbbrOpen(true);
+              setSuppOpen(false);
+              setTablesOpen(false);
+              setFiguresOpen(false);
+              setLettersOpen(false);
+            }}
+            className={`px-3 py-1 rounded-md text-xs font-bold transition flex items-center gap-1 shrink-0 ${
+              abbrOpen
+                ? 'bg-teal text-white shadow-sm'
+                : 'text-secondary hover:text-primary hover:bg-slate-100'
+            }`}
+          >
+            🔤 {lang === 'tr' ? 'Kısaltmalar' : 'Abbreviations'}
           </button>
         </div>
       </header>
@@ -2496,6 +2519,16 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
             refs={refs}
             refOrder={refOrder}
             onClose={() => setSuppOpen(false)}
+            lang={lang}
+          />
+        </div>
+      )}
+
+      {abbrOpen && editorInstance.current && (
+        <div className="fixed right-4 top-24 bottom-4 w-[360px] z-40 shadow-2xl">
+          <AbbreviationsPanel
+            editor={editorInstance.current}
+            onClose={() => setAbbrOpen(false)}
             lang={lang}
           />
         </div>

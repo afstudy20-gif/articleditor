@@ -23,6 +23,7 @@ import { Figure, FigureRef } from './extensions/figure';
 import type { Ref } from '@/store/types';
 import { newId } from '@/lib/id';
 import { useLang } from '@/lib/i18n/hooks';
+import { getNextNumbering, isNumberingPrefix } from '@/lib/editor/numbering';
 
 type Props = {
   initialContent?: unknown;
@@ -321,6 +322,7 @@ export function ArticleEditor({
         <EquationButton editor={editor} t={t} />
         <Sep />
         <SectionInserter editor={editor} />
+        <NumberingMenu editor={editor} t={t} />
         <Sep />
         <button
           ref={insertBtnRef}
@@ -947,6 +949,181 @@ export function tiptapToPlainTextWithMarkers(json: any, refOrder: Map<string, nu
   };
   walk(json);
   return out.join('').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+function getPrecedingHeadingInfo(editor: any): { text: string; level: number } {
+  const { state } = editor;
+  const { selection } = state;
+  const { from } = selection;
+
+  let level = 2;
+  let text = '';
+
+  state.doc.nodesBetween(0, from, (node: any) => {
+    if (node.type.name === 'heading') {
+      let t = '';
+      node.forEach((child: any) => {
+        if (child.isText) t += child.text;
+      });
+      if (t.trim()) {
+        text = t;
+        level = node.attrs?.level ?? 2;
+      }
+    }
+  });
+
+  if (!text) {
+    state.doc.descendants((node: any) => {
+      if (node.type.name === 'heading' && !text) {
+        let t = '';
+        node.forEach((child: any) => {
+          if (child.isText) t += child.text;
+        });
+        if (t.trim()) {
+          text = t;
+          level = node.attrs?.level ?? 2;
+        }
+      }
+    });
+  }
+
+  return { text, level };
+}
+
+function autoNumberAllHeadings(editor: any) {
+  const { state, view } = editor;
+  const { tr } = state;
+  const counters = [0, 0, 0];
+  const headingsToUpdate: Array<{ pos: number; endPos: number; newText: string }> = [];
+
+  state.doc.descendants((node: any, pos: number) => {
+    if (node.type.name === 'heading') {
+      const level = node.attrs?.level ?? 2;
+      const idx = Math.min(level - 1, 2);
+      counters[idx]++;
+      for (let i = idx + 1; i < counters.length; i++) {
+        counters[i] = 0;
+      }
+
+      const prefix = counters.slice(0, idx + 1).join('.') + '. ';
+
+      let text = '';
+      node.forEach((child: any) => {
+        if (child.isText) text += child.text;
+      });
+
+      const match = text.match(/^([0-9a-zA-Z]+(?:[\.\-\s\)]+[0-9a-zA-Z]+)*)([\.\-\s\)]+)/);
+      let cleanText = text;
+      if (match && isNumberingPrefix(match[1])) {
+        cleanText = text.substring(match[0].length);
+      }
+
+      const newText = prefix + cleanText.trim();
+
+      headingsToUpdate.push({
+        pos: pos + 1,
+        endPos: pos + node.nodeSize - 1,
+        newText,
+      });
+    }
+  });
+
+  for (let i = headingsToUpdate.length - 1; i >= 0; i--) {
+    const { pos, endPos, newText } = headingsToUpdate[i];
+    tr.insertText(newText, pos, endPos);
+  }
+
+  view.dispatch(tr);
+}
+
+function NumberingMenu({ editor, t }: { editor: any; t: (k: string) => string }): JSX.Element {
+  const [open, setOpen] = useState(false);
+  const [nextVals, setNextVals] = useState<{ next: string; nextSub: string; level: number } | null>(null);
+
+  const handleOpen = () => {
+    const info = getPrecedingHeadingInfo(editor);
+    if (info.text) {
+      const nextNum = getNextNumbering(info.text);
+      if (nextNum) {
+        setNextVals({
+          next: nextNum.next,
+          nextSub: nextNum.nextSub,
+          level: info.level,
+        });
+        setOpen(true);
+        return;
+      }
+    }
+    setNextVals({
+      next: '1. ',
+      nextSub: '1.1. ',
+      level: 2,
+    });
+    setOpen(true);
+  };
+
+  const insertHeading = (prefix: string, isSub: boolean) => {
+    let level = nextVals?.level ?? 2;
+    if (isSub) {
+      level = Math.min(level + 1, 3);
+    }
+    editor
+      .chain()
+      .focus()
+      .insertContent([
+        {
+          type: 'heading',
+          attrs: { level },
+          content: [{ type: 'text', text: prefix }],
+        },
+        { type: 'paragraph' },
+      ])
+      .run();
+    setOpen(false);
+  };
+
+  return (
+    <div className="relative">
+      <button
+        onClick={open ? () => setOpen(false) : handleOpen}
+        className="px-2.5 py-1 rounded-md text-xs font-semibold text-secondary hover:bg-slate-100 flex items-center gap-1"
+        title={t('ed_numbering_help')}
+      >
+        🔢 {t('ed_numbering')} ▾
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute top-full left-0 mt-1 z-20 bg-white border border-border rounded-lg shadow-lg w-64 py-1">
+            <button
+              onClick={() => insertHeading(nextVals?.next ?? '1. ', false)}
+              className="block w-full text-left px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal font-medium"
+            >
+              ➕ {t('ed_numbering_next').replace('{val}', (nextVals?.next ?? '').trim())}
+            </button>
+            <button
+              onClick={() => insertHeading(nextVals?.nextSub ?? '1.1. ', true)}
+              className="block w-full text-left px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal font-medium"
+            >
+              ➕ {t('ed_numbering_sub').replace('{val}', (nextVals?.nextSub ?? '').trim())}
+            </button>
+
+            <div className="border-t border-border my-1" />
+
+            <button
+              onClick={() => {
+                autoNumberAllHeadings(editor);
+                setOpen(false);
+              }}
+              className="block w-full text-left px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal text-teal font-semibold"
+            >
+              🔢 {t('ed_numbering_all')}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
 }
 
 export { computeRefOrder };

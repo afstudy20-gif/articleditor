@@ -28,6 +28,45 @@ export interface DocStructure {
   abstractText?: string;
 }
 
+function normalizeHeadingText(val: string): string {
+  return val
+    .toLowerCase()
+    .replace(/ö/g, 'o')
+    .replace(/ü/g, 'u')
+    .replace(/ı/g, 'i')
+    .replace(/ş/g, 's')
+    .replace(/ç/g, 'c')
+    .replace(/ğ/g, 'g')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+const HEADING_SYNONYMS = new Set([
+  'abstract', 'oz', 'ozet', 'summary',
+  'introduction', 'background', 'giris',
+  'methods', 'materials and methods', 'patients and methods', 'methodology', 'materials',
+  'yontemler', 'yontem', 'metotlar', 'metot',
+  'results', 'findings', 'bulgular', 'bulgu',
+  'discussion', 'tartisma',
+  'conclusion', 'conclusions', 'sonuc', 'sonuclar',
+  'references', 'bibliography', 'kaynaklar', 'kaynak', 'referanslar', 'referans',
+  'funding', 'conflict of interest', 'acknowledgements', 'tesekkur', 'tesekkurler'
+]);
+
+function isParagraphHeadingHeuristic(trimmedText: string): boolean {
+  if (!trimmedText || trimmedText.length > 80) return false;
+  const normalized = normalizeHeadingText(trimmedText);
+  // Remove leading section numbers like 1., 1.1, 1-
+  let clean = normalized.replace(/^[0-9\.\-\s]+/, '');
+  // Remove Roman numerals like i. , ii. , iv.
+  clean = clean.replace(/^(ix|iv|v?i{0,3})\b[\.\-\s]*/, '');
+  // Remove single character prefixes like a. , b.
+  clean = clean.replace(/^[a-z]\b[\.\-\s]*/, '');
+  
+  return HEADING_SYNONYMS.has(clean);
+}
+
 export function extractDocStructure(json: unknown): DocStructure {
   const headings: string[] = [];
   const textParts: string[] = [];
@@ -40,9 +79,13 @@ export function extractDocStructure(json: unknown): DocStructure {
   for (const node of top) {
     if (!isNode(node)) continue;
     const text = nodeText(node);
-    if (node.type === 'heading') {
+    const trimmed = text.trim();
+    const isHeadingNode = node.type === 'heading';
+    const isParagraphHeading = node.type === 'paragraph' && isParagraphHeadingHeuristic(trimmed);
+
+    if (isHeadingNode || isParagraphHeading) {
       headings.push(text);
-      if (ABSTRACT_RE.test(text.trim())) {
+      if (ABSTRACT_RE.test(trimmed)) {
         inAbstract = true;
       } else if (inAbstract) {
         inAbstract = false;
@@ -50,7 +93,7 @@ export function extractDocStructure(json: unknown): DocStructure {
           abstractText = abstractParts.join('\n').trim();
         }
       }
-    } else if (inAbstract && text.trim()) {
+    } else if (inAbstract && trimmed) {
       abstractParts.push(text);
     }
     if (text) textParts.push(text);
@@ -61,3 +104,4 @@ export function extractDocStructure(json: unknown): DocStructure {
 
   return { headings, plainText: textParts.join('\n'), abstractText };
 }
+
