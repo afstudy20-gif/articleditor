@@ -228,8 +228,27 @@ export function findSuggestions(text: string, abbreviations: Abbreviation[]): Ab
 }
 
 /**
+ * Checks whether a match position in the document is the defining occurrence,
+ * i.e. the full term is immediately followed by "(ACRONYM)".
+ */
+function isDefiningOccurrence(doc: any, matchTo: number, acronym: string): boolean {
+  // Collect up to 30 characters after the match to check for "(ACRONYM)"
+  let textAfter = '';
+  const maxScan = matchTo + acronym.length + 10; // enough for " (ACRONYM)"
+  doc.nodesBetween(matchTo, Math.min(doc.content.size, maxScan), (node: any, pos: number) => {
+    if (node.isText && node.text) {
+      const start = Math.max(0, matchTo - pos);
+      textAfter += node.text.slice(start);
+    }
+  });
+  const pattern = new RegExp(`^\\s*\\(\\s*${escapeRegExp(acronym)}\\s*\\)`, 'i');
+  return pattern.test(textAfter);
+}
+
+/**
  * Replaces full definition occurrences with the acronym inside the TipTap editor.
- * Replaces all occurrences when replaceAll is true.
+ * Skips the defining occurrence (where the full term is followed by "(ACRONYM)").
+ * Replaces all non-defining occurrences when replaceAll is true.
  */
 export function replaceTextInEditor(
   editor: Editor,
@@ -239,7 +258,7 @@ export function replaceTextInEditor(
 ): void {
   if (!editor || editor.isDestroyed) return;
 
-  const matches: Array<{ from: number; to: number }> = [];
+  const allMatches: Array<{ from: number; to: number }> = [];
 
   // Traverse document to find matching text nodes
   editor.state.doc.descendants((node: any, pos: number) => {
@@ -247,7 +266,7 @@ export function replaceTextInEditor(
       const nodeText = node.text;
       let index = nodeText.toLowerCase().indexOf(searchText.toLowerCase());
       while (index !== -1) {
-        matches.push({
+        allMatches.push({
           from: pos + index,
           to: pos + index + searchText.length
         });
@@ -255,6 +274,13 @@ export function replaceTextInEditor(
       }
     }
   });
+
+  if (allMatches.length === 0) return;
+
+  // Filter out the defining occurrence (full term followed by "(ACRONYM)")
+  const matches = allMatches.filter(
+    (m) => !isDefiningOccurrence(editor.state.doc, m.to, replaceText)
+  );
 
   if (matches.length === 0) return;
 
@@ -272,7 +298,7 @@ export function replaceTextInEditor(
       })
       .run();
   } else {
-    // Replace the first match
+    // Replace the first non-defining match
     const m = matches[0];
     editor.chain().focus().setTextSelection({ from: m.from, to: m.to }).insertContent(replaceText).run();
   }

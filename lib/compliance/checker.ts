@@ -39,13 +39,13 @@ const STYLE_LABELS: Readonly<Record<CitationStyleId, string>> = {
 
 /** Synonym groups: a doc heading matching any alias satisfies the canonical name. */
 const SECTION_SYNONYMS: ReadonlyArray<readonly string[]> = [
-  ['introduction', 'background'],
-  ['methods', 'materials and methods', 'patients and methods', 'methodology', 'materials'],
-  ['results', 'findings'],
-  ['discussion'],
-  ['conclusion', 'conclusions'],
+  ['introduction', 'background', 'giris', 'arka plan'],
+  ['methods', 'materials and methods', 'patients and methods', 'methodology', 'materials', 'yontemler', 'yontem', 'metotlar', 'metot'],
+  ['results', 'findings', 'bulgular', 'bulgu'],
+  ['discussion', 'tartisma'],
+  ['conclusion', 'conclusions', 'sonuc', 'sonuclar'],
   ['abstract', 'summary', 'oz', 'ozet'],
-  ['references', 'bibliography'],
+  ['references', 'bibliography', 'kaynaklar', 'kaynak', 'referanslar', 'referans'],
 ];
 
 /** Headings that count as an "abstract" (Turkish included). */

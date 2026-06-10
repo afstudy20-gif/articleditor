@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useRef, useState, useMemo } from 'react';
 import type { Ref, RefType } from '@/store/types';
 import { newId } from '@/lib/id';
 import { useLang } from '@/lib/i18n/hooks';
@@ -121,6 +121,15 @@ export function RefsPanel({
           🕒 {t('rp_tab_history')}{history && history.length > 0 ? ` (${history.filter((h) => !h.undone).length})` : ''}
         </button>
       </div>
+
+      {/* Cited References Section */}
+      <CitedRefsSection
+        refs={refs}
+        refOrder={refOrder}
+        onSelectRef={onSelectRef}
+        t={t}
+      />
+
       {tab === 'list' && onLookupAll && refs.length > 0 && (
         <div className="px-3 py-2 border-b border-border flex items-center justify-between gap-2">
           <span className="text-xs text-muted">
@@ -175,6 +184,78 @@ type ContextMenuState = {
   x: number;
   y: number;
 };
+
+/* ─── Cited Refs Section (in-text citations summary) ─── */
+function CitedRefsSection({
+  refs,
+  refOrder,
+  onSelectRef,
+  t,
+}: {
+  refs: Ref[];
+  refOrder: Map<string, number>;
+  onSelectRef?: (id: string) => void;
+  t: (k: string) => string;
+}): JSX.Element | null {
+  const [expanded, setExpanded] = useState(true);
+
+  // Compute cited refs sorted by citation order
+  const citedRefs = useMemo(() => {
+    const cited: Array<{ ref: Ref; order: number }> = [];
+    for (const r of refs) {
+      const n = refOrder.get(r.id);
+      if (n && n > 0) {
+        cited.push({ ref: r, order: n });
+      }
+    }
+    cited.sort((a, b) => a.order - b.order);
+    return cited;
+  }, [refs, refOrder]);
+
+  if (citedRefs.length === 0) return null;
+
+  return (
+    <div className="border-b border-border">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full px-3 py-1.5 flex items-center justify-between hover:bg-slate-50 transition text-xs"
+      >
+        <span className="font-semibold text-primary flex items-center gap-1.5">
+          📎 {t('rp_cited_refs')}
+          <span className="bg-teal text-white text-[10px] font-bold rounded-full px-1.5 py-0.5 leading-none">
+            {citedRefs.length}
+          </span>
+        </span>
+        <span className="text-muted text-[10px]">{expanded ? '▼' : '▶'}</span>
+      </button>
+      {expanded && (
+        <div className="px-2 pb-2 max-h-[200px] overflow-y-auto space-y-0.5">
+          {citedRefs.map(({ ref: r, order }) => (
+            <button
+              key={r.id}
+              onClick={() => onSelectRef?.(r.id)}
+              className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-teal-bg transition text-left group"
+              title={r.title || ''}
+            >
+              <span className="shrink-0 w-5 h-5 rounded text-[10px] font-bold flex items-center justify-center bg-teal text-white">
+                {order}
+              </span>
+              <div className="flex-1 min-w-0">
+                <div className="text-xs text-primary font-medium truncate leading-tight group-hover:text-teal">
+                  {r.title || r.raw?.slice(0, 50) || '—'}
+                </div>
+                <div className="text-[10px] text-muted truncate leading-tight">
+                  {r.authors[0]?.family || r.authors[0]?.literal || '—'}
+                  {r.authors.length > 1 ? ' et al.' : ''} · {r.year ?? '?'}
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function RefList({
   refs,

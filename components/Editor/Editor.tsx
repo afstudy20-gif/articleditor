@@ -320,6 +320,7 @@ export function ArticleEditor({
         <ImageInsertButton editor={editor} t={t} />
         <FigureButton editor={editor} t={t} />
         <EquationButton editor={editor} t={t} />
+        <SymbolPool editor={editor} t={t} />
         <Sep />
         <SectionInserter editor={editor} />
         <NumberingMenu editor={editor} t={t} />
@@ -1034,6 +1035,273 @@ function autoNumberAllHeadings(editor: any) {
   }
 
   view.dispatch(tr);
+}
+
+/* ─── Symbol Pool Data ─── */
+const SYMBOL_CATEGORIES: Array<{ key: string; symbols: Array<{ char: string; name: string }> }> = [
+  {
+    key: 'greek',
+    symbols: [
+      { char: 'α', name: 'alpha' }, { char: 'β', name: 'beta' }, { char: 'γ', name: 'gamma' },
+      { char: 'δ', name: 'delta' }, { char: 'ε', name: 'epsilon' }, { char: 'ζ', name: 'zeta' },
+      { char: 'η', name: 'eta' }, { char: 'θ', name: 'theta' }, { char: 'ι', name: 'iota' },
+      { char: 'κ', name: 'kappa' }, { char: 'λ', name: 'lambda' }, { char: 'μ', name: 'mu' },
+      { char: 'ν', name: 'nu' }, { char: 'ξ', name: 'xi' }, { char: 'π', name: 'pi' },
+      { char: 'ρ', name: 'rho' }, { char: 'σ', name: 'sigma' }, { char: 'τ', name: 'tau' },
+      { char: 'υ', name: 'upsilon' }, { char: 'φ', name: 'phi' }, { char: 'χ', name: 'chi' },
+      { char: 'ψ', name: 'psi' }, { char: 'ω', name: 'omega' },
+      { char: 'Α', name: 'Alpha' }, { char: 'Β', name: 'Beta' }, { char: 'Γ', name: 'Gamma' },
+      { char: 'Δ', name: 'Delta' }, { char: 'Θ', name: 'Theta' }, { char: 'Λ', name: 'Lambda' },
+      { char: 'Σ', name: 'Sigma' }, { char: 'Φ', name: 'Phi' }, { char: 'Ψ', name: 'Psi' },
+      { char: 'Ω', name: 'Omega' },
+    ],
+  },
+  {
+    key: 'math',
+    symbols: [
+      { char: '±', name: 'plus-minus' }, { char: '×', name: 'times' }, { char: '÷', name: 'divide' },
+      { char: '≠', name: 'not equal' }, { char: '≈', name: 'approx' }, { char: '≤', name: 'less equal' },
+      { char: '≥', name: 'greater equal' }, { char: '∞', name: 'infinity' }, { char: '√', name: 'sqrt' },
+      { char: '∑', name: 'sum' }, { char: '∏', name: 'product' }, { char: '∫', name: 'integral' },
+      { char: '∂', name: 'partial' }, { char: '∇', name: 'nabla' }, { char: '∈', name: 'element of' },
+      { char: '∉', name: 'not element' }, { char: '⊂', name: 'subset' }, { char: '⊃', name: 'superset' },
+      { char: '∪', name: 'union' }, { char: '∩', name: 'intersection' }, { char: '∅', name: 'empty set' },
+      { char: '∀', name: 'for all' }, { char: '∃', name: 'exists' }, { char: '∴', name: 'therefore' },
+      { char: '∵', name: 'because' }, { char: '∝', name: 'proportional' }, { char: '⊥', name: 'perpendicular' },
+      { char: '∠', name: 'angle' }, { char: '≡', name: 'identical' }, { char: '∓', name: 'minus-plus' },
+    ],
+  },
+  {
+    key: 'arrows',
+    symbols: [
+      { char: '→', name: 'right arrow' }, { char: '←', name: 'left arrow' },
+      { char: '↑', name: 'up arrow' }, { char: '↓', name: 'down arrow' },
+      { char: '↔', name: 'left right' }, { char: '⇒', name: 'implies' },
+      { char: '⇐', name: 'implied by' }, { char: '⇔', name: 'iff' },
+      { char: '↗', name: 'upper right' }, { char: '↘', name: 'lower right' },
+      { char: '↙', name: 'lower left' }, { char: '↖', name: 'upper left' },
+      { char: '⟶', name: 'long right' }, { char: '⟵', name: 'long left' },
+      { char: '⇀', name: 'harpoon right' }, { char: '↩', name: 'return' },
+    ],
+  },
+  {
+    key: 'sub_super',
+    symbols: [
+      { char: '⁰', name: 'super 0' }, { char: '¹', name: 'super 1' }, { char: '²', name: 'super 2' },
+      { char: '³', name: 'super 3' }, { char: '⁴', name: 'super 4' }, { char: '⁵', name: 'super 5' },
+      { char: '⁶', name: 'super 6' }, { char: '⁷', name: 'super 7' }, { char: '⁸', name: 'super 8' },
+      { char: '⁹', name: 'super 9' }, { char: '⁺', name: 'super +' }, { char: '⁻', name: 'super -' },
+      { char: 'ⁿ', name: 'super n' }, { char: 'ⁱ', name: 'super i' },
+      { char: '₀', name: 'sub 0' }, { char: '₁', name: 'sub 1' }, { char: '₂', name: 'sub 2' },
+      { char: '₃', name: 'sub 3' }, { char: '₄', name: 'sub 4' }, { char: '₅', name: 'sub 5' },
+      { char: '₆', name: 'sub 6' }, { char: '₇', name: 'sub 7' }, { char: '₈', name: 'sub 8' },
+      { char: '₉', name: 'sub 9' }, { char: '₊', name: 'sub +' }, { char: '₋', name: 'sub -' },
+    ],
+  },
+  {
+    key: 'units',
+    symbols: [
+      { char: '°', name: 'degree' }, { char: '℃', name: 'celsius' }, { char: '℉', name: 'fahrenheit' },
+      { char: 'µ', name: 'micro' }, { char: 'Å', name: 'angstrom' }, { char: 'ℓ', name: 'liter' },
+      { char: '℧', name: 'mho' }, { char: 'Ω', name: 'ohm' }, { char: '‰', name: 'per mille' },
+      { char: '‱', name: 'per ten thousand' }, { char: '†', name: 'dagger' }, { char: '‡', name: 'double dagger' },
+    ],
+  },
+  {
+    key: 'misc',
+    symbols: [
+      { char: '©', name: 'copyright' }, { char: '®', name: 'registered' }, { char: '™', name: 'trademark' },
+      { char: '§', name: 'section' }, { char: '¶', name: 'paragraph' }, { char: '†', name: 'dagger' },
+      { char: '‡', name: 'double dagger' }, { char: '•', name: 'bullet' }, { char: '…', name: 'ellipsis' },
+      { char: '—', name: 'em dash' }, { char: '–', name: 'en dash' }, { char: '′', name: 'prime' },
+      { char: '″', name: 'double prime' }, { char: '‴', name: 'triple prime' },
+      { char: '♀', name: 'female' }, { char: '♂', name: 'male' },
+      { char: '★', name: 'star' }, { char: '✓', name: 'check' }, { char: '✗', name: 'cross' },
+      { char: '∎', name: 'end proof' },
+    ],
+  },
+];
+
+const RECENT_SYMBOLS_KEY = 'endnotere-recent-symbols';
+const MAX_RECENT = 12;
+
+function getRecentSymbols(): string[] {
+  try {
+    const raw = localStorage.getItem(RECENT_SYMBOLS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
+function addRecentSymbol(char: string): void {
+  try {
+    const recent = getRecentSymbols().filter((c) => c !== char);
+    recent.unshift(char);
+    localStorage.setItem(RECENT_SYMBOLS_KEY, JSON.stringify(recent.slice(0, MAX_RECENT)));
+  } catch { /* ignore */ }
+}
+
+function SymbolPool({ editor, t }: { editor: any; t: (k: string) => string }): JSX.Element {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const [recent, setRecent] = useState<string[]>([]);
+  const [activeCategory, setActiveCategory] = useState<string>('greek');
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (open) {
+      setRecent(getRecentSymbols());
+      setSearch('');
+      setTimeout(() => searchRef.current?.focus(), 50);
+    }
+  }, [open]);
+
+  const insertSymbol = (char: string) => {
+    editor.chain().focus().insertContent(char).run();
+    addRecentSymbol(char);
+    setRecent(getRecentSymbols());
+  };
+
+  // Flatten all symbols for search
+  const allSymbols = useMemo(() => {
+    const flat: Array<{ char: string; name: string; category: string }> = [];
+    for (const cat of SYMBOL_CATEGORIES) {
+      for (const s of cat.symbols) {
+        flat.push({ ...s, category: cat.key });
+      }
+    }
+    return flat;
+  }, []);
+
+  const filteredSymbols = useMemo(() => {
+    if (!search.trim()) return null;
+    const q = search.toLowerCase();
+    return allSymbols.filter(
+      (s) => s.name.toLowerCase().includes(q) || s.char.includes(q)
+    );
+  }, [search, allSymbols]);
+
+  const catKeyToLabel = (key: string): string => {
+    const map: Record<string, string> = {
+      greek: t('sym_greek'), math: t('sym_math'), arrows: t('sym_arrows'),
+      misc: t('sym_misc'), sub_super: t('sym_sub_super'), units: t('sym_units'),
+    };
+    return map[key] || key;
+  };
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen(!open)}
+        className="px-2.5 py-1 rounded-md text-xs font-semibold text-secondary hover:bg-slate-100 flex items-center gap-1 transition"
+        title={t('sym_pool_title')}
+      >
+        Ω⁺
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute top-full left-0 mt-1 z-20 bg-white border border-border rounded-xl shadow-xl"
+               style={{ width: '340px' }}>
+            {/* Header */}
+            <div className="px-3 py-2 border-b border-border flex items-center justify-between bg-slate-50 rounded-t-xl">
+              <span className="text-xs font-bold text-primary">{t('sym_pool_title')}</span>
+              <button onClick={() => setOpen(false)} className="text-muted hover:text-primary text-sm leading-none">✕</button>
+            </div>
+
+            {/* Search */}
+            <div className="px-3 py-2 border-b border-border">
+              <input
+                ref={searchRef}
+                type="text"
+                placeholder={t('sym_search')}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full text-xs px-2.5 py-1.5 border border-border rounded-lg focus:outline-none focus:border-teal bg-slate-50/30"
+              />
+            </div>
+
+            <div style={{ maxHeight: '320px', overflowY: 'auto' }}>
+              {/* Search results */}
+              {filteredSymbols ? (
+                <div className="p-3">
+                  {filteredSymbols.length === 0 ? (
+                    <div className="text-xs text-muted text-center py-4 italic">—</div>
+                  ) : (
+                    <div className="grid grid-cols-10 gap-0.5">
+                      {filteredSymbols.map((s, i) => (
+                        <button
+                          key={`${s.char}-${i}`}
+                          onClick={() => insertSymbol(s.char)}
+                          className="w-8 h-8 flex items-center justify-center rounded-md text-sm hover:bg-teal/10 hover:text-teal transition font-medium border border-transparent hover:border-teal/20"
+                          title={s.name}
+                        >
+                          {s.char}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <>
+                  {/* Recent symbols */}
+                  {recent.length > 0 && (
+                    <div className="px-3 pt-2.5 pb-1.5">
+                      <div className="text-[10px] font-semibold text-muted uppercase tracking-wider mb-1.5">{t('sym_recent')}</div>
+                      <div className="flex flex-wrap gap-0.5">
+                        {recent.map((c, i) => (
+                          <button
+                            key={`r-${i}`}
+                            onClick={() => insertSymbol(c)}
+                            className="w-8 h-8 flex items-center justify-center rounded-md text-sm hover:bg-teal/10 hover:text-teal transition font-medium bg-teal/5 border border-teal/10"
+                            title={c}
+                          >
+                            {c}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Category tabs */}
+                  <div className="px-3 pt-2 flex gap-1 flex-wrap">
+                    {SYMBOL_CATEGORIES.map((cat) => (
+                      <button
+                        key={cat.key}
+                        onClick={() => setActiveCategory(cat.key)}
+                        className={`px-2 py-1 rounded-md text-[10px] font-semibold transition ${
+                          activeCategory === cat.key
+                            ? 'bg-teal text-white'
+                            : 'bg-slate-100 text-secondary hover:bg-slate-200'
+                        }`}
+                      >
+                        {catKeyToLabel(cat.key)}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Active category grid */}
+                  <div className="p-3">
+                    <div className="grid grid-cols-10 gap-0.5">
+                      {SYMBOL_CATEGORIES.find((c) => c.key === activeCategory)?.symbols.map((s, i) => (
+                        <button
+                          key={`${s.char}-${i}`}
+                          onClick={() => insertSymbol(s.char)}
+                          className="w-8 h-8 flex items-center justify-center rounded-md text-sm hover:bg-teal/10 hover:text-teal transition font-medium border border-transparent hover:border-teal/20"
+                          title={s.name}
+                        >
+                          {s.char}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
 }
 
 function NumberingMenu({ editor, t }: { editor: any; t: (k: string) => string }): JSX.Element {
