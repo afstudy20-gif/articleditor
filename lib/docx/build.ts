@@ -115,7 +115,7 @@ function buildParagraph(
       runs.push(runXml(text.slice(cursor - paraStart, m.startIndex - paraStart)));
     }
     const resolved = resolveRefs(m.refNumbers, refs);
-    const display = formatInTextCitation(style, resolved, m.refNumbers);
+    const display = formatInTextCitation(style, resolved, m.refNumbers, m.cite);
     if (mode === 'active' && resolved.length > 0) {
       runs.push(activeEndNoteField(resolved, display));
     } else if (mode === 'placeholder' && resolved.length > 0) {

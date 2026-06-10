@@ -39,39 +39,103 @@ export function styleLabel(id: StyleId): string {
   return getCustomStyle(id)?.name ?? id;
 }
 
+/**
+ * Per-citation rendering options (page/locator, prefix/suffix text,
+ * author suppression for narrative author-year citations).
+ */
+export type CiteOptions = {
+  /** Page or other locator, e.g. "s. 12", "pp. 12-14", "Table 2". */
+  locator?: string;
+  /** Text before the citation content, e.g. "see", "bkz.". */
+  prefix?: string;
+  /** Free text after the citation content. */
+  suffix?: string;
+  /** Author-year styles: render "(2020)" — author named in running text. */
+  suppressAuthor?: boolean;
+};
+
+function hasCiteOptions(opts?: CiteOptions): boolean {
+  return Boolean(opts && (opts.locator || opts.prefix || opts.suffix || opts.suppressAuthor));
+}
+
 // In-text citation display. Numbers parameter = ref numbers in order of citation.
 // refs parameter = the actual Ref objects for author-year styles.
-export function formatInTextCitation(style: StyleId, refs: Ref[], numbers: number[]): string {
+export function formatInTextCitation(
+  style: StyleId,
+  refs: Ref[],
+  numbers: number[],
+  opts?: CiteOptions,
+): string {
   if (!isBuiltinStyle(style)) {
     const spec = getCustomStyle(style);
-    if (spec) return formatInTextSpec(spec, refs, numbers);
-    return formatNumeric(numbers, '[', ']');
+    if (spec) {
+      const base = formatInTextSpec(spec, refs, numbers);
+      return hasCiteOptions(opts)
+        ? decorateCitation(base, isNumericSpec(spec), opts!)
+        : base;
+    }
+    return formatNumericWithOpts(numbers, opts);
   }
   switch (style) {
     case 'apa':
-      return formatApaInText(refs);
+      return formatApaInText(refs, opts);
     case 'vancouver':
     case 'ama':
-      return formatNumeric(numbers, '[', ']');
     case 'ieee':
-      return formatNumeric(numbers, '[', ']');
     default:
-      return formatNumeric(numbers, '[', ']');
+      return formatNumericWithOpts(numbers, opts);
   }
 }
 
-function formatApaInText(refs: Ref[]): string {
+function formatNumericWithOpts(numbers: number[], opts?: CiteOptions): string {
+  const base = formatNumeric(numbers, '[', ']');
+  return hasCiteOptions(opts) ? decorateCitation(base, true, opts!) : base;
+}
+
+/**
+ * Apply locator/prefix/suffix to an already-formatted citation.
+ * Numeric: locator goes inside the bracket — "[3, s. 12]";
+ * author-year/other: locator goes inside the closing paren when present.
+ * Prefix/suffix wrap outside (numeric) or inside the parens (author-year).
+ */
+function decorateCitation(base: string, numeric: boolean, opts: CiteOptions): string {
+  let out = base;
+  if (numeric) {
+    if (opts.locator && out.endsWith(']')) {
+      out = `${out.slice(0, -1)}, ${opts.locator}]`;
+    }
+    if (opts.prefix) out = `${opts.prefix} ${out}`;
+    if (opts.suffix) out = `${out} ${opts.suffix}`;
+    return out;
+  }
+  // Author-year shape "(...)" — splice inside the parens.
+  if (out.startsWith('(') && out.endsWith(')')) {
+    let inner = out.slice(1, -1);
+    if (opts.locator) inner = `${inner}, ${opts.locator}`;
+    if (opts.prefix) inner = `${opts.prefix} ${inner}`;
+    if (opts.suffix) inner = `${inner}, ${opts.suffix}`;
+    return `(${inner})`;
+  }
+  if (opts.prefix) out = `${opts.prefix} ${out}`;
+  if (opts.locator) out = `${out}, ${opts.locator}`;
+  if (opts.suffix) out = `${out} ${opts.suffix}`;
+  return out;
+}
+
+function formatApaInText(refs: Ref[], opts?: CiteOptions): string {
   if (refs.length === 0) return '';
   const parts = refs
     .map((r) => {
-      const author = firstAuthorFamily(r.authors);
       const year = r.year ?? 'n.d.';
+      if (opts?.suppressAuthor) return `${year}`;
+      const author = firstAuthorFamily(r.authors);
       const co = r.authors.length === 2 && r.authors[1].family ? ` & ${r.authors[1].family}` : '';
       const etAl = r.authors.length > 2 ? ' et al.' : '';
       return `${author}${co}${etAl}, ${year}`;
     })
     .join('; ');
-  return `(${parts})`;
+  const base = `(${parts})`;
+  return hasCiteOptions(opts) ? decorateCitation(base, false, opts!) : base;
 }
 
 function formatNumeric(numbers: number[], open: string, close: string): string {

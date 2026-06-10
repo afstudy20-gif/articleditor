@@ -40,7 +40,14 @@ export function tiptapToBuildInput(
       const nums = ids.map((id) => bibPos.get(id) ?? 0).filter((x) => x > 0);
       const cited = ids.map((id) => refsById.get(id)).filter((r): r is Ref => Boolean(r));
       if (nums.length === 0 && cited.length === 0) return;
-      const raw = formatInTextCitation(style, cited, nums);
+      const cite = {
+        locator: n.attrs?.locator || undefined,
+        prefix: n.attrs?.prefix || undefined,
+        suffix: n.attrs?.suffix || undefined,
+        suppressAuthor: n.attrs?.suppressAuthor || undefined,
+      };
+      const hasCite = Boolean(cite.locator || cite.prefix || cite.suffix || cite.suppressAuthor);
+      const raw = formatInTextCitation(style, cited, nums, cite);
       const start = cursor;
       emit(raw);
       markers.push({
@@ -48,6 +55,7 @@ export function tiptapToBuildInput(
         endIndex: cursor,
         raw,
         refNumbers: nums.sort((a, b) => a - b),
+        ...(hasCite ? { cite } : {}),
       });
       return;
     }

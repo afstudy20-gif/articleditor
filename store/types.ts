@@ -135,4 +135,11 @@ export type MarkerOccurrence = {
   endIndex: number;
   raw: string;
   refNumbers: number[];
+  /** Per-citation options (locator/prefix/suffix/suppressAuthor) when known. */
+  cite?: {
+    locator?: string;
+    prefix?: string;
+    suffix?: string;
+    suppressAuthor?: boolean;
+  };
 };

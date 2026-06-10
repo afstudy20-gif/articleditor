@@ -14,7 +14,7 @@ import { splitBodyAndBiblio, parseBiblioLines } from '@/lib/refs/parse-biblio';
 import { detectMarkers } from '@/lib/markers/detect';
 import { newId } from '@/lib/id';
 import { backupToBlob, buildBackup, projectFilename, parseBackup } from '@/lib/projects/backup';
-import { type StyleId, listAllStyles } from '@/lib/refs/styles';
+import { type StyleId, listAllStyles, isNumericStyle } from '@/lib/refs/styles';
 import { StyleEditor, type StyleSeed } from '@/components/Style/StyleEditor';
 import { RefDetail } from '@/components/RefDetail/RefDetail';
 import { BibliographyPreview } from '@/components/Bibliography/BibliographyPreview';
@@ -1510,6 +1510,29 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
     setCitationPopover(null);
   }
 
+  function updateCitationOptsAt(
+    pos: number,
+    opts: { locator?: string; prefix?: string; suffix?: string; suppressAuthor?: boolean },
+  ): void {
+    const ed = editorInstance.current;
+    if (!ed) return;
+    ed.chain().focus().updateCitationOpts(pos, opts).run();
+    setCitationPopover(null);
+  }
+
+  /** Current locator/prefix/suffix attrs of the citation node at pos. */
+  function citationOptsAt(pos: number): { locator: string; prefix: string; suffix: string; suppressAuthor: boolean } {
+    const ed = editorInstance.current;
+    const node = ed && !ed.isDestroyed ? ed.state.doc.nodeAt(pos) : null;
+    const attrs = node?.type?.name === 'citation' ? node.attrs : {};
+    return {
+      locator: attrs.locator ?? '',
+      prefix: attrs.prefix ?? '',
+      suffix: attrs.suffix ?? '',
+      suppressAuthor: Boolean(attrs.suppressAuthor),
+    };
+  }
+
   function updateAllCitations(): void {
     const ed = editorInstance.current;
     if (!ed || ed.isDestroyed) return;
@@ -2353,9 +2376,12 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
           pos={citationPopover.pos}
           refIds={citationPopover.refIds}
           allRefs={refs}
+          initialOpts={citationOptsAt(citationPopover.pos)}
+          authorYearStyle={!isNumericStyle(style)}
           onClose={() => setCitationPopover(null)}
           onReplace={replaceCitationRef}
           onDelete={deleteCitationAtPos}
+          onUpdateOpts={updateCitationOptsAt}
         />
       )}
 

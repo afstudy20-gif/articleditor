@@ -353,7 +353,12 @@ ${paragraphs.join('\n')}
       .map((num) => this.orderedRefs[num - 1])
       .filter((r): r is Ref => Boolean(r));
     if (cited.length === 0) return '';
-    const display = formatInTextCitation(this.input.style, cited, nums);
+    const display = formatInTextCitation(this.input.style, cited, nums, {
+      locator: n.attrs?.locator || undefined,
+      prefix: n.attrs?.prefix || undefined,
+      suffix: n.attrs?.suffix || undefined,
+      suppressAuthor: n.attrs?.suppressAuthor || undefined,
+    });
     if (this.input.mode === 'active') return activeEndNoteField(cited, display);
     if (this.input.mode === 'placeholder') return textRun(placeholderText(cited));
     return textRun(display);

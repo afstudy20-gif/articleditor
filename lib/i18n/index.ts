@@ -487,6 +487,16 @@ const tr: Dict = {
   cite_insert_title: 'Kütüphaneden atıf yerleştir',
   cite_no_matches: 'Eşleşen referans yok.',
   cite_insert_cancel: 'İptal',
+  cite_options: 'Seçenekler',
+  cite_locator: 'Sayfa / konum',
+  cite_locator_ph: 'örn. s. 12, ss. 12-14, Tablo 2',
+  cite_prefix: 'Ön ek',
+  cite_prefix_ph: 'örn. bkz.',
+  cite_suffix: 'Son ek',
+  cite_suppress_author: 'Yazarı gizle — metin içinde yazar zaten geçiyor: "Smith (2020)"',
+  cite_options_hint: 'Bu seçenekler yalnızca bu atıfa uygulanır; editörde ve dışa aktarmada görünür.',
+  cite_options_clear: 'Temizle',
+  cite_options_apply: 'Uygula',
 
   // AI panels
   ai_mode_expand: 'Genişlet',
@@ -1188,6 +1198,16 @@ const en: Dict = {
   cite_insert_title: 'Insert citation from library',
   cite_no_matches: 'No matching references.',
   cite_insert_cancel: 'Cancel',
+  cite_options: 'Options',
+  cite_locator: 'Page / locator',
+  cite_locator_ph: 'e.g. p. 12, pp. 12-14, Table 2',
+  cite_prefix: 'Prefix',
+  cite_prefix_ph: 'e.g. see',
+  cite_suffix: 'Suffix',
+  cite_suppress_author: 'Suppress author — author named in running text: "Smith (2020)"',
+  cite_options_hint: 'These options apply to this citation only; visible in the editor and in exports.',
+  cite_options_clear: 'Clear',
+  cite_options_apply: 'Apply',
 
   // AI panels
   ai_mode_expand: 'Expand',

@@ -49,8 +49,14 @@ function CitationNodeView({ node, getPos }: any) {
 
   const resolvedRefs: Ref[] = refIds.map((id) => refsMap.get(id)).filter((r): r is Ref => Boolean(r));
   const numbers = refIds.map((id) => order.get(id) ?? 0).filter((n) => n > 0);
+  const citeOpts = {
+    locator: node.attrs.locator || undefined,
+    prefix: node.attrs.prefix || undefined,
+    suffix: node.attrs.suffix || undefined,
+    suppressAuthor: node.attrs.suppressAuthor || undefined,
+  };
   const display =
-    resolvedRefs.length > 0 ? formatInTextCitation(style, resolvedRefs, numbers) : '[?]';
+    resolvedRefs.length > 0 ? formatInTextCitation(style, resolvedRefs, numbers, citeOpts) : '[?]';
 
   const titleAttr = refIds
     .map((id) => {

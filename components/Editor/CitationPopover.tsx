@@ -4,20 +4,45 @@ import { useEffect, useMemo, useState } from 'react';
 import type { Ref } from '@/store/types';
 import { useLang } from '@/lib/i18n/hooks';
 
+export type CiteOptsValue = {
+  locator: string;
+  prefix: string;
+  suffix: string;
+  suppressAuthor: boolean;
+};
+
 type Props = {
   pos: number;
   refIds: string[];
   allRefs: Ref[];
+  /** Current locator/prefix/suffix attrs of the node being edited. */
+  initialOpts?: CiteOptsValue;
+  /** True for author-year styles (APA): shows the suppress-author toggle. */
+  authorYearStyle?: boolean;
   onClose: () => void;
   onReplace: (pos: number, newRefIds: string[]) => void;
   onDelete: (pos: number) => void;
+  onUpdateOpts?: (pos: number, opts: CiteOptsValue) => void;
 };
 
-export function CitationPopover({ pos, refIds, allRefs, onClose, onReplace, onDelete }: Props): JSX.Element {
+export function CitationPopover({
+  pos,
+  refIds,
+  allRefs,
+  initialOpts,
+  authorYearStyle,
+  onClose,
+  onReplace,
+  onDelete,
+  onUpdateOpts,
+}: Props): JSX.Element {
   const { t } = useLang();
-  const [mode, setMode] = useState<'view' | 'replace' | 'add'>('view');
+  const [mode, setMode] = useState<'view' | 'replace' | 'add' | 'options'>('view');
   const [replaceTargetId, setReplaceTargetId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
+  const [opts, setOpts] = useState<CiteOptsValue>(
+    initialOpts ?? { locator: '', prefix: '', suffix: '', suppressAuthor: false },
+  );
   const refsById = useMemo(() => new Map(allRefs.map((r) => [r.id, r])), [allRefs]);
   const cited = refIds.map((id) => refsById.get(id)).filter((r): r is Ref => Boolean(r));
 
@@ -138,9 +163,88 @@ export function CitationPopover({ pos, refIds, allRefs, onClose, onReplace, onDe
               <button onClick={() => setMode('add')} className="btn-secondary text-xs">
                 + Ref ekle
               </button>
+              {onUpdateOpts && (
+                <button onClick={() => setMode('options')} className="btn-secondary text-xs">
+                  ⚙ {t('cite_options')}
+                  {(opts.locator || opts.prefix || opts.suffix || opts.suppressAuthor) && (
+                    <span className="ml-1 text-teal">•</span>
+                  )}
+                </button>
+              )}
               <button onClick={() => onDelete(pos)} className="btn-danger text-xs ml-auto">
                 {t('cite_delete')}
               </button>
+            </div>
+          </>
+        )}
+
+        {mode === 'options' && (
+          <>
+            <div className="p-4 space-y-3 overflow-auto flex-1">
+              <div>
+                <label className="tool-label block mb-1">{t('cite_locator')}</label>
+                <input
+                  autoFocus
+                  value={opts.locator}
+                  onChange={(e) => setOpts({ ...opts, locator: e.target.value })}
+                  placeholder={t('cite_locator_ph')}
+                  className="w-full border border-border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-teal"
+                />
+              </div>
+              <div>
+                <label className="tool-label block mb-1">{t('cite_prefix')}</label>
+                <input
+                  value={opts.prefix}
+                  onChange={(e) => setOpts({ ...opts, prefix: e.target.value })}
+                  placeholder={t('cite_prefix_ph')}
+                  className="w-full border border-border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-teal"
+                />
+              </div>
+              <div>
+                <label className="tool-label block mb-1">{t('cite_suffix')}</label>
+                <input
+                  value={opts.suffix}
+                  onChange={(e) => setOpts({ ...opts, suffix: e.target.value })}
+                  className="w-full border border-border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-teal"
+                />
+              </div>
+              {authorYearStyle && (
+                <label className="flex items-center gap-2 text-sm text-secondary cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={opts.suppressAuthor}
+                    onChange={(e) => setOpts({ ...opts, suppressAuthor: e.target.checked })}
+                  />
+                  {t('cite_suppress_author')}
+                </label>
+              )}
+              <p className="text-[11px] text-muted">{t('cite_options_hint')}</p>
+            </div>
+            <div className="px-4 py-3 border-t border-border flex items-center justify-between">
+              <button
+                onClick={() => setMode('view')}
+                className="text-xs text-muted hover:text-primary"
+              >
+                ← Geri
+              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    const cleared = { locator: '', prefix: '', suffix: '', suppressAuthor: false };
+                    setOpts(cleared);
+                    onUpdateOpts?.(pos, cleared);
+                  }}
+                  className="btn-secondary text-xs"
+                >
+                  {t('cite_options_clear')}
+                </button>
+                <button
+                  onClick={() => onUpdateOpts?.(pos, opts)}
+                  className="btn-primary text-xs"
+                >
+                  {t('cite_options_apply')}
+                </button>
+              </div>
             </div>
           </>
         )}
