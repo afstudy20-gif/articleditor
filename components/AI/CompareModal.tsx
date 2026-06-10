@@ -15,7 +15,7 @@ type Props = {
 };
 
 export function CompareModal({ myAbstract: initialAbstract, refs, onClose, onInsertSnippet, onExtractAspects }: Props): JSX.Element {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const [abstract, setAbstract] = useState(initialAbstract);
   const [targetId, setTargetId] = useState<string>(refs[0]?.id ?? '');
   const [loading, setLoading] = useState(false);
@@ -58,7 +58,7 @@ export function CompareModal({ myAbstract: initialAbstract, refs, onClose, onIns
           containerTitle: workingTarget.containerTitle,
           aspects: workingTarget.aspects,
         },
-        lang: 'tr' as const,
+        lang,
       };
       const res = await fetch('/api/ai/compare', {
         method: 'POST',

@@ -594,7 +594,10 @@ const tr: Dict = {
   trash_purge_confirm: 'Bu projeyi kalıcı olarak silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.',
   trash_soft_delete_confirm: 'Bu projeyi çöp kutusuna taşımak istediğinizden emin misiniz?',
   app_close: 'kapat',
-  tab_conflict_msg: 'Bu proje başka bir sekmede de açık ve orada da değişiklik yapılıyor. Çakışma riski var — sekmeyi kapatın veya birinde çalışın.',
+  tab_conflict_msg: 'Bu proje başka bir sekmede kaydedildi. Otomatik kayıt duraklatıldı — seçim yapın:',
+  tab_conflict_reload: 'Diğer sekmenin halini yükle',
+  tab_conflict_overwrite: 'Bu sekmeyle devam et',
+  tab_conflict_overwrite_hint: 'Bu sekmedeki içerik diğer sekmenin kaydının üzerine yazılır.',
   // Header icon captions
   hdr_style: 'Ref.Stili',
   hdr_find: 'Bul',
@@ -1251,7 +1254,10 @@ const en: Dict = {
   trash_purge_confirm: 'Are you sure you want to permanently delete this project? This action cannot be undone.',
   trash_soft_delete_confirm: 'Are you sure you want to move this project to the trash?',
   app_close: 'close',
-  tab_conflict_msg: 'This project is open in another tab and is being edited there too. Risk of conflict — close one tab or work in just one.',
+  tab_conflict_msg: 'This project was saved in another tab. Autosave is paused — choose how to continue:',
+  tab_conflict_reload: 'Load the other tab\'s version',
+  tab_conflict_overwrite: 'Continue with this tab',
+  tab_conflict_overwrite_hint: 'This tab\'s content will overwrite the other tab\'s save.',
   // Header icon captions
   hdr_style: 'Style',
   hdr_find: 'Find',

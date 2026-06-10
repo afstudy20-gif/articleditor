@@ -49,6 +49,7 @@ import { LettersPanel } from '@/components/Letters/LettersPanel';
 import { PhrasebankPanel } from '@/components/Phrasebank/PhrasebankPanel';
 import { SupplementaryPanel } from '@/components/Supplementary/SupplementaryPanel';
 import { useTabSync } from '@/lib/hooks/useTabSync';
+import { useIsDesktop } from '@/lib/hooks/useIsDesktop';
 import { computeWritingStats } from '@/lib/stats/writing-stats';
 import {
   encodeSelection,
@@ -275,12 +276,13 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
       window.removeEventListener('enr-keys-updated', onKeyUpdate);
     };
   }, []);
-  // Both desktop + mobile ArticleEditor mount unconditionally — Tailwind only
-  // toggles visibility via lg:hidden/hidden lg:flex. We track BOTH editors and
-  // return the one whose DOM is currently laid out (offsetParent !== null).
+  // Exactly ONE ArticleEditor mounts at a time (desktop OR mobile layout,
+  // chosen by useIsDesktop). The registry prunes destroyed instances so a
+  // breakpoint switch hands over cleanly to the freshly mounted editor.
   const editorRegistry = useRef<any[]>([]);
   const editorInstance = {
     get current(): any {
+      editorRegistry.current = editorRegistry.current.filter((ed) => ed && !ed.isDestroyed);
       const eds = editorRegistry.current;
       for (const ed of eds) {
         if (ed?.view?.dom?.offsetParent) return ed;
@@ -528,10 +530,14 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
     }
   }, [refOrder, refsById, style]);
 
-  // Cross-tab edit detection — warns when another tab saved the same project.
+  // Cross-tab edit detection — when another tab saved the same project,
+  // autosave PAUSES (otherwise last-writer-wins silently destroys the other
+  // tab's work) until the user picks "overwrite" or "reload".
   const { conflict: tabConflict, dismiss: dismissTabConflict, notifySaved: notifyTabSaved } = useTabSync(project.id);
+  const isDesktop = useIsDesktop();
 
   useEffect(() => {
+    if (tabConflict) return undefined; // paused until conflict resolved
     const t = setTimeout(async () => {
       setSavingState('saving');
       await saveProject({
@@ -549,7 +555,24 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
       setTimeout(() => setSavingState('idle'), 1200);
     }, 600);
     return () => clearTimeout(t);
-  }, [title, refs, doc, style, supplementary, project, onSaved, notifyTabSaved]);
+  }, [title, refs, doc, style, supplementary, project, onSaved, notifyTabSaved, tabConflict]);
+
+  // Conflict resolution: reload the project as saved by the other tab.
+  const reloadFromDisk = useCallback(async (): Promise<void> => {
+    const fresh = await getProject(project.id);
+    if (fresh) {
+      setTitle(fresh.title);
+      setRefs(fresh.refs);
+      setDoc(fresh.doc);
+      setSupplementary(fresh.supplementary ?? '');
+      const ed = editorInstance.current;
+      if (ed && !ed.isDestroyed) {
+        ed.commands.setContent(fresh.doc ?? { type: 'doc', content: [{ type: 'paragraph' }] });
+      }
+    }
+    dismissTabConflict();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project.id, dismissTabConflict]);
 
   async function callLookup(ref: Ref): Promise<Ref | null> {
     const res = await fetch('/api/lookup', {
@@ -952,7 +975,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
       const res = await fetch('/api/ai/score', {
         method: 'POST',
         headers: aiHeaders(),
-        body: JSON.stringify({ text, scope: 'document', lang: 'tr' }),
+        body: JSON.stringify({ text, scope: 'document', lang }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
@@ -1001,7 +1024,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
         const res = await fetch('/api/ai/enhance', {
           method: 'POST',
           headers: aiHeaders(),
-          body: JSON.stringify({ text: sel.encoded, mode, lang: 'tr' }),
+          body: JSON.stringify({ text: sel.encoded, mode, lang }),
         });
         if (!res.ok) {
           const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
@@ -1076,7 +1099,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
         year: ref.year,
         containerTitle: ref.containerTitle,
         raw: ref.raw,
-        lang: 'tr' as const,
+        lang,
       };
       try {
         const res = await fetch('/api/ai/extract-aspects', {
@@ -1166,7 +1189,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
       const res = await fetch('/api/ai/gap-detect', {
         method: 'POST',
         headers: aiHeaders(),
-        body: JSON.stringify({ text, scope: 'document', lang: 'tr' }),
+        body: JSON.stringify({ text, scope: 'document', lang }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
@@ -1300,7 +1323,11 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
       const res = await fetch('/api/ai/review', {
         method: 'POST',
         headers: aiHeaders(),
-        body: JSON.stringify({ text, lang: 'tr', section: 'Tüm belge (yapı kontrolü)' }),
+        body: JSON.stringify({
+          text,
+          lang,
+          section: lang === 'tr' ? 'Tüm belge (yapı kontrolü)' : 'Whole document (structure check)',
+        }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
@@ -1359,7 +1386,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
       const res = await fetch('/api/ai/review', {
         method: 'POST',
         headers: aiHeaders(),
-        body: JSON.stringify({ text: sel.text, context: sel.context, lang: 'tr' }),
+        body: JSON.stringify({ text: sel.text, context: sel.context, lang }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
@@ -2001,13 +2028,26 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
         <div className="w-full px-4 sm:px-6 mt-2">
           <div className="card bg-amber-50 border-amber-200 text-amber-800 text-sm p-3 flex items-center justify-between gap-3">
             <span>⚠️ {t('tab_conflict_msg')}</span>
-            <button className="text-amber-800 hover:underline text-xs" onClick={dismissTabConflict}>
-              {t('app_close')}
-            </button>
+            <div className="flex items-center gap-3 shrink-0">
+              <button
+                className="px-2 py-1 rounded border border-amber-300 hover:bg-amber-100 text-xs font-semibold"
+                onClick={() => void reloadFromDisk()}
+              >
+                {t('tab_conflict_reload')}
+              </button>
+              <button
+                className="px-2 py-1 rounded border border-amber-300 hover:bg-amber-100 text-xs font-semibold"
+                onClick={dismissTabConflict}
+                title={t('tab_conflict_overwrite_hint')}
+              >
+                {t('tab_conflict_overwrite')}
+              </button>
+            </div>
           </div>
         </div>
       )}
 
+      {isDesktop && (
       <main
         ref={gridRef}
         className="flex-1 w-full px-4 sm:px-6 py-4 hidden lg:flex flex-col min-h-0 overflow-hidden"
@@ -2177,8 +2217,10 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
           </div>
         </div>
       </main>
+      )}
 
       {/* Mobile / narrow screen fallback: stacked layout */}
+      {!isDesktop && (
       <main className="flex-1 w-full px-3 sm:px-4 py-3 lg:hidden flex flex-col gap-3 min-h-0">
         <ArticleEditor
           initialContent={doc}
@@ -2237,6 +2279,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
           onUpdate={updateRef}
         />
       </main>
+      )}
 
       {showImportModal && (
         <ImportModal
@@ -2521,7 +2564,7 @@ function ImportModal({
   onApply,
 }: {
   onClose: () => void;
-  docxInputRef: React.RefObject<HTMLInputElement>;
+  docxInputRef: React.RefObject<HTMLInputElement | null>;
   onSelectDocx: (file: File) => Promise<void>;
   pasteText: string;
   setPasteText: (v: string) => void;

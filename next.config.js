@@ -3,14 +3,11 @@ const nextConfig = {
   output: 'standalone',
   reactStrictMode: true,
   poweredByHeader: false,
-  webpack: (config) => {
-    // pdfjs-dist (phrasebank PDF importer) optionally requires the native
-    // `canvas` package for Node-side rendering. It installs on macOS but not on
-    // Alpine (no build toolchain), so the Coolify build failed with
-    // "Module not found: Can't resolve 'canvas'". We never render PDFs on the
-    // server — resolve it to an empty module so the bundle never needs it.
-    config.resolve.alias = { ...config.resolve.alias, canvas: false };
-    return config;
+  // pdfjs-dist >=5 no longer pulls the native `canvas` package, so the old
+  // webpack `canvas: false` alias (Alpine build fix) is no longer needed and
+  // the config stays Turbopack-compatible.
+  turbopack: {
+    root: __dirname,
   },
 };
 

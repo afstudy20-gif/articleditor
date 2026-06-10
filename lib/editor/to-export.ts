@@ -11,6 +11,15 @@ export function tiptapToBuildInput(
   refOrder: Map<string, number>,
   style: StyleId = 'vancouver',
 ): { bodyText: string; markers: MarkerOccurrence[]; orderedRefs: Ref[] } {
+  // Compute the FINAL bibliography order up front. Styles like APA re-sort
+  // alphabetically; marker numbers must index into that final list, otherwise
+  // the DOCX builder resolves citation-order numbers against the re-sorted
+  // array and silently links the wrong reference.
+  const citationOrdered = orderRefs(refsById, refOrder);
+  const orderedRefs = orderRefsForBib(style, citationOrdered);
+  const bibPos = new Map<string, number>();
+  orderedRefs.forEach((r, i) => bibPos.set(r.id, i + 1));
+
   const out: string[] = [];
   const markers: MarkerOccurrence[] = [];
   let cursor = 0;
@@ -28,7 +37,7 @@ export function tiptapToBuildInput(
     }
     if (n.type === 'citation') {
       const ids: string[] = n.attrs?.refIds ?? [];
-      const nums = ids.map((id) => refOrder.get(id) ?? 0).filter((x) => x > 0);
+      const nums = ids.map((id) => bibPos.get(id) ?? 0).filter((x) => x > 0);
       const cited = ids.map((id) => refsById.get(id)).filter((r): r is Ref => Boolean(r));
       if (nums.length === 0 && cited.length === 0) return;
       const raw = formatInTextCitation(style, cited, nums);
@@ -61,8 +70,6 @@ export function tiptapToBuildInput(
   walk(json);
 
   const bodyText = out.join('').replace(/\n+$/g, '');
-  const ordered = orderRefs(refsById, refOrder);
-  const orderedRefs = orderRefsForBib(style, ordered);
   return { bodyText, markers, orderedRefs };
 }
 

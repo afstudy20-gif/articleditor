@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import type { Ref } from '@/store/types';
 import { aiHeaders } from '@/lib/ai/user-keys';
+import { useLang } from '@/lib/i18n/hooks';
 
 type Cluster = {
   theme: string;
@@ -18,6 +19,7 @@ type Props = {
 };
 
 export function DeepResearchPanel({ initialAbstract, onClose, onAddRef }: Props): JSX.Element {
+  const { lang } = useLang();
   const [title, setTitle] = useState('');
   const [abstract, setAbstract] = useState(initialAbstract);
   const [loading, setLoading] = useState(false);
@@ -38,7 +40,7 @@ export function DeepResearchPanel({ initialAbstract, onClose, onAddRef }: Props)
       const res = await fetch('/api/ai/deep-research', {
         method: 'POST',
         headers: aiHeaders(),
-        body: JSON.stringify({ title, abstract, lang: 'tr' }),
+        body: JSON.stringify({ title, abstract, lang }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));

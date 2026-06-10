@@ -37,20 +37,26 @@ const MODE_KEY: Record<EnhanceModeT, string> = {
 
 export function EnhanceModal({ state, mode, onAccept, onClose, onRetry }: Props): JSX.Element | null {
   const { t } = useLang();
-  if (state.status === 'idle') return null;
+  const open = state.status !== 'idle';
 
-  const before = state.before;
+  const before = state.status !== 'idle' ? state.before : '';
   const after = state.status === 'ready' ? state.after : '';
-  const diff = useMemo(() => (state.status === 'ready' ? diffWords(before, after) : []), [before, after, state.status]);
+  const diff = useMemo(
+    () => (state.status === 'ready' ? diffWords(before, after) : []),
+    [before, after, state.status],
+  );
 
-  // Esc closes.
+  // Esc closes (only while open).
   useEffect(() => {
+    if (!open) return undefined;
     const onKey = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, [onClose, open]);
+
+  if (state.status === 'idle') return null;
 
   const citationCheck = state.status === 'ready' ? state.citationCheck : undefined;
   const citationWarn =

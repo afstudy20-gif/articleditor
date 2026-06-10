@@ -5,12 +5,12 @@ export async function extractPdfText(file: File): Promise<string> {
 
   const pdfjs = await import('pdfjs-dist');
   pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-    'pdfjs-dist/build/pdf.worker.min.js',
+    'pdfjs-dist/build/pdf.worker.min.mjs',
     import.meta.url,
   ).toString();
 
   const data = new Uint8Array(await file.arrayBuffer());
-  const loadingTask = pdfjs.getDocument({ data, isEvalSupported: false });
+  const loadingTask = pdfjs.getDocument({ data });
   const pdf = await loadingTask.promise;
   const pages: string[] = [];
 
@@ -41,6 +41,6 @@ export async function extractPdfText(file: File): Promise<string> {
     pages.push(lines.join('\n'));
   }
 
-  await pdf.destroy();
+  await loadingTask.destroy();
   return pages.join('\n\n');
 }
