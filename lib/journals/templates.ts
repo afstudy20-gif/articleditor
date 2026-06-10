@@ -263,6 +263,41 @@ export const JOURNAL_TEMPLATES: readonly JournalTemplate[] = [
       'Structured abstract headings: Objectives, Design, Setting, Participants, Interventions, Main outcome measures, Results, Conclusions.',
   },
   {
+    id: 'jcm',
+    sourceUrl: 'https://www.mdpi.com/journal/jcm/instructions',
+    rulesUpdatedAt: '2026-06-10',
+    name: 'Journal of Clinical Medicine (JCM)',
+    publisher: 'MDPI',
+    description:
+      'Original research article preset for JCM, with a structured abstract, standard research sections, and MDPI back-matter declarations.',
+    // JCM uses numbered square-bracket citations in order of appearance.
+    // Vancouver is the closest built-in style; MDPI bibliography punctuation
+    // still needs manual verification before submission.
+    referenceStyle: VANCOUVER,
+    abstractStructure: STRUCTURED,
+    abstractWordLimit: 250,
+    sections: [
+      { heading: 'Abstract', level: 2, required: true },
+      { heading: 'Keywords', level: 2, required: true },
+      { heading: 'Introduction', level: 2, required: true },
+      { heading: 'Materials and Methods', level: 2, required: true },
+      { heading: 'Results', level: 2, required: true },
+      { heading: 'Discussion', level: 2, required: true },
+      { heading: 'Conclusions', level: 2, required: false },
+      { heading: 'References', level: 2, required: true },
+    ],
+    requiredStatements: pickStatements(
+      'author-contributions',
+      'funding',
+      'ethics',
+      'informed-consent',
+      'data-availability',
+      'conflict-of-interest',
+    ),
+    notes:
+      'This preset targets original research articles. JCM sets no maximum manuscript length, but expects concise reporting. Original research and systematic reviews use an approximately 250-word structured abstract with Background/Objectives, Methods, Results, and Conclusions; reviews use a 200-word unstructured abstract. Add 3-10 keywords. Conclusions are optional, and Results and Discussion may be combined. Data Availability is required; ethics approval and informed-consent statements must be supplied when applicable (or handled as instructed by the journal). References are numbered by first appearance, cited in square brackets before punctuation, and should include full article titles. A cover letter is required. Systematic/scoping reviews must also follow the relevant PRISMA guidance and include the checklist and flow diagram. Figures should be placed near their first citation and supplied at preferably 600 dpi or higher.',
+  },
+  {
     id: 'apa-psych',
     sourceUrl: 'https://apastyle.apa.org/style-grammar-guidelines',
     rulesUpdatedAt: '2026-01-01',
