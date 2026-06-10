@@ -57,7 +57,9 @@ export function FiguresPanel({
   const [pendingFileName, setPendingFileName] = useState('');
   const [pendingCaption, setPendingCaption] = useState('');
   const [fileError, setFileError] = useState('');
+  const [replaceTarget, setReplaceTarget] = useState<FigureEntry | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const replaceFileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!editor) return undefined;
@@ -114,6 +116,33 @@ export function FiguresPanel({
     );
   };
 
+  const replaceImage = (file: File | undefined): void => {
+    if (!file || !replaceTarget) return;
+    setFileError('');
+    if (!/^image\/(png|jpe?g)$/i.test(file.type)) {
+      setFileError(t('fig_file_error'));
+      setReplaceTarget(null);
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const node = editor.state.doc.nodeAt(replaceTarget.pos);
+      if (!node || node.type?.name !== 'figure' || typeof reader.result !== 'string') return;
+      editor.view.dispatch(
+        editor.state.tr.setNodeMarkup(replaceTarget.pos, undefined, {
+          ...node.attrs,
+          src: reader.result,
+        }),
+      );
+      setReplaceTarget(null);
+    };
+    reader.onerror = () => {
+      setFileError(t('fig_file_error'));
+      setReplaceTarget(null);
+    };
+    reader.readAsDataURL(file);
+  };
+
   const remove = (item: FigureEntry): void => {
     const node = editor.state.doc.nodeAt(item.pos);
     if (!node || node.type?.name !== 'figure') return;
@@ -138,6 +167,16 @@ export function FiguresPanel({
             className="hidden"
             onChange={(event) => {
               chooseFile(event.target.files?.[0]);
+              event.target.value = '';
+            }}
+          />
+          <input
+            ref={replaceFileRef}
+            type="file"
+            accept="image/png,image/jpeg"
+            className="hidden"
+            onChange={(event) => {
+              replaceImage(event.target.files?.[0]);
               event.target.value = '';
             }}
           />
@@ -246,6 +285,15 @@ export function FiguresPanel({
                   className="text-secondary hover:text-primary"
                 >
                   {t('fig_insert_ref')}
+                </button>
+                <button
+                  onClick={() => {
+                    setReplaceTarget(it);
+                    replaceFileRef.current?.click();
+                  }}
+                  className="text-secondary hover:text-primary"
+                >
+                  {t('fig_replace_image')}
                 </button>
                 <button onClick={() => remove(it)} className="ml-auto text-red hover:underline">
                   {t('fig_delete')}
