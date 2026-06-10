@@ -31,6 +31,10 @@ export type DocxStyleMap = {
   figureCaption?: string;
   equation?: string;
   tableBody?: string;
+  /** Caption paragraph above tables ("Table N. ..."). */
+  tableCaption?: string;
+  /** Word table style (w:tblStyle) reference, e.g. MDPItable. */
+  table?: string;
   numIdBullet?: number;
   numIdOrdered?: number;
 };
@@ -115,6 +119,12 @@ export class BuildCtx {
   private relId = 100; // rId1/rId2 reserved for styles/settings, rId3 numbering
   private figCounters: Record<string, number> = { figure: 0, table: 0 };
   private figNumbers = new Map<string, { kind: string; num: number }>();
+  // Plain TipTap tables share the Table counter with figure[kind=table]
+  // nodes. indexFigures records their numbers in document order; table()
+  // consumes them via the cursor (render order == index order, both
+  // depth-first walks of the same doc).
+  private plainTableNumbers: number[] = [];
+  private plainTableCursor = 0;
 
   constructor(input: RichBuildInput) {
     this.input = input;
@@ -139,9 +149,19 @@ export class BuildCtx {
         const id = n.attrs?.figId;
         if (id) this.figNumbers.set(id, { kind, num: this.figCounters[kind] });
       }
+      if (n.type === 'table') {
+        this.figCounters.table += 1;
+        this.plainTableNumbers.push(this.figCounters.table);
+      }
       if (Array.isArray(n.content)) for (const c of n.content) walk(c);
     };
     walk(doc);
+  }
+
+  /** Next document-order Table number for a plain TipTap table. */
+  private nextPlainTableNumber(): number | null {
+    if (this.plainTableCursor >= this.plainTableNumbers.length) return null;
+    return this.plainTableNumbers[this.plainTableCursor++];
   }
 
   figureLabel(figId: string): string {
@@ -294,7 +314,7 @@ ${paragraphs.join('\n')}
         return out;
       }
       case 'table':
-        return [this.table(n)];
+        return this.table(n);
       case 'equation': {
         const latex: string = n.attrs?.latex ?? '';
         const eqStyle = this.sid('equation');
@@ -481,17 +501,58 @@ ${paragraphs.join('\n')}
     return `<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${img.widthEmu}" cy="${img.heightEmu}"/><wp:docPr id="${docPrId}" name="Image ${docPrId}"/><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="${docPrId}" name="Image ${docPrId}"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${img.rid}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${img.widthEmu}" cy="${img.heightEmu}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>`;
   }
 
-  private table(n: Json): string {
+  /**
+   * Publication-style ("three-line") table: thick top + bottom rules, thin
+   * rule under the header row, no vertical/inner grid, bold header, full
+   * width. A numbered "Table N." caption paragraph precedes the table.
+   */
+  private table(n: Json): string[] {
+    const out: string[] = [];
+
+    // Caption: "Table N." (continues the shared counter with figure[kind=table]).
+    const num = this.nextPlainTableNumber();
+    if (num !== null) {
+      const capStyle = this.sid('tableCaption');
+      const capPPr = capStyle
+        ? `<w:pPr><w:pStyle w:val="${capStyle}"/></w:pPr>`
+        : '';
+      out.push(
+        `<w:p>${capPPr}<w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">${escapeXml(`Table ${num}.`)}</w:t></w:r><w:r><w:t xml:space="preserve"> </w:t></w:r></w:p>`,
+      );
+    }
+
+    // Column grid from TipTap colwidth attrs (px → twip), when the user
+    // resized columns in the editor.
+    const firstRow = (n.content ?? []).find((r: Json) => r.type === 'tableRow');
+    const colWidthsPx: number[] = [];
+    for (const cell of firstRow?.content ?? []) {
+      const cw = cell.attrs?.colwidth;
+      if (Array.isArray(cw)) {
+        for (const w of cw) colWidthsPx.push(Number(w) || 0);
+      } else {
+        colWidthsPx.push(0);
+      }
+    }
+    const hasWidths = colWidthsPx.some((w) => w > 0);
+    const tblGrid = hasWidths
+      ? `<w:tblGrid>${colWidthsPx.map((w) => `<w:gridCol w:w="${w > 0 ? Math.round(w * 15) : 1440}"/>`).join('')}</w:tblGrid>`
+      : '';
+
     const rows: string[] = [];
-    for (const row of n.content ?? []) {
-      if (row.type !== 'tableRow') continue;
+    const rowNodes = (n.content ?? []).filter((r: Json) => r.type === 'tableRow');
+    rowNodes.forEach((row: Json, rowIdx: number) => {
+      const isHeaderRow = (row.content ?? []).some((c: Json) => c.type === 'tableHeader');
       const cells: string[] = [];
       for (const cell of row.content ?? []) {
         const isHeader = cell.type === 'tableHeader';
         const colspan = Number(cell.attrs?.colspan ?? 1);
         const tcPr: string[] = [];
         if (colspan > 1) tcPr.push(`<w:gridSpan w:val="${colspan}"/>`);
-        if (isHeader) tcPr.push('<w:shd w:val="clear" w:color="auto" w:fill="F2F2F2"/>');
+        // Header row carries the thin middle rule of the three-line look.
+        if (isHeaderRow && rowIdx === 0) {
+          tcPr.push('<w:tcBorders><w:bottom w:val="single" w:sz="6" w:color="000000"/></w:tcBorders>');
+        }
+        tcPr.push('<w:vAlign w:val="center"/>');
         const inner: string[] = [];
         const cellStyle = this.sid('tableBody');
         for (const blk of cell.content ?? []) {
@@ -499,20 +560,33 @@ ${paragraphs.join('\n')}
             const runs = this.inlineRuns(blk.content ?? []);
             const stylePart = cellStyle ? `<w:pStyle w:val="${cellStyle}"/>` : '';
             const boldPart = isHeader ? '<w:rPr><w:b/></w:rPr>' : '';
-            const pPr = stylePart || boldPart ? `<w:pPr>${stylePart}${boldPart}</w:pPr>` : '';
+            const pPr = stylePart || boldPart || isHeader
+              ? `<w:pPr>${stylePart}${isHeader ? '<w:jc w:val="center"/>' : ''}${boldPart}</w:pPr>`
+              : '';
             inner.push(`<w:p>${pPr}${runs || textRun('')}</w:p>`);
           } else {
             inner.push(...this.blockToXml(blk, {}));
           }
         }
         if (inner.length === 0) inner.push(`<w:p>${textRun('')}</w:p>`);
-        cells.push(
-          `<w:tc><w:tcPr>${tcPr.join('')}<w:tcBorders><w:top w:val="single" w:sz="4" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:color="000000"/><w:left w:val="single" w:sz="4" w:color="000000"/><w:right w:val="single" w:sz="4" w:color="000000"/></w:tcBorders></w:tcPr>${inner.join('')}</w:tc>`,
-        );
+        cells.push(`<w:tc><w:tcPr>${tcPr.join('')}</w:tcPr>${inner.join('')}</w:tc>`);
       }
-      rows.push(`<w:tr>${cells.join('')}</w:tr>`);
-    }
-    return `<w:tbl><w:tblPr><w:tblW w:w="0" w:type="auto"/><w:tblBorders><w:top w:val="single" w:sz="4" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:color="000000"/><w:left w:val="single" w:sz="4" w:color="000000"/><w:right w:val="single" w:sz="4" w:color="000000"/><w:insideH w:val="single" w:sz="4" w:color="000000"/><w:insideV w:val="single" w:sz="4" w:color="000000"/></w:tblBorders></w:tblPr>${rows.join('')}</w:tbl>`;
+      const trPr = isHeaderRow && rowIdx === 0 ? '<w:trPr><w:tblHeader/></w:trPr>' : '';
+      rows.push(`<w:tr>${trPr}${cells.join('')}</w:tr>`);
+    });
+
+    const tblStyleRef = this.sid('table');
+    const tblPr =
+      '<w:tblPr>'
+      + (tblStyleRef ? `<w:tblStyle w:val="${tblStyleRef}"/>` : '')
+      + '<w:tblW w:w="5000" w:type="pct"/>'
+      + '<w:jc w:val="center"/>'
+      + '<w:tblBorders><w:top w:val="single" w:sz="12" w:color="000000"/><w:bottom w:val="single" w:sz="12" w:color="000000"/></w:tblBorders>'
+      + '<w:tblCellMar><w:top w:w="40" w:type="dxa"/><w:left w:w="80" w:type="dxa"/><w:bottom w:w="40" w:type="dxa"/><w:right w:w="80" w:type="dxa"/></w:tblCellMar>'
+      + '</w:tblPr>';
+
+    out.push(`<w:tbl>${tblPr}${tblGrid}${rows.join('')}</w:tbl>`);
+    return out;
   }
 }
 

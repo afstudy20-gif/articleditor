@@ -86,6 +86,12 @@ describe('buildRichDocx', () => {
     assert.ok(xml.includes('<w:i/>'), 'italic run');
     assert.ok(xml.includes('<w:numPr>'), 'list numbering');
     assert.ok(xml.includes('<w:tbl>'), 'table element');
+    // Publication three-line table look
+    assert.ok(xml.includes('Table 1.'), 'numbered table caption');
+    assert.ok(xml.includes('<w:tblW w:w="5000" w:type="pct"/>'), 'full-width table');
+    assert.ok(!xml.includes('insideV'), 'no vertical grid lines');
+    assert.ok(!xml.includes('F2F2F2'), 'no grey header shading');
+    assert.ok(xml.includes('<w:tblHeader/>'), 'header row repeats across pages');
     assert.ok(xml.includes('ADDIN EN.CITE'), 'active EndNote field');
     assert.ok(xml.includes('<w:jc w:val="both"/>'), 'justified alignment');
     assert.ok(xml.includes('References'), 'English bibliography heading');

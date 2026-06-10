@@ -50,6 +50,8 @@ export const DOCX_TEMPLATES: readonly DocxTemplateDef[] = [
       figureCaption: 'MDPI51figurecaption',
       equation: 'MDPI39equation',
       tableBody: 'MDPI42tablebody',
+      tableCaption: 'MDPI41tablecaption',
+      table: 'MDPItable',
       numIdBullet: TPL_NUM_BULLET,
       numIdOrdered: TPL_NUM_ORDERED,
     },
