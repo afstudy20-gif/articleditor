@@ -166,6 +166,26 @@ describe('buildLatex', () => {
     assert.ok(output.tex.includes('\\mkbibparens{\\citeyear{smith2024}}'));
   });
 
+  it('maps MDPI styles to portable numeric and author-year biblatex modes', () => {
+    const doc = {
+      type: 'doc',
+      content: [{
+        type: 'paragraph',
+        content: [{ type: 'citation', attrs: { refIds: ['smith'] } }],
+      }],
+    };
+
+    const acs = buildLatex({ doc, refs: [ref], style: 'mdpi-acs' });
+    assert.ok(acs.tex.includes('style=numeric-comp'));
+    assert.ok(acs.tex.includes('sorting=none'));
+    assert.ok(acs.tex.includes('\\cite{smith2024}'));
+
+    const chicago = buildLatex({ doc, refs: [ref], style: 'mdpi-chicago' });
+    assert.ok(chicago.tex.includes('style=authoryear'));
+    assert.ok(chicago.tex.includes('sorting=nyt'));
+    assert.ok(chicago.tex.includes('\\parencite{smith2024}'));
+  });
+
   it('reports unsupported external images instead of emitting a broken includegraphics path', () => {
     const output = buildLatex({
       doc: {

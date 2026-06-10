@@ -24,7 +24,7 @@ const tr: Dict = {
   feat_convert: 'Word belgesi yükle veya metin yapıştır, kaynakça otomatik algılansın.',
   feat_lookup: 'CrossRef, OpenAlex ve PubMed taraması ile DOI, PMID ve özetleri zenginleştir.',
   feat_editor: 'TipTap tabanlı online editör, canlı atıf numaralandırma, multi-cite desteği.',
-  feat_styles: 'Vancouver, APA, AMA, IEEE stilleri arasında geçiş, aktif EndNote .docx çıktısı.',
+  feat_styles: 'Vancouver, APA, AMA, IEEE ve MDPI referans stilleri; aktif EndNote .docx çıktısı.',
   feat_latex: 'LaTeX (.tex + .bib) bundle ile Overleaf/TeXLive uyumlu çıktı.',
   feat_endnote: 'EndNote XML, RIS, .enw, BibTeX import. Tarayıcı tabanlı, hızlı.',
 
@@ -78,7 +78,7 @@ const tr: Dict = {
     'Atıf kütüphanesinden referansları sürükle/tıkla. Multi-cite için checkbox ile çoklu seçim yap.',
   tutorial_step4_title: '4. Stil seçin',
   tutorial_step4_desc:
-    'Vancouver, APA, AMA veya IEEE stilleri arasında geçiş yapın. Atıflar ve kaynakça canlı yenilenir.',
+    'Vancouver, APA, AMA, IEEE veya MDPI ACS/Chicago/APA stilleri arasında geçiş yapın. Atıflar ve kaynakça canlı yenilenir.',
   tutorial_step5_title: '5. Dışa aktarın',
   tutorial_step5_desc:
     'Aktif EndNote .docx, placeholder .docx, .ris veya LaTeX (.zip) çıktısı alın. Word + EndNote CWYW açıldığında atıflar canlı.',
@@ -354,6 +354,11 @@ const tr: Dict = {
   jc_source_link: 'Dergi kuralları kaynağı',
   jc_rules_date: 'kurallar gözden geçirildi',
   jc_outdated_warning: 'Dergi kuralları değişmiş olabilir — göndermeden önce kaynaktan doğrulayın.',
+  jc_reference_profile: 'Bibliyografya / referans profili',
+  jc_preferred_style: 'önerilen',
+  jc_apply_ref_style: 'Bu stili kullan',
+  jc_publisher_styles: 'Yayıncının stil seçenekleri',
+  jc_reference_guide: 'Referans kılavuzunu aç',
   jc_generic_template: 'Genel şablon — belirli bir derginin resmi kurallarını temsil etmez.',
   jc_add: 'Yeni Şablon',
   jc_edit: 'Düzenle',
@@ -746,7 +751,7 @@ const en: Dict = {
   feat_convert: 'Upload a Word document or paste text; bibliography auto-detected.',
   feat_lookup: 'Enrich DOI, PMID and abstracts via CrossRef, OpenAlex and PubMed.',
   feat_editor: 'TipTap-based online editor with live citation numbering and multi-cite support.',
-  feat_styles: 'Switch between Vancouver, APA, AMA, IEEE styles. Active EndNote .docx export.',
+  feat_styles: 'Vancouver, APA, AMA, IEEE, and MDPI reference styles. Active EndNote .docx export.',
   feat_latex: 'LaTeX (.tex + .bib) bundle compatible with Overleaf / TeXLive.',
   feat_endnote: 'Import EndNote XML, RIS, .enw, BibTeX. Browser-based, fast.',
 
@@ -796,7 +801,7 @@ const en: Dict = {
     'Click or drag refs from the citation library. Use checkboxes for multi-cite (combined citation).',
   tutorial_step4_title: '4. Pick a style',
   tutorial_step4_desc:
-    'Switch between Vancouver, APA, AMA and IEEE styles. Citations and bibliography refresh live.',
+    'Switch between Vancouver, APA, AMA, IEEE, or MDPI ACS/Chicago/APA styles. Citations and bibliography refresh live.',
   tutorial_step5_title: '5. Export',
   tutorial_step5_desc:
     'Active EndNote .docx, placeholder .docx, .ris or LaTeX (.zip). Open in Word + EndNote CWYW for live citations.',
@@ -1072,6 +1077,11 @@ const en: Dict = {
   jc_source_link: 'Journal guideline source',
   jc_rules_date: 'rules reviewed',
   jc_outdated_warning: 'Journal rules may have changed — verify at the source before submitting.',
+  jc_reference_profile: 'Bibliography / reference profile',
+  jc_preferred_style: 'preferred',
+  jc_apply_ref_style: 'Use this style',
+  jc_publisher_styles: 'Publisher style options',
+  jc_reference_guide: 'Open reference guide',
   jc_generic_template: 'Generic template — does not represent any specific journal\'s official rules.',
   jc_add: 'New Template',
   jc_edit: 'Edit',

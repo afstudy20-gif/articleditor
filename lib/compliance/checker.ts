@@ -6,7 +6,6 @@
 // empty / malformed input. See ../journals/types for the produced shape.
 
 import type {
-  CitationStyleId,
   ComplianceIssue,
   ComplianceReport,
   ComplianceSeverity,
@@ -14,6 +13,7 @@ import type {
   JournalTemplate,
   RequiredStatement,
 } from '@/lib/journals/types';
+import { styleLabel } from '@/lib/refs/styles';
 import type { WritingStats } from '@/lib/stats/types';
 
 export interface ComplianceInput {
@@ -24,18 +24,10 @@ export interface ComplianceInput {
   /** Heading texts present in the document (any case). */
   sectionHeadings: string[];
   /** Current project citation style. */
-  referenceStyle: CitationStyleId;
+  referenceStyle: string;
   /** Text under the Abstract heading, if extractable (may be undefined). */
   abstractText?: string;
 }
-
-/** Human-readable labels for citation styles used in messages. */
-const STYLE_LABELS: Readonly<Record<CitationStyleId, string>> = {
-  vancouver: 'Vancouver',
-  apa: 'APA',
-  ama: 'AMA',
-  ieee: 'IEEE',
-};
 
 /** Synonym groups: a doc heading matching any alias satisfies the canonical name. */
 const SECTION_SYNONYMS: ReadonlyArray<readonly string[]> = [
@@ -302,18 +294,27 @@ function checkStatement(statement: RequiredStatement, haystack: string): Complia
 
 function checkReferenceStyle(
   template: JournalTemplate,
-  referenceStyle: CitationStyleId,
+  referenceStyle: string,
 ): ComplianceIssue {
   if (template.referenceStyle === referenceStyle) {
     return {
       severity: 'ok',
       category: 'reference-style',
-      message: `Reference style matches the journal (${STYLE_LABELS[referenceStyle]}).`,
+      message: `Reference style matches the journal (${styleLabel(referenceStyle)}).`,
       confidence: 'verified',
     };
   }
-  const expected = STYLE_LABELS[template.referenceStyle];
-  const current = STYLE_LABELS[referenceStyle];
+  const expected = styleLabel(template.referenceStyle);
+  const current = styleLabel(referenceStyle);
+  if (template.referenceStylePolicy === 'preferred') {
+    return {
+      severity: 'info',
+      category: 'reference-style',
+      message: `The journal prefers ${expected}.`,
+      detail: `Project is set to ${current}. A different style is acceptable only when it is used consistently.`,
+      confidence: 'heuristic',
+    };
+  }
   return {
     severity: 'warn',
     category: 'reference-style',

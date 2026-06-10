@@ -2586,6 +2586,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
             docJson={doc}
             stats={writingStats}
             referenceStyle={style}
+            onReferenceStyleChange={(nextStyle) => setStyle(nextStyle)}
             onClose={() => setJournalOpen(false)}
             t={t}
           />

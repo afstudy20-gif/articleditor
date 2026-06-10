@@ -5,12 +5,14 @@ import { JOURNAL_TEMPLATES, DEFAULT_REQUIRED_STATEMENTS } from '@/lib/journals/t
 import type { ComplianceSeverity, CitationStyleId, AbstractStructure, JournalTemplate, JournalSection } from '@/lib/journals/types';
 import { checkCompliance } from '@/lib/compliance/checker';
 import { extractDocStructure } from '@/lib/editor/doc-structure';
+import { STYLE_LABELS, type CitationStyle } from '@/lib/refs/styles';
 import type { WritingStats } from '@/lib/stats/types';
 
 interface JournalCheckPanelProps {
   docJson: unknown;
   stats: WritingStats;
   referenceStyle: string;
+  onReferenceStyleChange?: (style: CitationStyleId) => void;
   onClose: () => void;
   t: (k: string) => string;
 }
@@ -39,6 +41,7 @@ export function JournalCheckPanel({
   docJson,
   stats,
   referenceStyle,
+  onReferenceStyleChange,
   onClose,
   t,
 }: JournalCheckPanelProps): JSX.Element {
@@ -85,7 +88,7 @@ export function JournalCheckPanel({
       stats,
       plainText,
       sectionHeadings: headings,
-      referenceStyle: referenceStyle as CitationStyleId,
+      referenceStyle,
       abstractText,
     });
   }, [template, docJson, stats, referenceStyle]);
@@ -202,10 +205,9 @@ export function JournalCheckPanel({
                 onChange={(e) => setFormRefStyle(e.target.value as CitationStyleId)}
                 className="w-full text-xs border border-border rounded px-2 py-1.5 bg-surface text-primary outline-none focus:border-teal"
               >
-                <option value="vancouver">Vancouver</option>
-                <option value="apa">APA</option>
-                <option value="ama">AMA</option>
-                <option value="ieee">IEEE</option>
+                {(Object.entries(STYLE_LABELS) as Array<[CitationStyle, string]>).map(([id, label]) => (
+                  <option key={id} value={id}>{label}</option>
+                ))}
               </select>
             </div>
             <div>
@@ -373,6 +375,61 @@ export function JournalCheckPanel({
         </div>
       )}
 
+      {template && (template.publisherReferenceStyles?.length || template.referenceRules?.length) ? (
+        <div className="px-3 py-2 border-b border-border bg-slate-50/60 space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <div className="text-[10px] font-bold uppercase tracking-wider text-muted">
+                {t('jc_reference_profile')}
+              </div>
+              <div className="text-xs font-semibold text-primary">
+                {STYLE_LABELS[template.referenceStyle]}
+                {template.referenceStylePolicy === 'preferred'
+                  ? ` (${t('jc_preferred_style')})`
+                  : ''}
+              </div>
+            </div>
+            {referenceStyle !== template.referenceStyle && onReferenceStyleChange && (
+              <button
+                onClick={() => onReferenceStyleChange(template.referenceStyle)}
+                className="shrink-0 rounded border border-teal px-2 py-1 text-[10px] font-semibold text-teal hover:bg-teal-bg"
+              >
+                {t('jc_apply_ref_style')}
+              </button>
+            )}
+          </div>
+
+          {template.publisherReferenceStyles && template.publisherReferenceStyles.length > 1 && (
+            <div className="text-[10px] text-secondary">
+              <span className="font-semibold">{t('jc_publisher_styles')}:</span>{' '}
+              {template.publisherReferenceStyles.map((id) => STYLE_LABELS[id]).join(', ')}
+            </div>
+          )}
+
+          {template.referenceRules && template.referenceRules.length > 0 && (
+            <ul className="space-y-1 text-[10px] leading-snug text-secondary">
+              {template.referenceRules.map((rule) => (
+                <li key={rule} className="flex gap-1.5">
+                  <span className="text-teal">•</span>
+                  <span>{rule}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {template.referenceGuideUrl && (
+            <a
+              href={template.referenceGuideUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block text-[10px] text-teal hover:underline"
+            >
+              {t('jc_reference_guide')} ↗
+            </a>
+          )}
+        </div>
+      ) : null}
+
       <div className="flex-1 overflow-auto p-2 space-y-1.5">
         {report?.issues.map((issue, i) => (
           <div key={i} className={`rounded border px-2 py-1.5 text-xs ${SEVERITY_STYLE[issue.severity]}`}>
@@ -414,4 +471,3 @@ export function JournalCheckPanel({
     </div>
   );
 }
-

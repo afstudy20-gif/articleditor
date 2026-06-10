@@ -77,7 +77,7 @@ export type Project = {
   refs: Ref[];
   bodyText?: string;
   settings?: {
-    // Built-in id ('vancouver'|'apa'|'ama'|'ieee') or a 'custom:<id>' style.
+    // Built-in citation style id or a 'custom:<id>' style.
     style?: string;
     aiProvider?: 'anthropic' | 'openai';
   };

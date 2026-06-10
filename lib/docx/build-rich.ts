@@ -178,7 +178,10 @@ ${this.rels.join('\n')}
       }
     }
     if (this.input.includeBibliography !== false) {
-      const bibHeading = this.input.bibHeading ?? (this.input.style === 'apa' ? 'Kaynakça' : 'Kaynaklar');
+      const authorYearStyle = this.input.style === 'apa'
+        || this.input.style === 'mdpi-apa'
+        || this.input.style === 'mdpi-chicago';
+      const bibHeading = this.input.bibHeading ?? (authorYearStyle ? 'Kaynakça' : 'Kaynaklar');
       paragraphs.push(`<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr>${textRun(bibHeading)}</w:p>`);
       this.orderedRefs.forEach((r, i) => {
         paragraphs.push(`<w:p>${textRun(formatBibEntry(this.input.style, r, i + 1))}</w:p>`);

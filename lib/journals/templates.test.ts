@@ -9,7 +9,14 @@ describe('Journal of Clinical Medicine template', () => {
     assert.ok(template);
     assert.equal(template.sourceUrl, 'https://www.mdpi.com/journal/jcm/instructions');
     assert.equal(template.rulesUpdatedAt, '2026-06-10');
-    assert.equal(template.referenceStyle, 'vancouver');
+    assert.equal(template.referenceStyle, 'mdpi-acs');
+    assert.equal(template.referenceStylePolicy, 'preferred');
+    assert.deepEqual(template.publisherReferenceStyles, [
+      'mdpi-acs',
+      'mdpi-chicago',
+      'mdpi-apa',
+    ]);
+    assert.equal(template.referenceGuideUrl, 'https://www.mdpi.com/authors/layout');
     assert.equal(template.abstractStructure, 'structured');
     assert.equal(template.abstractWordLimit, 250);
     assert.equal(template.totalWordLimit, undefined);
@@ -46,5 +53,14 @@ describe('Journal of Clinical Medicine template', () => {
         'conflict-of-interest',
       ],
     );
+  });
+
+  it('captures JCM citation and bibliography requirements', () => {
+    assert.ok(template);
+    assert.ok(template.referenceRules?.some((rule) => rule.includes('square brackets')));
+    assert.ok(template.referenceRules?.some((rule) => rule.includes('before punctuation')));
+    assert.ok(template.referenceRules?.some((rule) => rule.includes('full article title')));
+    assert.ok(template.referenceRules?.some((rule) => rule.includes('DOIs')));
+    assert.ok(template.referenceRules?.some((rule) => rule.includes('supplementary files')));
   });
 });

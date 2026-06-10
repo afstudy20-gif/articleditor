@@ -1,6 +1,13 @@
 // Shared contracts for journal templates + pre-submission compliance.
 
-export type CitationStyleId = 'vancouver' | 'apa' | 'ama' | 'ieee';
+export type CitationStyleId =
+  | 'vancouver'
+  | 'apa'
+  | 'ama'
+  | 'ieee'
+  | 'mdpi-acs'
+  | 'mdpi-chicago'
+  | 'mdpi-apa';
 
 export type AbstractStructure = 'structured' | 'unstructured' | 'any';
 
@@ -31,7 +38,16 @@ export interface JournalTemplate {
   sourceUrl?: string;
   /** ISO date the bundled rules were last reviewed against the source. */
   rulesUpdatedAt?: string;
+  /** Preferred style for this journal template. */
   referenceStyle: CitationStyleId;
+  /** Whether a different consistent style is acceptable at submission. */
+  referenceStylePolicy?: 'required' | 'preferred';
+  /** Reference families documented by the publisher's general style guide. */
+  publisherReferenceStyles?: CitationStyleId[];
+  /** Detailed journal-specific citation and bibliography requirements. */
+  referenceRules?: string[];
+  /** Publisher or journal reference-list guide. */
+  referenceGuideUrl?: string;
   abstractStructure: AbstractStructure;
   abstractWordLimit?: number;
   totalWordLimit?: number;

@@ -108,6 +108,21 @@ describe('buildRichDocx', () => {
     assert.ok(alphaIdx > -1 && zetaIdx > -1 && alphaIdx < zetaIdx, 'bibliography alphabetical');
     assert.ok(/\(Zeta,?\s*2020\)/.test(xml), 'APA in-text citation for the actually cited ref');
   });
+
+  it('exports MDPI ACS citations and full-title bibliography entries', async () => {
+    const blob = await buildRichDocx({
+      doc,
+      refsById,
+      refOrder,
+      style: 'mdpi-acs',
+      mode: 'plain',
+    });
+    const xml = await documentXml(blob);
+
+    assert.ok(xml.includes('[1]'));
+    assert.ok(xml.includes('Title Zeta'));
+    assert.ok(xml.includes('Zeta, A.'));
+  });
 });
 
 describe('sniffDimensions', () => {

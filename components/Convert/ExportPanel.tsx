@@ -54,7 +54,7 @@ export function ExportPanel({ bodyText, refs, markers }: Props) {
           ))}
         </select>
         <p className="text-xs text-muted mt-1.5">
-          Vancouver/AMA/IEEE numaralı `[N]`, APA yazar-yıl `(Smith, 2020)` formatı kullanır.
+          Vancouver/AMA/IEEE ve MDPI ACS numaralı; APA, MDPI APA ve MDPI Chicago yazar-yıl formatı kullanır.
         </p>
       </div>
       <div className="flex gap-2 mb-4">

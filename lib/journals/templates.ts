@@ -88,6 +88,9 @@ function pickStatements(...ids: readonly string[]): RequiredStatement[] {
 // Citation-style aliases for readability at the call sites below.
 const VANCOUVER: CitationStyleId = 'vancouver';
 const APA: CitationStyleId = 'apa';
+const MDPI_ACS: CitationStyleId = 'mdpi-acs';
+const MDPI_CHICAGO: CitationStyleId = 'mdpi-chicago';
+const MDPI_APA: CitationStyleId = 'mdpi-apa';
 
 const STRUCTURED: AbstractStructure = 'structured';
 const UNSTRUCTURED: AbstractStructure = 'unstructured';
@@ -270,10 +273,22 @@ export const JOURNAL_TEMPLATES: readonly JournalTemplate[] = [
     publisher: 'MDPI',
     description:
       'Original research article preset for JCM, with a structured abstract, standard research sections, and MDPI back-matter declarations.',
-    // JCM uses numbered square-bracket citations in order of appearance.
-    // Vancouver is the closest built-in style; MDPI bibliography punctuation
-    // still needs manual verification before submission.
-    referenceStyle: VANCOUVER,
+    referenceStyle: MDPI_ACS,
+    referenceStylePolicy: 'preferred',
+    publisherReferenceStyles: [MDPI_ACS, MDPI_CHICAGO, MDPI_APA],
+    referenceGuideUrl: 'https://www.mdpi.com/authors/layout',
+    referenceRules: [
+      'JCM accepts any consistently formatted reference style at initial submission; MDPI ACS is the recommended final layout.',
+      'Number references individually in order of first appearance, including citations in figure legends and table captions.',
+      'Place citation numbers in square brackets before punctuation; use an en dash for ranges.',
+      'Put page locators after the citation, for example [5] (p. 10) or [6] (pp. 101–105).',
+      'Include the full article title and use the MDPI ACS bibliography layout.',
+      'Include author names, source title, year, volume and pagination; issue numbers are normally omitted in MDPI house style.',
+      'Use the official abbreviated journal title where available; verify records that contain only the full journal name.',
+      'DOIs are strongly encouraged when available.',
+      'Citations used in supplementary files must also appear in the main manuscript and main reference list.',
+      'Data, software and other citable research outputs should be cited as formal references where possible.',
+    ],
     abstractStructure: STRUCTURED,
     abstractWordLimit: 250,
     sections: [
@@ -295,7 +310,7 @@ export const JOURNAL_TEMPLATES: readonly JournalTemplate[] = [
       'conflict-of-interest',
     ),
     notes:
-      'This preset targets original research articles. JCM sets no maximum manuscript length, but expects concise reporting. Original research and systematic reviews use an approximately 250-word structured abstract with Background/Objectives, Methods, Results, and Conclusions; reviews use a 200-word unstructured abstract. Add 3-10 keywords. Conclusions are optional, and Results and Discussion may be combined. Data Availability is required; ethics approval and informed-consent statements must be supplied when applicable (or handled as instructed by the journal). References are numbered by first appearance, cited in square brackets before punctuation, and should include full article titles. A cover letter is required. Systematic/scoping reviews must also follow the relevant PRISMA guidance and include the checklist and flow diagram. Figures should be placed near their first citation and supplied at preferably 600 dpi or higher.',
+      'This preset targets original research articles. JCM sets no maximum manuscript length, but expects concise reporting. Original research and systematic reviews use an approximately 250-word structured abstract with Background/Objectives, Methods, Results, and Conclusions; reviews use a 200-word unstructured abstract. Add 3-10 keywords. Conclusions are optional, and Results and Discussion may be combined. Data Availability is required; ethics approval and informed-consent statements must be supplied when applicable (or handled as instructed by the journal). JCM accepts consistently formatted references at submission but recommends the numbered MDPI ACS full-title layout for the final reference list. A cover letter is required. Systematic/scoping reviews must also follow the relevant PRISMA guidance and include the checklist and flow diagram. Figures should be placed near their first citation and supplied at preferably 600 dpi or higher.',
   },
   {
     id: 'apa-psych',

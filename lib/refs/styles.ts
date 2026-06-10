@@ -10,10 +10,25 @@ import {
 } from './style-spec';
 
 // A style id is either a built-in name or a 'custom:<uuid>' id.
-export type CitationStyle = 'vancouver' | 'apa' | 'ama' | 'ieee';
+export type CitationStyle =
+  | 'vancouver'
+  | 'apa'
+  | 'ama'
+  | 'ieee'
+  | 'mdpi-acs'
+  | 'mdpi-chicago'
+  | 'mdpi-apa';
 export type StyleId = CitationStyle | string;
 
-const BUILTIN_IDS: readonly CitationStyle[] = ['vancouver', 'apa', 'ama', 'ieee'];
+const BUILTIN_IDS: readonly CitationStyle[] = [
+  'vancouver',
+  'apa',
+  'ama',
+  'ieee',
+  'mdpi-acs',
+  'mdpi-chicago',
+  'mdpi-apa',
+];
 
 export function isBuiltinStyle(id: string): id is CitationStyle {
   return (BUILTIN_IDS as readonly string[]).includes(id);
@@ -24,6 +39,9 @@ export const STYLE_LABELS: Record<CitationStyle, string> = {
   apa: 'APA 7',
   ama: 'AMA',
   ieee: 'IEEE',
+  'mdpi-acs': 'MDPI ACS',
+  'mdpi-chicago': 'MDPI Chicago',
+  'mdpi-apa': 'MDPI APA',
 };
 
 /** All selectable styles (built-ins + user custom styles) for the picker. */
@@ -78,13 +96,27 @@ export function formatInTextCitation(
   }
   switch (style) {
     case 'apa':
+    case 'mdpi-apa':
       return formatApaInText(refs, opts);
+    case 'mdpi-chicago':
+      return formatChicagoInText(refs, opts);
+    case 'mdpi-acs':
+      return formatMdpiNumericWithOpts(numbers, opts);
     case 'vancouver':
     case 'ama':
     case 'ieee':
     default:
       return formatNumericWithOpts(numbers, opts);
   }
+}
+
+function formatMdpiNumericWithOpts(numbers: number[], opts?: CiteOptions): string {
+  let out = formatNumeric(numbers, '[', ']', '–');
+  if (!opts) return out;
+  if (opts.locator) out = `${out} (${opts.locator})`;
+  if (opts.prefix) out = `${opts.prefix} ${out}`;
+  if (opts.suffix) out = `${out} ${opts.suffix}`;
+  return out;
 }
 
 function formatNumericWithOpts(numbers: number[], opts?: CiteOptions): string {
@@ -138,7 +170,30 @@ function formatApaInText(refs: Ref[], opts?: CiteOptions): string {
   return hasCiteOptions(opts) ? decorateCitation(base, false, opts!) : base;
 }
 
-function formatNumeric(numbers: number[], open: string, close: string): string {
+function formatChicagoInText(refs: Ref[], opts?: CiteOptions): string {
+  if (refs.length === 0) return '';
+  const parts = refs.map((r) => {
+    const year = r.year ?? 'n.d.';
+    if (opts?.suppressAuthor) return String(year);
+    const author = firstAuthorFamily(r.authors);
+    if (r.authors.length === 2) {
+      const second = r.authors[1]?.family ?? r.authors[1]?.literal ?? '';
+      return `${author} and ${second} ${year}`;
+    }
+    return r.authors.length > 2
+      ? `${author} et al. ${year}`
+      : `${author} ${year}`;
+  });
+  const base = `(${parts.join('; ')})`;
+  return hasCiteOptions(opts) ? decorateCitation(base, false, opts!) : base;
+}
+
+function formatNumeric(
+  numbers: number[],
+  open: string,
+  close: string,
+  rangeSeparator = '-',
+): string {
   if (numbers.length === 0) return '';
   const sorted = [...numbers].sort((a, b) => a - b);
   const groups: Array<[number, number]> = [];
@@ -154,7 +209,7 @@ function formatNumeric(numbers: number[], open: string, close: string): string {
     }
   }
   groups.push([s, p]);
-  return `${open}${groups.map(([a, b]) => (a === b ? `${a}` : `${a}-${b}`)).join(',')}${close}`;
+  return `${open}${groups.map(([a, b]) => (a === b ? `${a}` : `${a}${rangeSeparator}${b}`)).join(',')}${close}`;
 }
 
 // Bibliography entry formatting. n = ordinal (1-based) for numeric styles.
@@ -166,7 +221,12 @@ export function formatBibEntry(style: StyleId, r: Ref, n: number): string {
   }
   switch (style) {
     case 'apa':
+    case 'mdpi-apa':
       return formatApaEntry(r);
+    case 'mdpi-acs':
+      return formatMdpiAcsEntry(r, n);
+    case 'mdpi-chicago':
+      return formatMdpiChicagoEntry(r);
     case 'vancouver':
     case 'ama':
       return formatVancouverEntry(r, n);
@@ -175,6 +235,91 @@ export function formatBibEntry(style: StyleId, r: Ref, n: number): string {
     default:
       return formatVancouverEntry(r, n);
   }
+}
+
+function formatMdpiAcsEntry(r: Ref, n: number): string {
+  const parts: string[] = [`${n}.`];
+  const authors = mdpiAcsAuthorList(r);
+  if (authors) parts.push(authors.endsWith('.') ? authors : `${authors}.`);
+  if (r.title) parts.push(`${stripPeriod(r.title)}.`);
+
+  if (r.type === 'webpage') {
+    if (r.containerTitle) parts.push(`${stripPeriod(r.containerTitle)}.`);
+    if (r.url) parts.push(`Available online: ${r.url}.`);
+  } else if (r.type === 'book' || r.type === 'book-chapter') {
+    if (r.containerTitle) parts.push(`In ${stripPeriod(r.containerTitle)};`);
+    if (r.publisher) parts.push(`${stripPeriod(r.publisher)}:`);
+    if (r.year) parts.push(`${r.year};`);
+    if (r.pages) parts.push(`pp. ${r.pages}.`);
+  } else {
+    if (r.containerTitle) parts.push(`${stripPeriod(r.containerTitle)}`);
+    const details: string[] = [];
+    if (r.year) details.push(String(r.year));
+    if (r.volume) details.push(r.volume);
+    if (r.pages) details.push(r.pages);
+    if (details.length > 0) parts.push(`${details.join(', ')}.`);
+  }
+
+  if (r.doi) parts.push(`https://doi.org/${r.doi}`);
+  else if (r.url && r.type !== 'webpage') parts.push(r.url);
+  return parts.join(' ').replace(/\s+([.;,:])/g, '$1');
+}
+
+function mdpiAcsAuthorList(r: Ref): string {
+  return r.authors
+    .map((author) => {
+      if (author.literal) return author.literal;
+      const family = author.family ?? '';
+      const initials = (author.given ?? '')
+        .replace(/\./g, ' ')
+        .split(/\s+/)
+        .filter(Boolean)
+        .map((part) => `${part[0]?.toUpperCase() ?? ''}.`)
+        .join('');
+      return family && initials ? `${family}, ${initials}` : family || initials;
+    })
+    .filter(Boolean)
+    .join('; ');
+}
+
+function formatMdpiChicagoEntry(r: Ref): string {
+  const parts: string[] = [];
+  const authors = chicagoAuthorList(r);
+  if (authors) parts.push(`${authors}.`);
+  if (r.year) parts.push(`${r.year}.`);
+  if (r.title) parts.push(`${stripPeriod(r.title)}.`);
+
+  if (r.type === 'webpage') {
+    if (r.containerTitle) parts.push(`${stripPeriod(r.containerTitle)}.`);
+    if (r.url) parts.push(`Available online: ${r.url}.`);
+  } else if (r.type === 'book' || r.type === 'book-chapter') {
+    if (r.containerTitle) parts.push(`In ${stripPeriod(r.containerTitle)}.`);
+    if (r.publisher) parts.push(`${stripPeriod(r.publisher)}.`);
+    if (r.pages) parts.push(`pp. ${r.pages}.`);
+  } else if (r.containerTitle) {
+    let source = stripPeriod(r.containerTitle);
+    if (r.volume) source += ` ${r.volume}`;
+    if (r.pages) source += `: ${r.pages}`;
+    parts.push(`${source}.`);
+  }
+
+  if (r.doi) parts.push(`https://doi.org/${r.doi}`);
+  else if (r.url && r.type !== 'webpage') parts.push(r.url);
+  return parts.join(' ');
+}
+
+function chicagoAuthorList(r: Ref): string {
+  const names = r.authors.map((author, index) => {
+    if (author.literal) return author.literal;
+    const family = author.family ?? '';
+    const given = author.given ?? '';
+    if (index === 0) return family && given ? `${family}, ${given}` : family || given;
+    return given && family ? `${given} ${family}` : family || given;
+  }).filter(Boolean);
+
+  if (names.length <= 1) return names[0] ?? '';
+  if (names.length === 2) return `${names[0]}, and ${names[1]}`;
+  return `${names.slice(0, -1).join(', ')}, and ${names[names.length - 1]}`;
 }
 
 function formatVancouverEntry(r: Ref, n: number): string {
@@ -254,14 +399,14 @@ function stripPeriod(s: string): string {
   return s.replace(/\.+\s*$/, '');
 }
 
-// Sort refs for bibliography ordering. APA = alphabetical by first author family;
-// others = order of citation in document (caller provides already-ordered array).
+// Sort author-year bibliographies alphabetically; numeric styles preserve
+// citation order supplied by the caller.
 export function orderRefsForBib<T extends Ref>(style: StyleId, refs: T[]): T[] {
   if (!isBuiltinStyle(style)) {
     const spec = getCustomStyle(style);
     return spec ? orderBySpec(spec, refs) : refs;
   }
-  if (style !== 'apa') return refs;
+  if (style !== 'apa' && style !== 'mdpi-apa' && style !== 'mdpi-chicago') return refs;
   return [...refs].sort((a, b) => {
     const fa = (a.authors[0]?.family ?? a.authors[0]?.literal ?? '').toLowerCase();
     const fb = (b.authors[0]?.family ?? b.authors[0]?.literal ?? '').toLowerCase();
@@ -274,5 +419,8 @@ export function isNumericStyle(style: StyleId): boolean {
     const spec = getCustomStyle(style);
     return spec ? isNumericSpec(spec) : true;
   }
-  return style === 'vancouver' || style === 'ama' || style === 'ieee';
+  return style === 'vancouver'
+    || style === 'ama'
+    || style === 'ieee'
+    || style === 'mdpi-acs';
 }

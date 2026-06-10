@@ -37,6 +37,9 @@ const STYLE_PACKAGE: Record<CitationStyle, BibliographyConfig> = {
   ama: { biblatexStyle: 'numeric-comp', sorting: 'none' },
   ieee: { biblatexStyle: 'numeric-comp', sorting: 'none' },
   apa: { biblatexStyle: 'authoryear', sorting: 'nyt' },
+  'mdpi-acs': { biblatexStyle: 'numeric-comp', sorting: 'none' },
+  'mdpi-chicago': { biblatexStyle: 'authoryear', sorting: 'nyt' },
+  'mdpi-apa': { biblatexStyle: 'authoryear', sorting: 'nyt' },
 };
 
 export function buildLatex(input: TexBuildInput): TexBuildOutput {
@@ -45,13 +48,22 @@ export function buildLatex(input: TexBuildInput): TexBuildOutput {
   const bib = generateBibtex(input.refs);
   const bibliography = bibliographyConfig(input.style);
   const renderer = new LatexRenderer(input.doc, keyMap, input.style);
-  if (input.style === 'ama' || input.style === 'ieee' || input.style === 'vancouver') {
+  if (
+    input.style === 'ama'
+    || input.style === 'ieee'
+    || input.style === 'vancouver'
+    || input.style === 'mdpi-acs'
+  ) {
     renderer.addExportWarning(
       `The ${input.style.toUpperCase()} export uses biblatex's portable numeric-comp style; verify journal-specific bibliography punctuation.`,
     );
-  } else if (input.style === 'apa') {
+  } else if (
+    input.style === 'apa'
+    || input.style === 'mdpi-apa'
+    || input.style === 'mdpi-chicago'
+  ) {
     renderer.addExportWarning(
-      `The APA export uses biblatex's portable authoryear style; verify APA-specific bibliography punctuation.`,
+      `The ${input.style.toUpperCase()} export uses biblatex's portable authoryear style; verify journal-specific bibliography punctuation.`,
     );
   } else {
     renderer.addExportWarning(
