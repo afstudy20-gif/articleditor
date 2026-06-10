@@ -51,19 +51,13 @@ function useDocTick(editor: any): number {
   return tick;
 }
 
-function FigureNodeView({ node, updateAttributes, editor }: any): JSX.Element {
+function FigureNodeView({ node, editor }: any): JSX.Element {
   useDocTick(editor);
   const kind: FigureKind = node.attrs.kind ?? 'figure';
   const src: string = node.attrs.src ?? '';
   const caption: string = node.attrs.caption ?? '';
   const figId: string = node.attrs.figId ?? '';
   const num = editor ? figureNumber(editor.state.doc, figId, kind) : 0;
-
-  const editCaption = (): void => {
-    if (!editor?.isEditable) return;
-    const next = window.prompt('Caption', caption);
-    if (next !== null) updateAttributes({ caption: next });
-  };
 
   return (
     <NodeViewWrapper as="figure" className="enr-figure my-3 text-center" data-fig-id={figId} data-kind={kind}>
@@ -76,9 +70,8 @@ function FigureNodeView({ node, updateAttributes, editor }: any): JSX.Element {
         <img src={src} alt={caption || `Table ${num}`} className="max-w-full mx-auto rounded border border-border" />
       )}
       <figcaption
-        className="text-xs text-secondary mt-1 cursor-pointer hover:text-primary"
-        onClick={editCaption}
-        title="Click to edit caption"
+        className="text-xs text-secondary mt-1"
+        title="Edit this caption in the Figure Legends panel"
       >
         <strong>
           {kindLabel(kind)} {num || '?'}.

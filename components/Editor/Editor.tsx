@@ -21,7 +21,6 @@ import { CitationWithView } from './extensions/citation-view';
 import { Equation } from './extensions/equation';
 import { Figure, FigureRef } from './extensions/figure';
 import type { Ref } from '@/store/types';
-import { newId } from '@/lib/id';
 import { useLang } from '@/lib/i18n/hooks';
 import { getNextNumbering, isNumberingPrefix } from '@/lib/editor/numbering';
 
@@ -317,8 +316,6 @@ export function ArticleEditor({
         </ToolbarButton>
         <Sep />
         <TableMenu editor={editor} t={t} />
-        <ImageInsertButton editor={editor} t={t} />
-        <FigureButton editor={editor} t={t} />
         <EquationButton editor={editor} t={t} />
         <SymbolPool editor={editor} t={t} />
         <Sep />
@@ -811,45 +808,6 @@ function TableMenu({ editor, t }: { editor: any; t: (k: string) => string }): JS
   );
 }
 
-function ImageInsertButton({ editor, t }: { editor: any; t: (k: string) => string }): JSX.Element {
-  const fileRef = useRef<HTMLInputElement>(null);
-  return (
-    <>
-      <input
-        ref={fileRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (!file) return;
-          const reader = new FileReader();
-          reader.onload = () => {
-            const result = reader.result as string;
-            editor.chain().focus().setImage({ src: result }).run();
-          };
-          reader.readAsDataURL(file);
-          e.target.value = '';
-        }}
-      />
-      <button
-        onClick={() => {
-          const url = prompt(t('ed_image_url'));
-          if (url) {
-            editor.chain().focus().setImage({ src: url }).run();
-          } else if (url === '') {
-            fileRef.current?.click();
-          }
-        }}
-        className="px-2.5 py-1 rounded-md text-xs font-semibold text-secondary hover:bg-slate-100 transition"
-        title={t('ed_insert_image')}
-      >
-        🖼
-      </button>
-    </>
-  );
-}
-
 function EquationButton({ editor, t }: { editor: any; t: (k: string) => string }): JSX.Element {
   return (
     <button
@@ -862,42 +820,6 @@ function EquationButton({ editor, t }: { editor: any; t: (k: string) => string }
     >
       Σ
     </button>
-  );
-}
-
-function FigureButton({ editor, t }: { editor: any; t: (k: string) => string }): JSX.Element {
-  const fileRef = useRef<HTMLInputElement>(null);
-  const insert = (src: string): void => {
-    editor.chain().focus().insertFigure({ src, kind: 'figure', figId: newId('fig') }).run();
-  };
-  return (
-    <>
-      <input
-        ref={fileRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (!file) return;
-          const reader = new FileReader();
-          reader.onload = () => insert(reader.result as string);
-          reader.readAsDataURL(file);
-          e.target.value = '';
-        }}
-      />
-      <button
-        onClick={() => {
-          const url = prompt(t('fig_url_prompt'));
-          if (url) insert(url);
-          else if (url === '') fileRef.current?.click();
-        }}
-        className="px-2.5 py-1 rounded-md text-xs font-semibold text-secondary hover:bg-slate-100 transition"
-        title={t('fig_insert')}
-      >
-        🖼＋
-      </button>
-    </>
   );
 }
 

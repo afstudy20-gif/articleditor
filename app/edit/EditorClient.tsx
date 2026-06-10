@@ -2058,6 +2058,22 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
           </button>
           <button
             onClick={() => {
+              setFiguresOpen(true);
+              setTablesOpen(false);
+              setSuppOpen(false);
+              setLettersOpen(false);
+              setAbbrOpen(false);
+            }}
+            className={`px-3 py-1 rounded-md text-xs font-bold transition flex items-center gap-1 shrink-0 ${
+              figuresOpen
+                ? 'bg-teal text-white shadow-sm'
+                : 'text-secondary hover:text-primary hover:bg-slate-100'
+            }`}
+          >
+            🖼️ Figure Legends
+          </button>
+          <button
+            onClick={() => {
               setTablesOpen(true);
               setFiguresOpen(false);
               setSuppOpen(false);
@@ -2071,22 +2087,6 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
             }`}
           >
             ⊞ {lang === 'tr' ? 'Tablolar' : 'Tables'}
-          </button>
-          <button
-            onClick={() => {
-              setFiguresOpen(true);
-              setTablesOpen(false);
-              setSuppOpen(false);
-              setLettersOpen(false);
-              setAbbrOpen(false);
-            }}
-            className={`px-3 py-1 rounded-md text-xs font-bold transition flex items-center gap-1 shrink-0 ${
-              figuresOpen
-                ? 'bg-teal text-white shadow-sm'
-                : 'text-secondary hover:text-primary hover:bg-slate-100'
-            }`}
-          >
-            🖼️ {lang === 'tr' ? 'Şekiller' : 'Figures'}
           </button>
           <button
             onClick={() => {
@@ -2574,7 +2574,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
       )}
 
       {figuresOpen && editorInstance.current && (
-        <div className="fixed right-4 top-24 bottom-4 w-[340px] z-40 shadow-2xl">
+        <div className="fixed right-4 top-24 bottom-4 w-[400px] z-40 shadow-2xl">
           <FiguresPanel
             editor={editorInstance.current}
             onClose={() => setFiguresOpen(false)}
