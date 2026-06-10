@@ -7,7 +7,7 @@ export type ParsedTable = {
   rows: string[][];
   hasHeader: boolean;
   /** Source format detected */
-  format: 'html' | 'csv' | 'tsv' | 'text';
+  format: 'html' | 'csv' | 'tsv' | 'text' | 'docx';
 };
 
 /** Try all formats in priority order. Returns null if nothing detected. */

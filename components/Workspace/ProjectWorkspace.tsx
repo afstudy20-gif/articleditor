@@ -6,6 +6,8 @@ import { saveProject } from '@/store/db';
 import { newId } from '@/lib/id';
 import { useLang } from '@/lib/i18n/hooks';
 import { aiHeaders } from '@/lib/ai/user-keys';
+import { buildRichDocx } from '@/lib/docx/build-rich';
+import { docxFilename, plainTextToTiptapDoc } from '@/lib/docx/plain-text';
 import {
   buildCoverLetter,
   buildResponseToReviewers,
@@ -108,6 +110,8 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
   const [editContent, setEditContent] = useState('');
   const [aiBusy, setAiBusy] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+  const [docxBusy, setDocxBusy] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
 
   // Author Pool states
@@ -844,6 +848,7 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
     setEditTitle(doc.title);
     setEditContent(doc.content);
     setAiError(null);
+    setExportError(null);
     setSaveStatus(null);
     setView('edit-doc');
   };
@@ -1064,6 +1069,39 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
     a.download = `${editTitle.toLowerCase().replace(/\s+/g, '_')}.txt`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 5000);
+  };
+
+  const downloadWordFile = async () => {
+    if (!editContent.trim() || docxBusy) return;
+
+    setDocxBusy(true);
+    setExportError(null);
+    try {
+      const refsById = new Map(project.refs.map((ref) => [ref.id, ref]));
+      const refOrder = new Map(project.refs.map((ref, index) => [ref.id, index + 1]));
+      const blob = await buildRichDocx({
+        doc: plainTextToTiptapDoc(editContent),
+        refsById,
+        refOrder,
+        style: 'vancouver',
+        mode: 'plain',
+        title: editTitle || project.title,
+        includeDocumentTitle: false,
+        includeBibliography: false,
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = docxFilename(editTitle || project.title);
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    } catch {
+      setExportError(lang === 'tr'
+        ? 'Word dosyası oluşturulamadı.'
+        : 'The Word document could not be created.');
+    } finally {
+      setDocxBusy(false);
+    }
   };
 
   const getDocIcon = (type: WizardTab) => {
@@ -1329,7 +1367,9 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
                 />
               </div>
 
-              {aiError && <p className="text-xs text-red font-semibold">{aiError}</p>}
+              {(aiError || exportError) && (
+                <p className="text-xs text-red font-semibold">{aiError || exportError}</p>
+              )}
 
               <div className="flex gap-2 flex-wrap">
                 <button
@@ -1345,6 +1385,15 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
                   className="btn-secondary text-xs px-3 py-2 flex-1 disabled:opacity-40 flex items-center justify-center gap-1 hover:bg-slate-50 transition"
                 >
                   💾 .txt
+                </button>
+                <button
+                  onClick={() => void downloadWordFile()}
+                  disabled={!editContent || docxBusy}
+                  className="btn-secondary text-xs px-3 py-2 flex-1 disabled:opacity-40 flex items-center justify-center gap-1 hover:bg-slate-50 transition"
+                >
+                  📝 {docxBusy
+                    ? (lang === 'tr' ? 'Hazırlanıyor…' : 'Preparing…')
+                    : 'Word (.docx)'}
                 </button>
                 <button
                   onClick={handleSaveAsTemplate}

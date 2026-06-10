@@ -23,6 +23,10 @@ export type RichBuildInput = {
   lineNumbers?: boolean;
   /** Bibliography heading; defaults by style. */
   bibHeading?: string;
+  /** Add the title as the first body paragraph. Defaults to true. */
+  includeDocumentTitle?: boolean;
+  /** Add the bibliography heading and entries. Defaults to true. */
+  includeBibliography?: boolean;
 };
 
 const WORD_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
@@ -160,7 +164,11 @@ ${this.rels.join('\n')}
       (block: any) => block && block.type === 'heading' && block.attrs?.level === 1
     );
 
-    if (this.input.title && !hasHeading1) {
+    if (
+      this.input.includeDocumentTitle !== false
+      && this.input.title
+      && !hasHeading1
+    ) {
       paragraphs.push(`<w:p><w:pPr><w:pStyle w:val="Title"/></w:pPr>${textRun(this.input.title)}</w:p>`);
     }
     
@@ -169,12 +177,13 @@ ${this.rels.join('\n')}
         paragraphs.push(...this.blockToXml(block, {}));
       }
     }
-    // Bibliography
-    const bibHeading = this.input.bibHeading ?? (this.input.style === 'apa' ? 'Kaynakça' : 'Kaynaklar');
-    paragraphs.push(`<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr>${textRun(bibHeading)}</w:p>`);
-    this.orderedRefs.forEach((r, i) => {
-      paragraphs.push(`<w:p>${textRun(formatBibEntry(this.input.style, r, i + 1))}</w:p>`);
-    });
+    if (this.input.includeBibliography !== false) {
+      const bibHeading = this.input.bibHeading ?? (this.input.style === 'apa' ? 'Kaynakça' : 'Kaynaklar');
+      paragraphs.push(`<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr>${textRun(bibHeading)}</w:p>`);
+      this.orderedRefs.forEach((r, i) => {
+        paragraphs.push(`<w:p>${textRun(formatBibEntry(this.input.style, r, i + 1))}</w:p>`);
+      });
+    }
 
     const lineNumXml = this.input.lineNumbers
       ? '<w:lnNumType w:countBy="1" w:restart="continuous"/>'

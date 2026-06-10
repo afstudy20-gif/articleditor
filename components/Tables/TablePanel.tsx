@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { parseTable, tiptapTableToRows, rowsToTiptapTable, type ParsedTable } from '@/lib/tables/parse-table';
+import { parseDocxTables } from '@/lib/tables/import-docx';
 import {
   styledTableHtml,
   tableToLatex,
@@ -60,6 +61,10 @@ export function TablePanel({ editor, onClose, t }: TablePanelProps): JSX.Element
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [importText, setImportText] = useState('');
   const [importPreview, setImportPreview] = useState<ParsedTable | null>(null);
+  const [wordTables, setWordTables] = useState<ParsedTable[]>([]);
+  const [wordTableIndex, setWordTableIndex] = useState(0);
+  const [importBusy, setImportBusy] = useState(false);
+  const [importError, setImportError] = useState('');
   const [exportStyle, setExportStyle] = useState<TableStyle>('three-line');
   const [exportTitle, setExportTitle] = useState('');
   const [exportFootnote, setExportFootnote] = useState('');
@@ -79,6 +84,9 @@ export function TablePanel({ editor, onClose, t }: TablePanelProps): JSX.Element
 
   const handleImportTextChange = useCallback((text: string) => {
     setImportText(text);
+    setWordTables([]);
+    setWordTableIndex(0);
+    setImportError('');
     const parsed = parseTable(text);
     setImportPreview(parsed);
   }, []);
@@ -90,6 +98,9 @@ export function TablePanel({ editor, onClose, t }: TablePanelProps): JSX.Element
       e.preventDefault();
       const parsed = parseTable(html);
       if (parsed) {
+        setWordTables([]);
+        setWordTableIndex(0);
+        setImportError('');
         setImportPreview(parsed);
         setImportText(rowsToPlainText(parsed.rows));
         return;
@@ -98,18 +109,59 @@ export function TablePanel({ editor, onClose, t }: TablePanelProps): JSX.Element
     // Fall through to plain text handling via onChange
   }, []);
 
-  const handleFileImport = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileImport = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const text = reader.result as string;
+
+    setImportBusy(true);
+    setImportError('');
+    setWordTables([]);
+    setWordTableIndex(0);
+    try {
+      if (/\.docx$/i.test(file.name)) {
+        const tables = await parseDocxTables(await file.arrayBuffer());
+        if (tables.length === 0) {
+          setImportPreview(null);
+          setImportText('');
+          setImportError(t('tbl_word_no_tables'));
+          return;
+        }
+        setWordTables(tables);
+        setImportPreview(tables[0]);
+        setImportText('');
+        return;
+      }
+
+      const text = await file.text();
       setImportText(text);
-      setImportPreview(parseTable(text));
-    };
-    reader.readAsText(file);
-  }, []);
+      const parsed = parseTable(text);
+      setImportPreview(parsed);
+      if (!parsed) setImportError(t('tbl_import_invalid'));
+    } catch {
+      setImportPreview(null);
+      setImportText('');
+      setImportError(t('tbl_import_failed'));
+    } finally {
+      setImportBusy(false);
+    }
+  }, [t]);
+
+  const selectWordTable = useCallback((index: number) => {
+    const table = wordTables[index];
+    if (!table) return;
+    setWordTableIndex(index);
+    setImportPreview(table);
+  }, [wordTables]);
+
+  const toggleImportHeader = useCallback((hasHeader: boolean) => {
+    setImportPreview((current) => current ? { ...current, hasHeader } : current);
+    setWordTables((current) =>
+      current.map((table, index) =>
+        index === wordTableIndex ? { ...table, hasHeader } : table,
+      ),
+    );
+  }, [wordTableIndex]);
 
   const insertImportedTable = useCallback(() => {
     if (!importPreview || !editor) return;
@@ -119,6 +171,9 @@ export function TablePanel({ editor, onClose, t }: TablePanelProps): JSX.Element
     setView('list');
     setImportText('');
     setImportPreview(null);
+    setWordTables([]);
+    setWordTableIndex(0);
+    setImportError('');
   }, [importPreview, editor]);
 
   // ─── Export ───────────────────────────────────────────────
@@ -451,14 +506,15 @@ export function TablePanel({ editor, onClose, t }: TablePanelProps): JSX.Element
             <div className="flex items-center gap-2">
               <button
                 onClick={() => fileRef.current?.click()}
+                disabled={importBusy}
                 className="text-xs px-2 py-1 border border-border rounded hover:bg-slate-50"
               >
-                📂 {t('tbl_import_file')}
+                📂 {importBusy ? t('tbl_import_processing') : t('tbl_import_file')}
               </button>
               <input
                 ref={fileRef}
                 type="file"
-                accept=".csv,.tsv,.txt,.html,.htm"
+                accept=".docx,.csv,.tsv,.txt,.html,.htm"
                 className="hidden"
                 onChange={handleFileImport}
               />
@@ -468,12 +524,41 @@ export function TablePanel({ editor, onClose, t }: TablePanelProps): JSX.Element
                 </span>
               )}
             </div>
+
+            {importError && (
+              <p className="text-[10px] text-red">{importError}</p>
+            )}
+
+            {wordTables.length > 1 && (
+              <label className="block text-[10px] text-muted">
+                {t('tbl_word_select')}
+                <select
+                  value={wordTableIndex}
+                  onChange={(e) => selectWordTable(Number(e.target.value))}
+                  className="mt-1 w-full text-xs px-2 py-1 border border-border rounded bg-white text-primary"
+                >
+                  {wordTables.map((table, index) => (
+                    <option key={index} value={index}>
+                      {t('tbl_word_table')} {index + 1} ({table.rows.length}×{table.rows[0]?.length ?? 0})
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
           </div>
 
           {/* Import preview */}
           {importPreview && (
             <div className="px-3 py-2 border-t border-border">
               <div className="text-[10px] text-muted font-semibold mb-1">{t('tbl_preview')}</div>
+              <label className="mb-2 flex items-center gap-1.5 text-[10px] text-secondary">
+                <input
+                  type="checkbox"
+                  checked={importPreview.hasHeader}
+                  onChange={(e) => toggleImportHeader(e.target.checked)}
+                />
+                {t('tbl_first_row_header')}
+              </label>
               <div className="overflow-auto max-h-40 border border-border rounded">
                 <table className="text-[9px] border-collapse w-full">
                   {importPreview.rows.map((row, ri) => (

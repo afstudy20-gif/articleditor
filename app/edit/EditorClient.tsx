@@ -1628,34 +1628,54 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
 
   async function exportLatex(): Promise<void> {
     const { orderedRefs } = tiptapToBuildInput(doc as any, refsById, refOrder, style);
-    const { tex, bib, bibFilename } = buildLatex({
+    const { tex, bib, bibFilename, assets, warnings } = buildLatex({
       doc: doc as any,
       refs: orderedRefs,
       title,
       style,
+      language: lang,
     });
     const slug = slugify(title);
     const zip = new JSZip();
     zip.file(`${slug}.tex`, tex);
     zip.file(bibFilename, bib);
+    for (const asset of assets) {
+      zip.file(asset.filename, asset.base64, { base64: true });
+    }
     zip.file(
       'README.txt',
       [
         `Article Editor LaTeX bundle`,
         `Style: ${style}`,
+        `Engine: LuaLaTeX`,
         ``,
         `Files:`,
         `  ${slug}.tex  — main LaTeX source`,
         `  ${bibFilename}  — BibTeX bibliography database`,
+        ...(assets.length > 0 ? [`  assets/  — embedded manuscript images`] : []),
         ``,
-        `Build with biber + pdflatex:`,
-        `  pdflatex ${slug}`,
+        `TeXworks 0.6.11+:`,
+        `  1. Open ${slug}.tex. The first mode line selects LuaLaTeX.`,
+        `  2. Typeset once with LuaLaTeX.`,
+        `  3. Select Biber from the TeXworks engine list and typeset once.`,
+        `  4. Select LuaLaTeX again and typeset twice.`,
+        `  TeXworks supplies -synctex=1 automatically for source/PDF synchronization.`,
+        ``,
+        `Command line alternative:`,
+        `  lualatex ${slug}`,
         `  biber ${slug}`,
-        `  pdflatex ${slug}`,
-        `  pdflatex ${slug}`,
+        `  lualatex ${slug}`,
+        `  lualatex ${slug}`,
         ``,
-        `Or use latexmk:`,
-        `  latexmk -pdf -bibtex ${slug}`,
+        `Or, when latexmk is installed:`,
+        `  latexmk -lualatex ${slug}.tex`,
+        ...(warnings.length > 0
+          ? [
+              ``,
+              `Export warnings:`,
+              ...warnings.map((warning) => `  - ${warning}`),
+            ]
+          : []),
       ].join('\n'),
     );
     const blob = await zip.generateAsync({ type: 'blob', mimeType: 'application/zip' });
