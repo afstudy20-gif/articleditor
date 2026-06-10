@@ -1390,7 +1390,7 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
             </div>
 
             {/* Template Selectors */}
-            <div className="flex gap-1 px-4 py-2 bg-slate-50 border-b border-border overflow-x-auto whitespace-nowrap">
+            <div className="flex gap-1 px-4 py-2 bg-slate-50 border-b border-border overflow-x-auto scrollbar-none whitespace-nowrap">
               {(['cover', 'title-page', 'response', 'contrib', 'coi', 'custom', 'author-pool', 'custom-templates'] as WizardTab[]).map((type) => (
                 <button
                   key={type}
