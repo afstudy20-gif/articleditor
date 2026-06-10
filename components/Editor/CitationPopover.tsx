@@ -16,6 +16,7 @@ type Props = {
 export function CitationPopover({ pos, refIds, allRefs, onClose, onReplace, onDelete }: Props): JSX.Element {
   const { t } = useLang();
   const [mode, setMode] = useState<'view' | 'replace' | 'add'>('view');
+  const [replaceTargetId, setReplaceTargetId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const refsById = useMemo(() => new Map(allRefs.map((r) => [r.id, r])), [allRefs]);
   const cited = refIds.map((id) => refsById.get(id)).filter((r): r is Ref => Boolean(r));
@@ -50,7 +51,12 @@ export function CitationPopover({ pos, refIds, allRefs, onClose, onReplace, onDe
 
   function handleSelect(targetRef: Ref): void {
     if (mode === 'replace') {
-      onReplace(pos, [targetRef.id]);
+      if (replaceTargetId) {
+        const newRefIds = refIds.map((id) => id === replaceTargetId ? targetRef.id : id);
+        onReplace(pos, newRefIds);
+      } else {
+        onReplace(pos, [targetRef.id]);
+      }
     } else if (mode === 'add') {
       onReplace(pos, [...refIds, targetRef.id]);
     }
@@ -98,14 +104,28 @@ export function CitationPopover({ pos, refIds, allRefs, onClose, onReplace, onDe
                           DOI
                         </a>
                       )}
-                      {refIds.length > 1 && (
+                      <div className="flex items-center gap-2 ml-auto">
                         <button
-                          onClick={() => removeRef(r.id)}
-                          className="text-red hover:underline ml-auto"
+                          onClick={() => {
+                            setReplaceTargetId(r.id);
+                            setMode('replace');
+                          }}
+                          className="text-teal hover:underline font-semibold"
                         >
-                          Bu ref'i kaldır
+                          {t('cite_replace')}
                         </button>
-                      )}
+                        {refIds.length > 1 && (
+                          <>
+                            <span className="text-muted/30">|</span>
+                            <button
+                              onClick={() => removeRef(r.id)}
+                              className="text-red hover:underline"
+                            >
+                              {t('cite_remove_ref')}
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </div>
                   </li>
                 ))}
@@ -160,7 +180,7 @@ export function CitationPopover({ pos, refIds, allRefs, onClose, onReplace, onDe
               ))}
             </ul>
             <div className="px-4 py-2 border-t border-border flex justify-end">
-              <button onClick={() => setMode('view')} className="text-xs text-muted hover:text-primary">
+              <button onClick={() => { setMode('view'); setReplaceTargetId(null); }} className="text-xs text-muted hover:text-primary">
                 ← Geri
               </button>
             </div>

@@ -29,11 +29,19 @@ export function buildLatex(input: TexBuildInput): TexBuildOutput {
   const keyMap = buildCitationKeyMap(input.refs);
   const bib = generateBibtex(input.refs);
   const pkg = STYLE_PACKAGE[input.style as CitationStyle] ?? STYLE_PACKAGE.vancouver;
+  const exportDateText = new Date().toLocaleDateString('tr-TR', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
   const tex = buildTexSource({
     title: input.title ?? 'Untitled',
     body: renderBody(input.doc, keyMap),
     biblatexStyle: pkg.biblatex ?? 'numeric-comp',
     bibFilename: 'refs',
+    exportDate: exportDateText,
   });
   return { tex, bib, bibFilename };
 }
@@ -43,8 +51,11 @@ function buildTexSource(o: {
   body: string;
   biblatexStyle: string;
   bibFilename: string;
+  exportDate: string;
 }): string {
-  return `\\documentclass[11pt,a4paper]{article}
+  return `% Title: ${o.title}
+% Export Date: ${o.exportDate}
+\\documentclass[11pt,a4paper]{article}
 \\usepackage[utf8]{inputenc}
 \\usepackage[T1]{fontenc}
 \\usepackage[turkish,english]{babel}
