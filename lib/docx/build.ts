@@ -116,7 +116,7 @@ function buildParagraph(
   return paragraphXml(runs.join(''));
 }
 
-function placeholderText(refs: Ref[]): string {
+export function placeholderText(refs: Ref[]): string {
   return refs
     .map((r) => {
       const author = r.authors[0]?.family || r.authors[0]?.literal || 'Anonymous';
@@ -127,7 +127,7 @@ function placeholderText(refs: Ref[]): string {
     .join('');
 }
 
-function activeEndNoteField(refs: Ref[], displayText: string): string {
+export function activeEndNoteField(refs: Ref[], displayText: string): string {
   const xmlPayload = buildEnCiteXmlMulti(refs, displayText);
   const instr = ` ADDIN EN.CITE ${xmlPayload} `;
   return `<w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText xml:space="preserve">${escapeXml(

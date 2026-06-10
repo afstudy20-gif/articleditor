@@ -7,7 +7,7 @@ import type { Snapshot } from '@/store/types';
 import { ArticleEditor, computeRefOrder } from '@/components/Editor/Editor';
 import { RefsPanel } from '@/components/RefsPanel/RefsPanel';
 import { tiptapToBuildInput } from '@/lib/editor/to-export';
-import { buildDocx } from '@/lib/docx/build';
+import { buildRichDocx } from '@/lib/docx/build-rich';
 import { refsToRis } from '@/lib/refs/ris';
 import { parseDocx, type ImportRun } from '@/lib/docx/parse';
 import { splitBodyAndBiblio, parseBiblioLines } from '@/lib/refs/parse-biblio';
@@ -50,6 +50,7 @@ import { PhrasebankPanel } from '@/components/Phrasebank/PhrasebankPanel';
 import { SupplementaryPanel } from '@/components/Supplementary/SupplementaryPanel';
 import { useTabSync } from '@/lib/hooks/useTabSync';
 import { useIsDesktop } from '@/lib/hooks/useIsDesktop';
+import { rowsToTiptapTable } from '@/lib/tables/parse-table';
 import { computeWritingStats } from '@/lib/stats/writing-stats';
 import {
   encodeSelection,
@@ -1574,8 +1575,15 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
   }, [refs]);
 
   async function exportDocx(mode: 'active' | 'placeholder'): Promise<void> {
-    const { bodyText, markers, orderedRefs } = tiptapToBuildInput(doc as any, refsById, refOrder, style);
-    const blob = await buildDocx({ bodyText, markers, refs: orderedRefs, mode, title, style, lineNumbers: exportLineNumbers });
+    const blob = await buildRichDocx({
+      doc,
+      refsById,
+      refOrder,
+      style,
+      mode,
+      title,
+      lineNumbers: exportLineNumbers,
+    });
     download(blob, `${slugify(title)}-${style}-${mode}.docx`);
   }
 
@@ -2718,8 +2726,52 @@ function isCommonHeading(line: string, index: number): number | null {
   return null;
 }
 
-function buildDocWithCitations(paragraphs: Array<{ text: string; style?: string; runs?: ImportRun[] }>, refs: Ref[]): unknown {
-  const content = paragraphs.map((p) => {
+type ImportBlock = {
+  text: string;
+  style?: string;
+  runs?: ImportRun[];
+  list?: { type: 'bullet' | 'ordered'; level: number };
+  table?: string[][];
+};
+
+function buildDocWithCitations(paragraphs: ImportBlock[], refs: Ref[]): unknown {
+  const content: unknown[] = [];
+  let pendingList: { type: 'bullet' | 'ordered'; items: unknown[] } | null = null;
+
+  const flushList = (): void => {
+    if (!pendingList) return;
+    content.push({
+      type: pendingList.type === 'bullet' ? 'bulletList' : 'orderedList',
+      content: pendingList.items,
+    });
+    pendingList = null;
+  };
+
+  for (const p of paragraphs) {
+    // Tables become real TipTap tables.
+    if (p.table && p.table.length > 0) {
+      flushList();
+      const tableNode = rowsToTiptapTable(p.table, true);
+      if (tableNode) content.push(tableNode);
+      continue;
+    }
+
+    // Consecutive list paragraphs group into one bullet/ordered list.
+    if (p.list) {
+      const item = {
+        type: 'listItem',
+        content: [{ type: 'paragraph', content: paragraphToCitationInlineRich(p.text, p.runs, refs) }],
+      };
+      if (pendingList && pendingList.type === p.list.type) {
+        pendingList.items.push(item);
+      } else {
+        flushList();
+        pendingList = { type: p.list.type, items: [item] };
+      }
+      continue;
+    }
+    flushList();
+
     let style = p.style?.toLowerCase() ?? '';
     const text = p.text;
 
@@ -2741,18 +2793,20 @@ function buildDocWithCitations(paragraphs: Array<{ text: string; style?: string;
     }
 
     if (headingLevel !== null) {
-      return {
+      content.push({
         type: 'heading',
         attrs: { level: headingLevel },
         content: paragraphToCitationInlineRich(text, p.runs, refs),
-      };
+      });
+      continue;
     }
 
-    return {
+    content.push({
       type: 'paragraph',
       content: paragraphToCitationInlineRich(text, p.runs, refs),
-    };
-  });
+    });
+  }
+  flushList();
   return { type: 'doc', content: content.length > 0 ? content : [{ type: 'paragraph' }] };
 }
 

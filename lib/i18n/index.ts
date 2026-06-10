@@ -56,10 +56,10 @@ const tr: Dict = {
     'Projeler, makale metinleri ve kaynakça kütüphaneniz tarayıcınızın IndexedDB veritabanında saklanır. Sunucumuza yüklenmez.',
   privacy_lookup_title: 'DOI / PubMed / OpenAlex aramaları',
   privacy_lookup_desc:
-    'Bir referansın DOI bilgisini taradığınızda yalnızca başlık, yazar adı ve yıl bilgisi public CrossRef/OpenAlex/PubMed API uç noktalarına gönderilir. Tam metin asla gönderilmez. Yanıtlar sunucumuzdan geçmeden tarayıcıya döner.',
+    'Bir referansın DOI bilgisini taradığınızda yalnızca başlık, yazar adı ve yıl bilgisi sunucumuz üzerinden (proxy) public CrossRef/OpenAlex/PubMed API uç noktalarına iletilir. Tam metin asla gönderilmez. Sunucu bu istekleri saklamaz ve loglamaz; yanıt doğrudan tarayıcınıza döner.',
   privacy_ai_title: 'Opsiyonel AI özelliği',
   privacy_ai_desc:
-    'AI ile metin genişletme, kısaltma veya stil dönüştürme özelliği etkinleştirilirse kendi Anthropic veya OpenAI API anahtarınızı kullanırsınız. Seçili metin doğrudan o sağlayıcıya gider. Anahtar tarayıcınızda saklanır, sunucumuza yüklenmez.',
+    'AI özellikleri etkinleştirilirse kendi API anahtarınızı (Gemini, Anthropic, OpenAI, DeepSeek, NVIDIA) kullanırsınız. Anahtar tarayıcınızın localStorage alanında düz metin olarak saklanır — bu nedenle yalnızca bu uygulama için oluşturulmuş, harcama limiti tanımlı bir anahtar kullanmanızı öneririz. Her AI isteğinde seçili metin ve anahtarınız sunucumuz üzerinden ilgili sağlayıcıya iletilir; sunucu bunları saklamaz ve loglamaz.',
   privacy_export_title: 'Çıktılar',
   privacy_export_desc:
     'Tüm dışa aktarma (.docx, .ris, LaTeX, JSON yedek) tarayıcınızda oluşturulur ve indirilir.',
@@ -717,10 +717,10 @@ const en: Dict = {
     'Projects, article text and your reference library are stored in your browser’s IndexedDB. Nothing is uploaded to our server.',
   privacy_lookup_title: 'DOI / PubMed / OpenAlex lookups',
   privacy_lookup_desc:
-    'When you scan a reference for DOI, only its title, first author and year are sent to the public CrossRef / OpenAlex / PubMed API endpoints. The full text is never sent. Responses come back to your browser without our server storing them.',
+    'When you scan a reference for DOI, only its title, first author and year are relayed through our server (as a proxy) to the public CrossRef / OpenAlex / PubMed API endpoints. The full text is never sent. The server does not store or log these requests; responses return directly to your browser.',
   privacy_ai_title: 'Optional AI features',
   privacy_ai_desc:
-    'If enabled, AI features (expand, shorten, rewrite) use your own Anthropic or OpenAI API key. Selected text goes directly to that provider. Your key is stored in your browser only.',
+    'If enabled, AI features use your own API key (Gemini, Anthropic, OpenAI, DeepSeek, NVIDIA). The key is stored unencrypted in your browser\'s localStorage — we recommend a dedicated key with a spending limit created just for this app. On each AI request the selected text and your key pass through our server to the chosen provider; the server does not store or log them.',
   privacy_export_title: 'Exports',
   privacy_export_desc:
     'All exports (.docx, .ris, LaTeX, JSON backup) are generated in your browser and downloaded directly.',

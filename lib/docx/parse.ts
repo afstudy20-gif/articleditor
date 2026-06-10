@@ -19,6 +19,10 @@ export type ParagraphNode = {
   text: string;
   style?: string;
   runs?: ImportRun[];
+  /** Present when the paragraph is a list item (from w:numPr). */
+  list?: { type: 'bullet' | 'ordered'; level: number };
+  /** Present when this node is a table — rows × cells of plain text. */
+  table?: string[][];
 };
 
 /**
@@ -55,8 +59,96 @@ export async function parseDocx(file: ArrayBuffer | Uint8Array | Blob): Promise<
   const paragraphs: ParagraphNode[] = [];
   walk(parsed, paragraphs);
 
+  // Resolve list types (bullet vs ordered) from word/numbering.xml.
+  const numFmtById = await parseNumberingMap(zip, parser);
+  for (const p of paragraphs) {
+    if (p.list && p.list.type === 'ordered' && numFmtById) {
+      const fmt = numFmtById.get((p as ParagraphNodeInternal).numId ?? '');
+      if (fmt === 'bullet') p.list = { ...p.list, type: 'bullet' };
+    }
+  }
+
   const plainText = paragraphs.map((p) => p.text).join('\n');
   return { paragraphs, plainText, zip, documentXml };
+}
+
+type ParagraphNodeInternal = ParagraphNode & { numId?: string };
+
+/** Map numId → 'bullet' | 'ordered' by reading word/numbering.xml. */
+async function parseNumberingMap(
+  zip: JSZip,
+  parser: XMLParser,
+): Promise<Map<string, 'bullet' | 'ordered'> | null> {
+  const numberingFile = zip.file('word/numbering.xml');
+  if (!numberingFile) return null;
+  try {
+    const xml = await numberingFile.async('string');
+    const tree = parser.parse(xml) as OOXMLValue;
+    // abstractNumId → first-level numFmt
+    const abstractFmt = new Map<string, 'bullet' | 'ordered'>();
+    // numId → abstractNumId
+    const numToAbstract = new Map<string, string>();
+
+    const attrsOf = (n: OOXMLValue): OOXMLNode | undefined => {
+      const a = isOOXMLNode(n) ? n[':@'] : undefined;
+      return isOOXMLNode(a) ? a : undefined;
+    };
+
+    const scan = (n: OOXMLValue): void => {
+      if (Array.isArray(n)) {
+        for (const item of n) scan(item);
+        return;
+      }
+      if (!isOOXMLNode(n)) return;
+      if ('w:abstractNum' in n) {
+        const id = String(attrsOf(n)?.['@_w:abstractNumId'] ?? '');
+        let fmt: 'bullet' | 'ordered' = 'ordered';
+        const findFmt = (m: OOXMLValue): void => {
+          if (Array.isArray(m)) {
+            for (const item of m) findFmt(item);
+            return;
+          }
+          if (!isOOXMLNode(m)) return;
+          if ('w:numFmt' in m) {
+            const v = String(attrsOf(m)?.['@_w:val'] ?? '');
+            if (v === 'bullet') fmt = 'bullet';
+            return; // first numFmt (level 0) wins
+          }
+          for (const k of Object.keys(m)) if (k !== ':@') findFmt(m[k]);
+        };
+        findFmt(n['w:abstractNum']);
+        if (id) abstractFmt.set(id, fmt);
+      }
+      if ('w:num' in n) {
+        const numId = String(attrsOf(n)?.['@_w:numId'] ?? '');
+        let abstractId = '';
+        const findAbstract = (m: OOXMLValue): void => {
+          if (Array.isArray(m)) {
+            for (const item of m) findAbstract(item);
+            return;
+          }
+          if (!isOOXMLNode(m)) return;
+          if ('w:abstractNumId' in m) {
+            abstractId = String(attrsOf(m)?.['@_w:val'] ?? '');
+            return;
+          }
+          for (const k of Object.keys(m)) if (k !== ':@') findAbstract(m[k]);
+        };
+        findAbstract(n['w:num']);
+        if (numId && abstractId) numToAbstract.set(numId, abstractId);
+      }
+      for (const k of Object.keys(n)) if (k !== ':@') scan(n[k]);
+    };
+    scan(tree);
+
+    const out = new Map<string, 'bullet' | 'ordered'>();
+    numToAbstract.forEach((abstractId, numId) => {
+      out.set(numId, abstractFmt.get(abstractId) ?? 'ordered');
+    });
+    return out;
+  } catch {
+    return null;
+  }
 }
 
 function walk(node: OOXMLValue, out: ParagraphNode[]): void {
@@ -66,15 +158,92 @@ function walk(node: OOXMLValue, out: ParagraphNode[]): void {
   }
   if (!isOOXMLNode(node)) return;
   for (const key of Object.keys(node)) {
-    if (key === 'w:p') {
+    if (key === 'w:tbl') {
+      const rows = extractTableRows(node[key]);
+      if (rows.length > 0) {
+        out.push({
+          text: rows.map((r) => r.join('\t')).join('\n'),
+          table: rows,
+        });
+      }
+      // Do NOT recurse — cell paragraphs are already captured in `rows`.
+    } else if (key === 'w:p') {
       const text = extractParagraphText(node[key]);
       const style = extractStyle(node[key]);
       const runs = extractParagraphRuns(node[key]);
-      out.push({ text, style, runs });
+      const listInfo = extractListInfo(node[key]);
+      const para: ParagraphNodeInternal = { text, style, runs };
+      if (listInfo) {
+        para.list = { type: 'ordered', level: listInfo.ilvl }; // refined via numbering.xml
+        para.numId = listInfo.numId;
+      }
+      out.push(para);
     } else if (key !== ':@') {
       walk(node[key], out);
     }
   }
+}
+
+/** Rows × cells plain text from a w:tbl node. Nested tables flatten into cell text. */
+function extractTableRows(tblNode: OOXMLValue): string[][] {
+  const rows: string[][] = [];
+  const visitRows = (n: OOXMLValue): void => {
+    if (Array.isArray(n)) {
+      for (const item of n) visitRows(item);
+      return;
+    }
+    if (!isOOXMLNode(n)) return;
+    for (const k of Object.keys(n)) {
+      if (k === 'w:tr') {
+        const cells: string[] = [];
+        const visitCells = (c: OOXMLValue): void => {
+          if (Array.isArray(c)) {
+            for (const item of c) visitCells(item);
+            return;
+          }
+          if (!isOOXMLNode(c)) return;
+          for (const ck of Object.keys(c)) {
+            if (ck === 'w:tc') {
+              cells.push(extractParagraphText(c[ck]).trim());
+            } else if (ck !== ':@') {
+              visitCells(c[ck]);
+            }
+          }
+        };
+        visitCells(n[k]);
+        if (cells.length > 0) rows.push(cells);
+      } else if (k !== ':@') {
+        visitRows(n[k]);
+      }
+    }
+  };
+  visitRows(tblNode);
+  return rows;
+}
+
+/** numId + ilvl from w:pPr/w:numPr, or null when not a list paragraph. */
+function extractListInfo(pNode: OOXMLValue): { numId: string; ilvl: number } | null {
+  let numId: string | null = null;
+  let ilvl = 0;
+  const recurse = (n: OOXMLValue): void => {
+    if (Array.isArray(n)) {
+      for (const item of n) recurse(item);
+      return;
+    }
+    if (!isOOXMLNode(n)) return;
+    const attrs = isOOXMLNode(n[':@']) ? (n[':@'] as OOXMLNode) : undefined;
+    if ('w:numId' in n && attrs?.['@_w:val'] !== undefined) {
+      numId = String(attrs['@_w:val']);
+    }
+    if ('w:ilvl' in n && attrs?.['@_w:val'] !== undefined) {
+      ilvl = Number(attrs['@_w:val']) || 0;
+    }
+    for (const k of Object.keys(n)) {
+      if (k === 'w:pPr' || k === 'w:numPr' || Array.isArray(n[k])) recurse(n[k]);
+    }
+  };
+  recurse(pNode);
+  return numId !== null ? { numId, ilvl } : null;
 }
 
 function extractParagraphText(pNode: OOXMLValue): string {

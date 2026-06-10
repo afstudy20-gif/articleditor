@@ -11,6 +11,7 @@ import { generateTextAnthropic, streamTextAnthropic } from './anthropic';
 import { generateTextOpenAI, streamTextOpenAI, embedBatchOpenAI } from './openai';
 import { PROVIDERS, getProviderMeta, type ProviderId } from './registry';
 import { isAbortError, isTransientError } from './errors';
+import { sanitizeBaseUrl } from './url-guard';
 
 export type ProviderName = ProviderId;
 
@@ -72,7 +73,9 @@ export function configFromHeaders(headers: Headers): ProviderConfig {
     },
     openai: {
       apiKey: get('X-AI-OpenAI-Key'),
-      baseUrl: get('X-AI-OpenAI-BaseURL'),
+      // User-supplied base URLs are fetched SERVER-side — reject private/
+      // internal targets (SSRF) before they ever reach the OpenAI client.
+      baseUrl: sanitizeBaseUrl(get('X-AI-OpenAI-BaseURL')),
       model: get('X-AI-OpenAI-Model'),
       embedModel: get('X-AI-OpenAI-Embed-Model'),
     },
