@@ -50,3 +50,42 @@ describe('JCM reference-style compliance', () => {
     assert.match(issue?.message ?? '', /prefers MDPI ACS/);
   });
 });
+
+describe('JCM section compliance', () => {
+  const template = getJournalTemplate('jcm');
+  assert.ok(template);
+
+  it('accepts Turkish keyword headings for the required Keywords section', () => {
+    const report = checkCompliance({
+      template,
+      stats,
+      plainText: 'Anahtar Kelimeler: lipid paradoksu; mortalite',
+      sectionHeadings: ['Anahtar Kelimeler'],
+      referenceStyle: 'mdpi-acs',
+    });
+    const issue = report.issues.find(
+      (item) => item.category === 'section' && item.message.includes('"Keywords"'),
+    );
+
+    assert.equal(issue?.severity, 'ok');
+    assert.equal(issue?.confidence, 'verified');
+  });
+
+  it('accepts the generated bibliography as the required References section', () => {
+    const report = checkCompliance({
+      template,
+      stats,
+      plainText: '',
+      sectionHeadings: [],
+      referenceStyle: 'mdpi-acs',
+      bibliographyReferenceCount: 19,
+    });
+    const issue = report.issues.find(
+      (item) => item.category === 'section' && item.message.includes('"References"'),
+    );
+
+    assert.equal(issue?.severity, 'ok');
+    assert.equal(issue?.confidence, 'verified');
+    assert.match(issue?.message ?? '', /generated from 19 cited references/);
+  });
+});

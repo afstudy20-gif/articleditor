@@ -1970,7 +1970,6 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
               >
                 📄 {t('ed_import_docx')}
               </DropItem>
-              <DropItem onClick={exportProjectJson}>💾 Projeyi indir (.json)</DropItem>
               <DropItem onClick={() => projectImportRef.current?.click()}>📂 {t('ed_import_json')}</DropItem>
             </HeaderDropdown>
             <input
@@ -2004,6 +2003,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
               <DropItem onClick={() => exportDocx('placeholder')}>📝 {t('ed_export_docx_placeholder')}</DropItem>
               <DropItem onClick={exportRis}>🗂️ {t('ed_export_ris')}</DropItem>
               <DropItem onClick={exportLatex}>📐 {t('ed_export_latex')}</DropItem>
+              <DropItem onClick={exportProjectJson}>💾 {t('ed_export_json')}</DropItem>
             </HeaderDropdown>
             <HeaderIcon onClick={() => setPaletteOpen(true)} title={`${t('cmd_open')} (⌘K)`} label="⌘K" caption={t('hdr_palette')} />
             <HeaderIcon onClick={openPhrasebank} title={t('pb_title')} label="§" caption={t('hdr_phrasebank')} />
@@ -2620,6 +2620,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
             docJson={doc}
             stats={writingStats}
             referenceStyle={style}
+            bibliographyReferenceCount={refs.filter((ref) => refOrder.has(ref.id)).length}
             onReferenceStyleChange={(nextStyle) => setStyle(nextStyle)}
             onClose={() => setJournalOpen(false)}
             t={t}

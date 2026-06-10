@@ -25,6 +25,8 @@ export interface ComplianceInput {
   sectionHeadings: string[];
   /** Current project citation style. */
   referenceStyle: string;
+  /** References that will be emitted in the generated bibliography. */
+  bibliographyReferenceCount?: number;
   /** Text under the Abstract heading, if extractable (may be undefined). */
   abstractText?: string;
 }
@@ -37,6 +39,7 @@ const SECTION_SYNONYMS: ReadonlyArray<readonly string[]> = [
   ['discussion', 'tartisma'],
   ['conclusion', 'conclusions', 'sonuc', 'sonuclar'],
   ['abstract', 'summary', 'oz', 'ozet'],
+  ['keyword', 'keywords', 'key words', 'anahtar kelime', 'anahtar kelimeler', 'anahtar sozcuk', 'anahtar sozcukler'],
   ['references', 'bibliography', 'kaynaklar', 'kaynak', 'referanslar', 'referans'],
 ];
 
@@ -250,14 +253,20 @@ function checkAbstractLength(
 function checkSection(
   section: JournalSection,
   docHeadings: ReadonlyArray<string>,
+  bibliographyReferenceCount: number,
 ): ComplianceIssue {
   const canonical = normalize(section.heading);
-  const present = hasHeading(canonical, docHeadings);
+  const headingPresent = hasHeading(canonical, docHeadings);
+  const generatedBibliographyPresent =
+    bibliographyReferenceCount > 0 && aliasesFor(canonical).includes('references');
+  const present = headingPresent || generatedBibliographyPresent;
   if (present) {
     return {
       severity: 'ok',
       category: 'section',
-      message: `Section "${section.heading}" is present.`,
+      message: generatedBibliographyPresent && !headingPresent
+        ? `Section "${section.heading}" will be generated from ${bibliographyReferenceCount} cited reference${bibliographyReferenceCount === 1 ? '' : 's'}.`
+        : `Section "${section.heading}" is present.`,
       confidence: 'verified',
     };
   }
@@ -380,7 +389,15 @@ function orderBySeverity(issues: ReadonlyArray<ComplianceIssue>): ComplianceIssu
  * Pure and total: tolerates empty headings / text without throwing.
  */
 export function checkCompliance(input: ComplianceInput): ComplianceReport {
-  const { template, stats, plainText, sectionHeadings, referenceStyle, abstractText } = input;
+  const {
+    template,
+    stats,
+    plainText,
+    sectionHeadings,
+    referenceStyle,
+    bibliographyReferenceCount = 0,
+    abstractText,
+  } = input;
 
   const docHeadings = normalizeHeadings(sectionHeadings ?? []);
   const haystack = typeof plainText === 'string' ? plainText.toLowerCase() : '';
@@ -392,7 +409,9 @@ export function checkCompliance(input: ComplianceInput): ComplianceReport {
   collected.push(checkAbstractLength(template, abstractText));
 
   for (const section of template.sections) {
-    if (section.required) collected.push(checkSection(section, docHeadings));
+    if (section.required) {
+      collected.push(checkSection(section, docHeadings, bibliographyReferenceCount));
+    }
   }
 
   for (const statement of template.requiredStatements) {

@@ -12,6 +12,7 @@ interface JournalCheckPanelProps {
   docJson: unknown;
   stats: WritingStats;
   referenceStyle: string;
+  bibliographyReferenceCount: number;
   onReferenceStyleChange?: (style: CitationStyleId) => void;
   onClose: () => void;
   t: (k: string) => string;
@@ -41,6 +42,7 @@ export function JournalCheckPanel({
   docJson,
   stats,
   referenceStyle,
+  bibliographyReferenceCount,
   onReferenceStyleChange,
   onClose,
   t,
@@ -48,6 +50,7 @@ export function JournalCheckPanel({
   const [customTemplates, setCustomTemplates] = useState<JournalTemplate[]>([]);
   const [view, setView] = useState<'LIST' | 'FORM'>('LIST');
   const [editingTemplate, setEditingTemplate] = useState<JournalTemplate | null>(null);
+  const [referenceRulesOpen, setReferenceRulesOpen] = useState(false);
 
   // Form states
   const [formName, setFormName] = useState('');
@@ -76,6 +79,10 @@ export function JournalCheckPanel({
 
   const [templateId, setTemplateId] = useState(JOURNAL_TEMPLATES[0]?.id ?? '');
 
+  useEffect(() => {
+    setReferenceRulesOpen(false);
+  }, [templateId]);
+
   const template = useMemo(() => {
     return allTemplates.find((t) => t.id === templateId) || allTemplates[0];
   }, [allTemplates, templateId]);
@@ -89,9 +96,10 @@ export function JournalCheckPanel({
       plainText,
       sectionHeadings: headings,
       referenceStyle,
+      bibliographyReferenceCount,
       abstractText,
     });
-  }, [template, docJson, stats, referenceStyle]);
+  }, [template, docJson, stats, referenceStyle, bibliographyReferenceCount]);
 
   const handleAddClick = () => {
     setEditingTemplate(null);
@@ -172,7 +180,7 @@ export function JournalCheckPanel({
 
   if (view === 'FORM') {
     return (
-      <div className="card flex flex-col h-full bg-white">
+      <div className="card flex flex-col h-full min-h-0 overflow-hidden bg-white">
         <div className="px-3 py-2 border-b border-border flex items-center justify-between">
           <h3 className="font-semibold text-primary text-sm">
             📋 {editingTemplate ? t('jc_edit') : t('jc_add')}
@@ -181,7 +189,7 @@ export function JournalCheckPanel({
             ×
           </button>
         </div>
-        <div className="flex-1 overflow-auto p-3 space-y-3">
+        <div className="flex-1 min-h-0 overflow-y-auto journal-panel-scroll p-3 space-y-3">
           <div>
             <label className="block text-[10px] font-semibold text-muted uppercase tracking-wider mb-1">
               {t('jc_form_name')}
@@ -312,15 +320,15 @@ export function JournalCheckPanel({
   }
 
   return (
-    <div className="card flex flex-col h-full bg-white">
-      <div className="px-3 py-2 border-b border-border flex items-center justify-between">
+    <div className="card flex flex-col h-full min-h-0 overflow-hidden bg-white">
+      <div className="shrink-0 px-3 py-2 border-b border-border flex items-center justify-between">
         <h3 className="font-semibold text-primary text-sm">📋 {t('jc_title')}</h3>
         <button onClick={onClose} className="text-muted hover:text-primary text-lg leading-none">
           ×
         </button>
       </div>
 
-      <div className="px-3 py-2 border-b border-border flex items-center gap-1.5">
+      <div className="shrink-0 px-3 py-2 border-b border-border flex items-center gap-1.5">
         <select
           value={templateId}
           onChange={(e) => setTemplateId(e.target.value)}
@@ -360,7 +368,7 @@ export function JournalCheckPanel({
       </div>
 
       {report && (
-        <div className="px-3 py-2 border-b border-border">
+        <div className="shrink-0 px-3 py-2 border-b border-border">
           <div className="flex items-center justify-between">
             <span className="text-xs text-muted">
               {report.verifiedPassed}/{report.verifiedTotal} {t('jc_verified_passed')}
@@ -375,77 +383,97 @@ export function JournalCheckPanel({
         </div>
       )}
 
-      {template && (template.publisherReferenceStyles?.length || template.referenceRules?.length) ? (
-        <div className="px-3 py-2 border-b border-border bg-slate-50/60 space-y-2">
-          <div className="flex items-center justify-between gap-2">
-            <div>
-              <div className="text-[10px] font-bold uppercase tracking-wider text-muted">
-                {t('jc_reference_profile')}
+      <div className="flex-1 min-h-0 overflow-y-scroll overscroll-contain journal-panel-scroll">
+        {template && (template.publisherReferenceStyles?.length || template.referenceRules?.length) ? (
+          <div className="px-3 py-2 border-b border-border bg-slate-50/60 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-wider text-muted">
+                  {t('jc_reference_profile')}
+                </div>
+                <div className="text-xs font-semibold text-primary">
+                  {STYLE_LABELS[template.referenceStyle]}
+                  {template.referenceStylePolicy === 'preferred'
+                    ? ` (${t('jc_preferred_style')})`
+                    : ''}
+                </div>
               </div>
-              <div className="text-xs font-semibold text-primary">
-                {STYLE_LABELS[template.referenceStyle]}
-                {template.referenceStylePolicy === 'preferred'
-                  ? ` (${t('jc_preferred_style')})`
-                  : ''}
-              </div>
-            </div>
-            {referenceStyle !== template.referenceStyle && onReferenceStyleChange && (
-              <button
-                onClick={() => onReferenceStyleChange(template.referenceStyle)}
-                className="shrink-0 rounded border border-teal px-2 py-1 text-[10px] font-semibold text-teal hover:bg-teal-bg"
-              >
-                {t('jc_apply_ref_style')}
-              </button>
-            )}
-          </div>
-
-          {template.publisherReferenceStyles && template.publisherReferenceStyles.length > 1 && (
-            <div className="text-[10px] text-secondary">
-              <span className="font-semibold">{t('jc_publisher_styles')}:</span>{' '}
-              {template.publisherReferenceStyles.map((id) => STYLE_LABELS[id]).join(', ')}
-            </div>
-          )}
-
-          {template.referenceRules && template.referenceRules.length > 0 && (
-            <ul className="space-y-1 text-[10px] leading-snug text-secondary">
-              {template.referenceRules.map((rule) => (
-                <li key={rule} className="flex gap-1.5">
-                  <span className="text-teal">•</span>
-                  <span>{rule}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          {template.referenceGuideUrl && (
-            <a
-              href={template.referenceGuideUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-block text-[10px] text-teal hover:underline"
-            >
-              {t('jc_reference_guide')} ↗
-            </a>
-          )}
-        </div>
-      ) : null}
-
-      <div className="flex-1 overflow-auto p-2 space-y-1.5">
-        {report?.issues.map((issue, i) => (
-          <div key={i} className={`rounded border px-2 py-1.5 text-xs ${SEVERITY_STYLE[issue.severity]}`}>
-            <div className="font-semibold">
-              {SEVERITY_ICON[issue.severity]} {issue.message}
-              {issue.confidence === 'heuristic' && (
-                <span className="ml-1 font-normal text-[10px] opacity-70">({t('jc_heuristic_tag')})</span>
+              {referenceStyle !== template.referenceStyle && onReferenceStyleChange && (
+                <button
+                  onClick={() => onReferenceStyleChange(template.referenceStyle)}
+                  className="shrink-0 rounded border border-teal px-2 py-1 text-[10px] font-semibold text-teal hover:bg-teal-bg"
+                >
+                  {t('jc_apply_ref_style')}
+                </button>
               )}
             </div>
-            {issue.detail && <div className="mt-0.5 opacity-80">{issue.detail}</div>}
+
+            {template.publisherReferenceStyles && template.publisherReferenceStyles.length > 1 && (
+              <div className="text-[10px] text-secondary">
+                <span className="font-semibold">{t('jc_publisher_styles')}:</span>{' '}
+                {template.publisherReferenceStyles.map((id) => STYLE_LABELS[id]).join(', ')}
+              </div>
+            )}
+
+            {template.referenceRules && template.referenceRules.length > 0 && (
+              <button
+                type="button"
+                aria-expanded={referenceRulesOpen}
+                onClick={() => setReferenceRulesOpen((open) => !open)}
+                className="w-full flex items-center justify-between rounded border border-border bg-white px-2 py-1.5 text-left text-[10px] font-semibold text-secondary hover:border-teal hover:text-primary"
+              >
+                <span>
+                  {template.referenceRules.length} {t('jc_reference_rules')}
+                </span>
+                <span aria-hidden="true">{referenceRulesOpen ? '▴' : '▾'}</span>
+              </button>
+            )}
+
+            {referenceRulesOpen && (
+              <>
+                {template.referenceRules && template.referenceRules.length > 0 && (
+                  <ul className="space-y-1 text-[10px] leading-snug text-secondary">
+                    {template.referenceRules.map((rule) => (
+                      <li key={rule} className="flex gap-1.5">
+                        <span className="text-teal">•</span>
+                        <span>{rule}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                {template.referenceGuideUrl && (
+                  <a
+                    href={template.referenceGuideUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-block text-[10px] text-teal hover:underline"
+                  >
+                    {t('jc_reference_guide')} ↗
+                  </a>
+                )}
+              </>
+            )}
           </div>
-        ))}
+        ) : null}
+
+        <div className="p-2 space-y-1.5">
+          {report?.issues.map((issue, i) => (
+            <div key={i} className={`rounded border px-2 py-1.5 text-xs ${SEVERITY_STYLE[issue.severity]}`}>
+              <div className="font-semibold">
+                {SEVERITY_ICON[issue.severity]} {issue.message}
+                {issue.confidence === 'heuristic' && (
+                  <span className="ml-1 font-normal text-[10px] opacity-70">({t('jc_heuristic_tag')})</span>
+                )}
+              </div>
+              {issue.detail && <div className="mt-0.5 opacity-80">{issue.detail}</div>}
+            </div>
+          ))}
+        </div>
       </div>
 
       {template && (
-        <div className="px-3 py-2 border-t border-border text-[10px] text-muted leading-snug">
+        <div className="shrink-0 px-3 py-2 border-t border-border bg-white text-[10px] text-muted leading-snug">
           {template.sourceUrl ? (
             <>
               <a

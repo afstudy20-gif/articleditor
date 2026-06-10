@@ -50,6 +50,8 @@ const HEADING_SYNONYMS = new Set([
   'results', 'findings', 'bulgular', 'bulgu',
   'discussion', 'tartisma',
   'conclusion', 'conclusions', 'sonuc', 'sonuclar',
+  'keyword', 'keywords', 'key words',
+  'anahtar kelime', 'anahtar kelimeler', 'anahtar sozcuk', 'anahtar sozcukler',
   'references', 'bibliography', 'kaynaklar', 'kaynak', 'referanslar', 'referans',
   'funding', 'conflict of interest', 'acknowledgements', 'tesekkur', 'tesekkurler'
 ]);
@@ -104,4 +106,3 @@ export function extractDocStructure(json: unknown): DocStructure {
 
   return { headings, plainText: textParts.join('\n'), abstractText };
 }
-
