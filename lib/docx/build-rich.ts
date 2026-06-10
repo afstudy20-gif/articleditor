@@ -15,6 +15,26 @@ import { assignRecNums, activeEndNoteField, placeholderText, type BuildMode } fr
 
 type Json = any;
 
+/**
+ * Maps semantic block kinds to paragraph style IDs of a journal template
+ * (e.g. MDPI's "MDPI31text"). Unset entries keep the built-in defaults.
+ * numId* override the numbering instance IDs so list paragraphs can point
+ * at entries merged into a template's own numbering.xml.
+ */
+export type DocxStyleMap = {
+  normal?: string;
+  title?: string;
+  heading1?: string;
+  heading2?: string;
+  heading3?: string;
+  bibliography?: string;
+  figureCaption?: string;
+  equation?: string;
+  tableBody?: string;
+  numIdBullet?: number;
+  numIdOrdered?: number;
+};
+
 export type RichBuildInput = {
   /** TipTap document JSON (editor state). */
   doc: Json;
@@ -33,6 +53,10 @@ export type RichBuildInput = {
   includeBibliography?: boolean;
   /** Keep figure captions inline or collect them after the bibliography. */
   figureCaptionPlacement?: FigureCaptionPlacement;
+  /** Journal-template style mapping (see DocxStyleMap). */
+  styleMap?: DocxStyleMap;
+  /** Media part name prefix; templates may already contain imageN.* parts. */
+  imageNamePrefix?: string;
 };
 
 const WORD_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
@@ -79,9 +103,9 @@ export async function buildRichDocx(input: RichBuildInput): Promise<Blob> {
 
 // ─── Build context ──────────────────────────────────────────
 
-type ImagePart = { name: string; data: Uint8Array; ext: string };
+export type ImagePart = { name: string; data: Uint8Array; ext: string };
 
-class BuildCtx {
+export class BuildCtx {
   readonly input: RichBuildInput;
   readonly orderedRefs: Ref[];
   readonly bibPos = new Map<string, number>();
@@ -98,6 +122,12 @@ class BuildCtx {
     this.orderedRefs = assignRecNums(orderRefsForBib(input.style, citationOrdered));
     this.orderedRefs.forEach((r, i) => this.bibPos.set(r.id, i + 1));
     this.indexFigures(input.doc);
+  }
+
+  /** Style id for a semantic block kind, honoring the template style map. */
+  private sid(kind: keyof DocxStyleMap, fallback?: string): string | undefined {
+    const v = this.input.styleMap?.[kind];
+    return typeof v === 'string' && v ? v : fallback;
   }
 
   private indexFigures(doc: Json): void {
@@ -138,7 +168,7 @@ class BuildCtx {
       h = Math.round(h * (MAX_IMG_WIDTH_EMU / w));
       w = MAX_IMG_WIDTH_EMU;
     }
-    const name = `image${this.images.length + 1}.${parsed.ext}`;
+    const name = `${this.input.imageNamePrefix ?? 'image'}${this.images.length + 1}.${parsed.ext}`;
     this.images.push({ name, data: parsed.data, ext: parsed.ext });
     const id = `rId${++this.relId}`;
     this.rels.push(
@@ -161,9 +191,17 @@ ${this.rels.join('\n')}
 
   // ─── Body ─────────────────────────────────────────────────
 
-  buildBody(): string {
+  /**
+   * Body paragraphs only (no <w:document>/<w:body> wrapper, no sectPr) —
+   * used both by the standalone package and by template injection.
+   */
+  bodyParagraphs(): string[] {
     const paragraphs: string[] = [];
     const doc = this.input.doc;
+    const titleStyle = this.sid('title', 'Title');
+    const h1Style = this.sid('heading1', 'Heading1');
+    const bibStyle = this.sid('bibliography');
+    const normalStyle = this.sid('normal');
 
     // Check if the document already has a Heading 1 node.
     const hasHeading1 = Array.isArray(doc?.content) && doc.content.some(
@@ -175,9 +213,9 @@ ${this.rels.join('\n')}
       && this.input.title
       && !hasHeading1
     ) {
-      paragraphs.push(`<w:p><w:pPr><w:pStyle w:val="Title"/></w:pPr>${textRun(this.input.title)}</w:p>`);
+      paragraphs.push(`<w:p><w:pPr><w:pStyle w:val="${titleStyle}"/></w:pPr>${textRun(this.input.title)}</w:p>`);
     }
-    
+
     if (Array.isArray(doc?.content)) {
       for (const block of doc.content) {
         paragraphs.push(...this.blockToXml(block, {}));
@@ -185,21 +223,23 @@ ${this.rels.join('\n')}
     }
     if (this.input.includeBibliography !== false) {
       const bibHeading = this.input.bibHeading ?? 'References';
-      paragraphs.push(`<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr>${textRun(bibHeading)}</w:p>`);
+      paragraphs.push(`<w:p><w:pPr><w:pStyle w:val="${h1Style}"/></w:pPr>${textRun(bibHeading)}</w:p>`);
       this.orderedRefs.forEach((r, i) => {
-        paragraphs.push(`<w:p>${textRun(formatBibEntry(this.input.style, r, i + 1))}</w:p>`);
+        const pPr = bibStyle ? `<w:pPr><w:pStyle w:val="${bibStyle}"/></w:pPr>` : '';
+        paragraphs.push(`<w:p>${pPr}${textRun(formatBibEntry(this.input.style, r, i + 1))}</w:p>`);
       });
     }
     if (this.input.figureCaptionPlacement === 'after-bibliography') {
       const legends = collectFigureLegends(doc);
       if (legends.length > 0) {
         paragraphs.push(
-          '<w:p><w:pPr><w:pStyle w:val="Heading1"/><w:pageBreakBefore/></w:pPr>'
+          `<w:p><w:pPr><w:pStyle w:val="${h1Style}"/><w:pageBreakBefore/></w:pPr>`
           + `${textRun('Figure Legends')}</w:p>`,
         );
         legends.forEach((legend) => {
+          const pPr = normalStyle ? `<w:pPr><w:pStyle w:val="${normalStyle}"/></w:pPr>` : '';
           paragraphs.push(
-            '<w:p>'
+            `<w:p>${pPr}`
             + `<w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">${escapeXml(`Figure ${legend.number}.`)}</w:t></w:r>`
             + (legend.caption ? textRun(` ${legend.caption}`) : '')
             + '</w:p>',
@@ -207,6 +247,11 @@ ${this.rels.join('\n')}
         });
       }
     }
+    return paragraphs;
+  }
+
+  buildBody(): string {
+    const paragraphs = this.bodyParagraphs();
 
     const lineNumXml = this.input.lineNumbers
       ? '<w:lnNumType w:countBy="1" w:restart="continuous"/>'
@@ -236,12 +281,13 @@ ${paragraphs.join('\n')}
         return [this.paragraph(n, listCtx)];
       case 'heading': {
         const level = Math.min(Math.max(Number(n.attrs?.level ?? 1), 1), 3);
-        return [this.paragraph(n, listCtx, `Heading${level}`)];
+        const mapped = this.sid(`heading${level}` as keyof DocxStyleMap, `Heading${level}`);
+        return [this.paragraph(n, listCtx, mapped)];
       }
       case 'bulletList':
-        return this.list(n, 1);
+        return this.list(n, this.input.styleMap?.numIdBullet ?? 1);
       case 'orderedList':
-        return this.list(n, 2);
+        return this.list(n, this.input.styleMap?.numIdOrdered ?? 2);
       case 'blockquote': {
         const out: string[] = [];
         for (const c of n.content ?? []) out.push(...this.blockToXml(c, listCtx));
@@ -251,8 +297,12 @@ ${paragraphs.join('\n')}
         return [this.table(n)];
       case 'equation': {
         const latex: string = n.attrs?.latex ?? '';
+        const eqStyle = this.sid('equation');
+        const eqPPr = eqStyle
+          ? `<w:pPr><w:pStyle w:val="${eqStyle}"/></w:pPr>`
+          : '<w:pPr><w:jc w:val="center"/></w:pPr>';
         return [
-          `<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:i/></w:rPr><w:t xml:space="preserve">${escapeXml(latex)}</w:t></w:r></w:p>`,
+          `<w:p>${eqPPr}<w:r><w:rPr><w:i/></w:rPr><w:t xml:space="preserve">${escapeXml(latex)}</w:t></w:r></w:p>`,
         ];
       }
       case 'figure':
@@ -288,9 +338,9 @@ ${paragraphs.join('\n')}
       if (item.type !== 'listItem') continue;
       for (const child of item.content ?? []) {
         if (child.type === 'bulletList') {
-          out.push(...this.list(child, 1, ilvl + 1));
+          out.push(...this.list(child, this.input.styleMap?.numIdBullet ?? 1, ilvl + 1));
         } else if (child.type === 'orderedList') {
-          out.push(...this.list(child, 2, ilvl + 1));
+          out.push(...this.list(child, this.input.styleMap?.numIdOrdered ?? 2, ilvl + 1));
         } else if (child.type === 'paragraph') {
           out.push(this.paragraph(child, { numId, ilvl }));
         } else {
@@ -303,7 +353,9 @@ ${paragraphs.join('\n')}
 
   private paragraph(n: Json, listCtx: { numId?: number; ilvl?: number }, styleId?: string): string {
     const pPr: string[] = [];
-    if (styleId) pPr.push(`<w:pStyle w:val="${styleId}"/>`);
+    // Plain body paragraphs pick up the template's normal-text style.
+    const effectiveStyle = styleId ?? (listCtx.numId === undefined ? this.sid('normal') : undefined);
+    if (effectiveStyle) pPr.push(`<w:pStyle w:val="${effectiveStyle}"/>`);
     if (listCtx.numId !== undefined) {
       pPr.push(`<w:numPr><w:ilvl w:val="${listCtx.ilvl ?? 0}"/><w:numId w:val="${listCtx.numId}"/></w:numPr>`);
     }
@@ -410,8 +462,12 @@ ${paragraphs.join('\n')}
     const moveFigureCaption = kind === 'Figure'
       && this.input.figureCaptionPlacement === 'after-bibliography';
     if (!moveFigureCaption) {
+      const capStyle = this.sid('figureCaption');
+      const capPPr = capStyle
+        ? `<w:pPr><w:pStyle w:val="${capStyle}"/></w:pPr>`
+        : '<w:pPr><w:jc w:val="center"/></w:pPr>';
       out.push(
-        `<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">${escapeXml(`${label}.`)}</w:t></w:r>${caption ? textRun(` ${caption}`) : ''}</w:p>`,
+        `<w:p>${capPPr}<w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">${escapeXml(`${label}.`)}</w:t></w:r>${caption ? textRun(` ${caption}`) : ''}</w:p>`,
       );
     }
     return out;
@@ -437,11 +493,14 @@ ${paragraphs.join('\n')}
         if (colspan > 1) tcPr.push(`<w:gridSpan w:val="${colspan}"/>`);
         if (isHeader) tcPr.push('<w:shd w:val="clear" w:color="auto" w:fill="F2F2F2"/>');
         const inner: string[] = [];
+        const cellStyle = this.sid('tableBody');
         for (const blk of cell.content ?? []) {
           if (blk.type === 'paragraph') {
             const runs = this.inlineRuns(blk.content ?? []);
-            const bold = isHeader ? '<w:pPr><w:rPr><w:b/></w:rPr></w:pPr>' : '';
-            inner.push(`<w:p>${bold}${runs || textRun('')}</w:p>`);
+            const stylePart = cellStyle ? `<w:pStyle w:val="${cellStyle}"/>` : '';
+            const boldPart = isHeader ? '<w:rPr><w:b/></w:rPr>' : '';
+            const pPr = stylePart || boldPart ? `<w:pPr>${stylePart}${boldPart}</w:pPr>` : '';
+            inner.push(`<w:p>${pPr}${runs || textRun('')}</w:p>`);
           } else {
             inner.push(...this.blockToXml(blk, {}));
           }

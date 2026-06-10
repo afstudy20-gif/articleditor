@@ -8,6 +8,7 @@ import { ArticleEditor, computeRefOrder } from '@/components/Editor/Editor';
 import { RefsPanel } from '@/components/RefsPanel/RefsPanel';
 import { tiptapToBuildInput } from '@/lib/editor/to-export';
 import { buildRichDocx } from '@/lib/docx/build-rich';
+import { buildTemplateDocx, getDocxTemplate } from '@/lib/docx/template-docx';
 import { refsToRis } from '@/lib/refs/ris';
 import { parseDocx } from '@/lib/docx/parse';
 import { splitBodyAndBiblio, parseBiblioLines } from '@/lib/refs/parse-biblio';
@@ -1635,6 +1636,32 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
     download(blob, `${slugify(title)}-${style}-${mode}.docx`);
   }
 
+  /** Export into a bundled journal Word template (styles/headers preserved). */
+  async function exportDocxTemplate(templateId: string): Promise<void> {
+    const tpl = getDocxTemplate(templateId);
+    if (!tpl) return;
+    try {
+      const res = await fetch(tpl.file);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const bytes = await res.arrayBuffer();
+      const blob = await buildTemplateDocx(bytes, tpl, {
+        doc,
+        refsById,
+        refOrder,
+        style,
+        mode: 'active',
+        title,
+        figureCaptionPlacement,
+        // Template sectPr already carries the journal's line numbering.
+        lineNumbers: false,
+      });
+      download(blob, `${slugify(title)}-${tpl.id}.docx`);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setImportError(`${tpl.name}: ${msg}`);
+    }
+  }
+
   function exportRis(): void {
     const { orderedRefs } = tiptapToBuildInput(doc as any, refsById, refOrder, style);
     const blob = new Blob([refsToRis(orderedRefs)], { type: 'application/x-research-info-systems' });
@@ -1877,6 +1904,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
     { id: 'export-docx', group: t('cmd_g_export'), label: t('ed_export_docx_active'), run: () => exportDocx('active') },
     { id: 'export-docx-ph', group: t('cmd_g_export'), label: t('ed_export_docx_placeholder'), run: () => exportDocx('placeholder') },
     { id: 'export-ris', group: t('cmd_g_export'), label: t('ed_export_ris'), run: exportRis },
+    { id: 'export-jcm', group: t('cmd_g_export'), label: t('ed_export_jcm'), run: () => void exportDocxTemplate('jcm') },
     { id: 'export-latex', group: t('cmd_g_export'), label: t('ed_export_latex'), run: exportLatex },
     { id: 'export-json', group: t('cmd_g_export'), label: 'JSON', run: exportProjectJson },
     { id: 'import-docx', group: t('cmd_g_doc'), label: t('ed_import_docx'), run: () => { setShowImportModal(true); setImportPreview(null); setImportError(null); setImportPasteText(''); setPastedHtmlParagraphs(null); setPastedPlainReference(null); } },
@@ -2001,6 +2029,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
               <hr className="border-border my-1" />
               <DropItem onClick={() => exportDocx('active')}>📝 {t('ed_export_docx_active')}</DropItem>
               <DropItem onClick={() => exportDocx('placeholder')}>📝 {t('ed_export_docx_placeholder')}</DropItem>
+              <DropItem onClick={() => void exportDocxTemplate('jcm')}>📰 {t('ed_export_jcm')}</DropItem>
               <DropItem onClick={exportRis}>🗂️ {t('ed_export_ris')}</DropItem>
               <DropItem onClick={exportLatex}>📐 {t('ed_export_latex')}</DropItem>
               <DropItem onClick={exportProjectJson}>💾 {t('ed_export_json')}</DropItem>
