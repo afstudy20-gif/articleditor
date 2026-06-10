@@ -146,6 +146,8 @@ export const JOURNAL_TEMPLATES: readonly JournalTemplate[] = [
   },
   {
     id: 'icmje',
+    sourceUrl: 'https://www.icmje.org/recommendations/',
+    rulesUpdatedAt: '2026-01-01',
     name: 'ICMJE Recommendations',
     publisher: 'International Committee of Medical Journal Editors',
     description:
@@ -175,6 +177,8 @@ export const JOURNAL_TEMPLATES: readonly JournalTemplate[] = [
   },
   {
     id: 'plos-one',
+    sourceUrl: 'https://journals.plos.org/plosone/s/submission-guidelines',
+    rulesUpdatedAt: '2026-01-01',
     name: 'PLOS ONE',
     publisher: 'Public Library of Science',
     description:
@@ -202,6 +206,8 @@ export const JOURNAL_TEMPLATES: readonly JournalTemplate[] = [
   },
   {
     id: 'nature-letter',
+    sourceUrl: 'https://www.nature.com/nature/for-authors/formatting-guide',
+    rulesUpdatedAt: '2026-01-01',
     name: 'Nature (Letter)',
     publisher: 'Nature Portfolio',
     description:
@@ -227,6 +233,8 @@ export const JOURNAL_TEMPLATES: readonly JournalTemplate[] = [
   },
   {
     id: 'bmj',
+    sourceUrl: 'https://www.bmj.com/about-bmj/resources-authors',
+    rulesUpdatedAt: '2026-01-01',
     name: 'BMJ',
     publisher: 'BMJ Publishing Group',
     description:
@@ -256,6 +264,8 @@ export const JOURNAL_TEMPLATES: readonly JournalTemplate[] = [
   },
   {
     id: 'apa-psych',
+    sourceUrl: 'https://apastyle.apa.org/style-grammar-guidelines',
+    rulesUpdatedAt: '2026-01-01',
     name: 'APA (Psychology)',
     publisher: 'American Psychological Association',
     description:

@@ -115,6 +115,14 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
   }, []);
   const [doc, setDoc] = useState<unknown>(project.doc);
   const [savedAt, setSavedAt] = useState<number>(project.updatedAt);
+
+  // Sync editor Heading 1 to project title automatically
+  useEffect(() => {
+    const textTitle = findHeading1Text(doc);
+    if (textTitle && textTitle !== title) {
+      setTitle(textTitle);
+    }
+  }, [doc, title]);
   const [savingState, setSavingState] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [style, setStyle] = useState<StyleId>(
     (project.settings?.style as StyleId) ?? 'vancouver',
@@ -3133,4 +3141,20 @@ function DropItem({
 
 function truncate(s: string, n: number): string {
   return s.length > n ? s.slice(0, n) + '…' : s;
+}
+
+function findHeading1Text(doc: any): string | null {
+  if (!doc || !doc.content || !Array.isArray(doc.content)) return null;
+  for (const node of doc.content) {
+    if (node.type === 'heading' && node.attrs?.level === 1) {
+      if (Array.isArray(node.content)) {
+        return node.content
+          .filter((c: any) => c.type === 'text')
+          .map((c: any) => c.text || '')
+          .join('')
+          .trim();
+      }
+    }
+  }
+  return null;
 }

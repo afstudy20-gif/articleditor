@@ -139,10 +139,17 @@ ${this.rels.join('\n')}
 
   buildBody(): string {
     const paragraphs: string[] = [];
-    if (this.input.title) {
+    const doc = this.input.doc;
+
+    // Check if the document already has a Heading 1 node.
+    const hasHeading1 = Array.isArray(doc?.content) && doc.content.some(
+      (block: any) => block && block.type === 'heading' && block.attrs?.level === 1
+    );
+
+    if (this.input.title && !hasHeading1) {
       paragraphs.push(`<w:p><w:pPr><w:pStyle w:val="Title"/></w:pPr>${textRun(this.input.title)}</w:p>`);
     }
-    const doc = this.input.doc;
+    
     if (Array.isArray(doc?.content)) {
       for (const block of doc.content) {
         paragraphs.push(...this.blockToXml(block, {}));
@@ -214,7 +221,7 @@ ${paragraphs.join('\n')}
         const text = (n.content ?? []).map((c: Json) => c.text ?? '').join('');
         return text
           .split('\n')
-          .map((line: string) => `<w:p><w:r><w:rPr><w:rFonts w:ascii="Courier New" w:hAnsi="Courier New"/></w:rPr><w:t xml:space="preserve">${escapeXml(line)}</w:t></w:r></w:p>`);
+          .map((line: string) => `<w:p><w:r><w:rPr><w:rFonts w:ascii="Courier New" w:hAnsi="Courier New" w:cs="Courier New" w:eastAsia="Courier New"/></w:rPr><w:t xml:space="preserve">${escapeXml(line)}</w:t></w:r></w:p>`);
       }
       default: {
         // Unknown block with content: recurse; with text: wrap in paragraph.
@@ -302,7 +309,7 @@ ${paragraphs.join('\n')}
         case 'strike': rPr.push('<w:strike/>'); break;
         case 'superscript': rPr.push('<w:vertAlign w:val="superscript"/>'); break;
         case 'subscript': rPr.push('<w:vertAlign w:val="subscript"/>'); break;
-        case 'code': rPr.push('<w:rFonts w:ascii="Courier New" w:hAnsi="Courier New"/>'); break;
+        case 'code': rPr.push('<w:rFonts w:ascii="Courier New" w:hAnsi="Courier New" w:cs="Courier New" w:eastAsia="Courier New"/>'); break;
         case 'highlight': rPr.push('<w:highlight w:val="yellow"/>'); break;
         case 'textStyle': {
           const color = (m.attrs?.color ?? '').replace('#', '');
@@ -487,11 +494,11 @@ const ROOT_RELS_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 // default typography instead of Word's Calibri default.
 const RICH_STYLES_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:pPr><w:spacing w:line="360" w:lineRule="auto" w:after="120"/><w:jc w:val="both"/></w:pPr><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman"/><w:sz w:val="24"/></w:rPr></w:style>
-<w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="Heading 1"/><w:basedOn w:val="Normal"/><w:pPr><w:spacing w:before="240" w:after="120"/><w:jc w:val="left"/><w:outlineLvl w:val="0"/></w:pPr><w:rPr><w:b/><w:sz w:val="32"/></w:rPr></w:style>
-<w:style w:type="paragraph" w:styleId="Heading2"><w:name w:val="Heading 2"/><w:basedOn w:val="Normal"/><w:pPr><w:spacing w:before="200" w:after="100"/><w:jc w:val="left"/><w:outlineLvl w:val="1"/></w:pPr><w:rPr><w:b/><w:sz w:val="28"/></w:rPr></w:style>
-<w:style w:type="paragraph" w:styleId="Heading3"><w:name w:val="Heading 3"/><w:basedOn w:val="Normal"/><w:pPr><w:spacing w:before="160" w:after="80"/><w:jc w:val="left"/><w:outlineLvl w:val="2"/></w:pPr><w:rPr><w:b/><w:sz w:val="26"/></w:rPr></w:style>
-<w:style w:type="paragraph" w:styleId="Title"><w:name w:val="Title"/><w:basedOn w:val="Normal"/><w:pPr><w:jc w:val="center"/><w:spacing w:after="240"/></w:pPr><w:rPr><w:b/><w:sz w:val="36"/></w:rPr></w:style>
+<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:pPr><w:spacing w:line="360" w:lineRule="auto" w:after="120"/><w:jc w:val="both"/></w:pPr><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:cs="Times New Roman" w:eastAsia="Times New Roman"/><w:sz w:val="24"/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="Heading 1"/><w:basedOn w:val="Normal"/><w:pPr><w:spacing w:before="240" w:after="120"/><w:outlineLvl w:val="0"/></w:pPr><w:rPr><w:b/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="Heading2"><w:name w:val="Heading 2"/><w:basedOn w:val="Normal"/><w:pPr><w:spacing w:before="200" w:after="100"/><w:outlineLvl w:val="1"/></w:pPr><w:rPr><w:b/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="Heading3"><w:name w:val="Heading 3"/><w:basedOn w:val="Normal"/><w:pPr><w:spacing w:before="160" w:after="80"/><w:outlineLvl w:val="2"/></w:pPr><w:rPr><w:b/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="Title"><w:name w:val="Title"/><w:basedOn w:val="Normal"/><w:pPr><w:jc w:val="center"/><w:spacing w:after="240"/></w:pPr><w:rPr><w:b/><w:sz w:val="24"/></w:rPr></w:style>
 </w:styles>`;
 
 const SETTINGS_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>

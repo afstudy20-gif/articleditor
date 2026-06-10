@@ -72,8 +72,6 @@ function computeRefOrder(json: any, refIds: string[]): string[] {
     if (Array.isArray(n.content)) for (const c of n.content) walk(c);
   };
   walk(json);
-  // Append refs that weren't cited yet, preserving panel order.
-  for (const id of refIds) if (!seen.includes(id)) seen.push(id);
   return seen;
 }
 

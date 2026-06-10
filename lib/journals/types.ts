@@ -27,6 +27,10 @@ export interface JournalTemplate {
   name: string;
   publisher?: string;
   description?: string;
+  /** Authoritative guideline page these rules were derived from. */
+  sourceUrl?: string;
+  /** ISO date the bundled rules were last reviewed against the source. */
+  rulesUpdatedAt?: string;
   referenceStyle: CitationStyleId;
   abstractStructure: AbstractStructure;
   abstractWordLimit?: number;
@@ -43,14 +47,26 @@ export interface ComplianceIssue {
   category: 'word-count' | 'abstract' | 'section' | 'statement' | 'reference-style' | 'structure';
   message: string;
   detail?: string;
+  /**
+   * 'verified'  — mechanically measurable (word counts, heading presence,
+   *               style match). Counts toward the readiness score.
+   * 'heuristic' — keyword/pattern guess (statements, structured abstract).
+   *               Shown as "needs manual review"; excluded from the score.
+   */
+  confidence: 'verified' | 'heuristic';
 }
 
 export interface ComplianceReport {
   templateId: string;
   templateName: string;
-  /** 0-100 readiness score. */
+  /** 0-100 readiness score over VERIFIED checks only. */
   score: number;
   issues: ComplianceIssue[];
   passed: number;
   total: number;
+  /** Verified (mechanically measurable) checks. */
+  verifiedPassed: number;
+  verifiedTotal: number;
+  /** Heuristic checks the author should confirm by hand. */
+  manualReview: number;
 }

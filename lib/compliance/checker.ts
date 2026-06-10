@@ -149,6 +149,7 @@ function checkWordCount(template: JournalTemplate, stats: WritingStats): Complia
       category: 'word-count',
       message: 'No total word limit specified by the journal.',
       detail: `Current: ${stats.words} words.`,
+      confidence: 'verified',
     };
   }
   const detail = `Current: ${stats.words} / limit: ${limit} words.`;
@@ -158,6 +159,7 @@ function checkWordCount(template: JournalTemplate, stats: WritingStats): Complia
       category: 'word-count',
       message: `Word count exceeds the limit by more than 10%.`,
       detail,
+      confidence: 'verified',
     };
   }
   if (stats.words > limit) {
@@ -166,6 +168,7 @@ function checkWordCount(template: JournalTemplate, stats: WritingStats): Complia
       category: 'word-count',
       message: `Word count is slightly over the limit (within 10%).`,
       detail,
+      confidence: 'verified',
     };
   }
   return {
@@ -173,6 +176,7 @@ function checkWordCount(template: JournalTemplate, stats: WritingStats): Complia
     category: 'word-count',
     message: `Word count is within the limit.`,
     detail,
+    confidence: 'verified',
   };
 }
 
@@ -188,6 +192,7 @@ function checkAbstractPresence(
       severity: 'ok',
       category: 'abstract',
       message: 'Abstract section is present.',
+      confidence: 'verified',
     };
   }
   if (required) {
@@ -196,6 +201,7 @@ function checkAbstractPresence(
       category: 'abstract',
       message: 'Abstract section is required but missing.',
       detail: 'Add a heading titled "Abstract" (or "Öz"/"Özet").',
+      confidence: 'verified',
     };
   }
   return {
@@ -203,6 +209,7 @@ function checkAbstractPresence(
     category: 'abstract',
     message: 'No abstract heading detected.',
     detail: 'The journal does not list it as required.',
+    confidence: 'verified',
   };
 }
 
@@ -216,6 +223,7 @@ function checkAbstractLength(
       severity: 'ok',
       category: 'abstract',
       message: 'No abstract word limit specified by the journal.',
+      confidence: 'verified',
     };
   }
   if (typeof abstractText !== 'string') {
@@ -224,6 +232,7 @@ function checkAbstractLength(
       category: 'abstract',
       message: "Couldn't measure abstract length.",
       detail: `Journal limit is ${limit} words; abstract text was not available.`,
+      confidence: 'heuristic',
     };
   }
   const words = countWords(abstractText);
@@ -234,6 +243,7 @@ function checkAbstractLength(
       category: 'abstract',
       message: 'Abstract exceeds the word limit.',
       detail,
+      confidence: 'verified',
     };
   }
   return {
@@ -241,6 +251,7 @@ function checkAbstractLength(
     category: 'abstract',
     message: 'Abstract length is within the limit.',
     detail,
+    confidence: 'verified',
   };
 }
 
@@ -255,6 +266,7 @@ function checkSection(
       severity: 'ok',
       category: 'section',
       message: `Section "${section.heading}" is present.`,
+      confidence: 'verified',
     };
   }
   return {
@@ -262,6 +274,7 @@ function checkSection(
     category: 'section',
     message: `Required section "${section.heading}" is missing.`,
     detail: 'Add this heading or an accepted synonym.',
+    confidence: 'verified',
   };
 }
 
@@ -274,6 +287,8 @@ function checkStatement(statement: RequiredStatement, haystack: string): Complia
       severity: 'ok',
       category: 'statement',
       message: `"${statement.label}" statement appears to be present.`,
+      detail: 'Keyword match only — confirm the statement says what the journal requires.',
+      confidence: 'heuristic',
     };
   }
   return {
@@ -281,6 +296,7 @@ function checkStatement(statement: RequiredStatement, haystack: string): Complia
     category: 'statement',
     message: `"${statement.label}" statement may be missing.`,
     detail: 'These are often placed near the end of the manuscript.',
+    confidence: 'heuristic',
   };
 }
 
@@ -293,6 +309,7 @@ function checkReferenceStyle(
       severity: 'ok',
       category: 'reference-style',
       message: `Reference style matches the journal (${STYLE_LABELS[referenceStyle]}).`,
+      confidence: 'verified',
     };
   }
   const expected = STYLE_LABELS[template.referenceStyle];
@@ -302,6 +319,7 @@ function checkReferenceStyle(
     category: 'reference-style',
     message: `Reference style mismatch.`,
     detail: `Journal expects ${expected}, project is set to ${current}.`,
+    confidence: 'verified',
   };
 }
 
@@ -314,6 +332,7 @@ function checkStructure(
       severity: 'ok',
       category: 'structure',
       message: 'No structured-abstract requirement.',
+      confidence: 'verified',
     };
   }
   if (typeof abstractText !== 'string' || abstractText.trim().length === 0) {
@@ -321,6 +340,7 @@ function checkStructure(
       severity: 'info',
       category: 'structure',
       message: 'Structured abstract required, but abstract text was not available to check.',
+      confidence: 'heuristic',
     };
   }
   const normalized = normalize(abstractText);
@@ -331,6 +351,7 @@ function checkStructure(
       category: 'structure',
       message: 'Abstract appears to be structured.',
       detail: `Found labels: ${matched.slice(0, 5).join(', ')}.`,
+      confidence: 'heuristic',
     };
   }
   return {
@@ -338,6 +359,7 @@ function checkStructure(
     category: 'structure',
     message: 'Abstract may be unstructured.',
     detail: 'Journal expects a structured abstract (e.g. Background, Methods, Results, Conclusion).',
+    confidence: 'heuristic',
   };
 }
 
@@ -382,7 +404,16 @@ export function checkCompliance(input: ComplianceInput): ComplianceReport {
   const issues = orderBySeverity(collected);
   const total = issues.length;
   const passed = issues.filter((issue) => issue.severity === 'ok').length;
-  const score = total > 0 ? Math.round((100 * passed) / total) : 100;
+
+  // Score honesty: only mechanically VERIFIED checks count. Heuristic
+  // keyword matches (statements, structured abstract) can't prove
+  // compliance, so they surface as "manual review" instead of inflating
+  // the readiness number.
+  const verified = issues.filter((issue) => issue.confidence === 'verified');
+  const verifiedTotal = verified.length;
+  const verifiedPassed = verified.filter((issue) => issue.severity === 'ok').length;
+  const manualReview = issues.filter((issue) => issue.confidence === 'heuristic').length;
+  const score = verifiedTotal > 0 ? Math.round((100 * verifiedPassed) / verifiedTotal) : 100;
 
   return {
     templateId: template.id,
@@ -391,5 +422,8 @@ export function checkCompliance(input: ComplianceInput): ComplianceReport {
     issues,
     passed,
     total,
+    verifiedPassed,
+    verifiedTotal,
+    manualReview,
   };
 }

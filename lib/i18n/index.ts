@@ -331,6 +331,13 @@ const tr: Dict = {
   // Journal compliance
   jc_title: 'Dergi Uyum Kontrolü',
   jc_passed: 'kontrol geçti',
+  jc_verified_passed: 'doğrulanabilir kontrol geçti',
+  jc_manual_review: 'kontrol anahtar kelime tahminine dayanıyor — elle doğrulayın',
+  jc_heuristic_tag: 'manuel kontrol önerilir',
+  jc_source_link: 'Dergi kuralları kaynağı',
+  jc_rules_date: 'kurallar gözden geçirildi',
+  jc_outdated_warning: 'Dergi kuralları değişmiş olabilir — göndermeden önce kaynaktan doğrulayın.',
+  jc_generic_template: 'Genel şablon — belirli bir derginin resmi kurallarını temsil etmez.',
   // Letters
   letters_title: 'Akademik Mektuplar',
   letters_cover: 'Ön Yazı',
@@ -991,6 +998,13 @@ const en: Dict = {
   // Journal compliance
   jc_title: 'Journal Compliance Check',
   jc_passed: 'checks passed',
+  jc_verified_passed: 'verifiable checks passed',
+  jc_manual_review: 'check(s) rely on keyword guessing — verify by hand',
+  jc_heuristic_tag: 'manual review recommended',
+  jc_source_link: 'Journal guideline source',
+  jc_rules_date: 'rules reviewed',
+  jc_outdated_warning: 'Journal rules may have changed — verify at the source before submitting.',
+  jc_generic_template: 'Generic template — does not represent any specific journal\'s official rules.',
   // Letters
   letters_title: 'Academic Letters',
   letters_cover: 'Cover Letter',

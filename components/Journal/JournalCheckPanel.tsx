@@ -44,8 +44,9 @@ export function JournalCheckPanel({
 }: JournalCheckPanelProps): JSX.Element {
   const [templateId, setTemplateId] = useState(JOURNAL_TEMPLATES[0]?.id ?? '');
 
+  const template = getJournalTemplate(templateId) ?? JOURNAL_TEMPLATES[0];
+
   const report = useMemo(() => {
-    const template = getJournalTemplate(templateId) ?? JOURNAL_TEMPLATES[0];
     if (!template) return null;
     const { headings, plainText, abstractText } = extractDocStructure(docJson);
     return checkCompliance({
@@ -56,7 +57,7 @@ export function JournalCheckPanel({
       referenceStyle: referenceStyle as CitationStyleId,
       abstractText,
     });
-  }, [templateId, docJson, stats, referenceStyle]);
+  }, [template, docJson, stats, referenceStyle]);
 
   return (
     <div className="card flex flex-col h-full bg-white">
@@ -82,11 +83,18 @@ export function JournalCheckPanel({
       </div>
 
       {report && (
-        <div className="flex items-center justify-between px-3 py-2 border-b border-border">
-          <span className="text-xs text-muted">
-            {report.passed}/{report.total} {t('jc_passed')}
-          </span>
-          <span className={`text-2xl font-extrabold ${scoreColor(report.score)}`}>{report.score}</span>
+        <div className="px-3 py-2 border-b border-border">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-muted">
+              {report.verifiedPassed}/{report.verifiedTotal} {t('jc_verified_passed')}
+            </span>
+            <span className={`text-2xl font-extrabold ${scoreColor(report.score)}`}>{report.score}</span>
+          </div>
+          {report.manualReview > 0 && (
+            <div className="text-[10px] text-amber-700 mt-0.5">
+              ⚠ {report.manualReview} {t('jc_manual_review')}
+            </div>
+          )}
         </div>
       )}
 
@@ -95,11 +103,39 @@ export function JournalCheckPanel({
           <div key={i} className={`rounded border px-2 py-1.5 text-xs ${SEVERITY_STYLE[issue.severity]}`}>
             <div className="font-semibold">
               {SEVERITY_ICON[issue.severity]} {issue.message}
+              {issue.confidence === 'heuristic' && (
+                <span className="ml-1 font-normal text-[10px] opacity-70">({t('jc_heuristic_tag')})</span>
+              )}
             </div>
             {issue.detail && <div className="mt-0.5 opacity-80">{issue.detail}</div>}
           </div>
         ))}
       </div>
+
+      {template && (
+        <div className="px-3 py-2 border-t border-border text-[10px] text-muted leading-snug">
+          {template.sourceUrl ? (
+            <>
+              <a
+                href={template.sourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-teal hover:underline"
+              >
+                {t('jc_source_link')} ↗
+              </a>
+              {template.rulesUpdatedAt && (
+                <span className="ml-1">
+                  · {t('jc_rules_date')}: {template.rulesUpdatedAt}
+                </span>
+              )}
+              <div className="mt-0.5">{t('jc_outdated_warning')}</div>
+            </>
+          ) : (
+            <div>{t('jc_generic_template')}</div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
