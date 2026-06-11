@@ -111,7 +111,7 @@ export async function parseDocx(file: ArrayBuffer | Uint8Array | Blob): Promise<
   // Post-process to detect and link table titles and footnotes.
   // Broader regex matches standard abbreviations, superscripts, daggers, or single letters/digits followed by dot/parenthesis.
   const processed: ParagraphNode[] = [];
-  const footnoteRegex = /^\s*(Note|Not|Values|Data|Mean|SD|p\s*[\d<>]|Source|Kaynak|Abbreviation|Kısaltma|Statistical|İstatistik|[\*†‡§¶#¹²³⁴⁵⁶⁷⁸⁹⁺⁻ⁿⁱ₀₁₂₃₄₅₆₇₈₉\u00B2\u00B3\u00B9]|\b[a-z0-9](?:\.|\)|\]|\b))/i;
+  const footnoteRegex = /^\s*(Note|Not|Values|Data|Mean|SD|p\s*[\d<>]|Source|Kaynak|Abbreviation|Kısaltma|Statistical|İstatistik|[\*†‡§¶#¹²³⁴⁵⁶⁷⁸⁹⁺⁻ⁿⁱ₀₁₂₃₄₅₆₇₈₉\u00B2\u00B3\u00B9]|\b[a-z0-9](?:\.|\)|\]|\b)|[A-Za-z0-9\s]{1,20}\s*[\:\-–—])/i;
 
   for (let i = 0; i < paragraphs.length; i++) {
     const p = paragraphs[i];

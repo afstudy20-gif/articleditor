@@ -569,20 +569,6 @@ export function TablePanel({
           <div className="px-3 py-2 space-y-2">
             <p className="text-xs text-muted">{t('tbl_import_desc')}</p>
 
-            <input
-              type="text"
-              value={importTitle}
-              onChange={(e) => setImportTitle(e.target.value)}
-              placeholder={t('tbl_title_placeholder')}
-              className="w-full text-xs px-2 py-1.5 border border-border rounded"
-            />
-            <textarea
-              value={importFootnote}
-              onChange={(e) => setImportFootnote(e.target.value)}
-              placeholder={t('tbl_footnote_placeholder')}
-              className="w-full min-h-16 resize-y text-xs px-2 py-1.5 border border-border rounded"
-            />
-
             <div className="rounded-md border border-border bg-slate-50 p-2">
               <div className="mb-1.5 text-[10px] font-semibold text-primary">{t('tbl_blank_table')}</div>
               <div className="flex items-center gap-1.5">
@@ -672,9 +658,29 @@ export function TablePanel({
 
           {/* Import preview */}
           {importPreview && (
-            <div className="px-3 py-2 border-t border-border">
-              <div className="text-[10px] text-muted font-semibold mb-1">{t('tbl_preview')}</div>
-              <label className="mb-2 flex items-center gap-1.5 text-[10px] text-secondary">
+            <div className="px-3 py-2 border-t border-border space-y-2">
+              <div className="text-[10px] text-muted font-semibold">{t('tbl_preview')}</div>
+
+              <div>
+                <input
+                  type="text"
+                  value={importTitle}
+                  onChange={(e) => setImportTitle(e.target.value)}
+                  placeholder={t('tbl_title_placeholder')}
+                  className="w-full text-xs px-2 py-1.5 border border-border rounded"
+                />
+              </div>
+
+              <div>
+                <textarea
+                  value={importFootnote}
+                  onChange={(e) => setImportFootnote(e.target.value)}
+                  placeholder={t('tbl_footnote_placeholder')}
+                  className="w-full min-h-12 resize-y text-xs px-2 py-1.5 border border-border rounded"
+                />
+              </div>
+
+              <label className="flex items-center gap-1.5 text-[10px] text-secondary pt-1">
                 <input
                   type="checkbox"
                   checked={importPreview.hasHeader}
