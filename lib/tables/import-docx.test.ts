@@ -89,4 +89,43 @@ describe('docxParagraphsToTables', () => {
       title: 'Table 1.',
     }]);
   });
+
+  it('imports a table with title and footnote from a real DOCX package', async () => {
+    const blob = await buildRichDocx({
+      doc: {
+        type: 'doc',
+        content: [{
+          type: 'table',
+          attrs: {
+            title: 'My Custom Table Title',
+            footnote: 'Values are mean ± SD',
+          },
+          content: [
+            {
+              type: 'tableRow',
+              content: [
+                { type: 'tableHeader', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Metric' }] }] },
+              ],
+            },
+            {
+              type: 'tableRow',
+              content: [
+                { type: 'tableCell', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Value' }] }] },
+              ],
+            },
+          ],
+        }],
+      },
+      refsById: new Map<string, Ref>(),
+      refOrder: new Map<string, number>(),
+      style: 'vancouver',
+      mode: 'plain',
+    });
+
+    const tables = await parseDocxTables(await blob.arrayBuffer());
+
+    assert.equal(tables.length, 1);
+    assert.equal(tables[0].title, 'Table 1. My Custom Table Title');
+    assert.equal(tables[0].footnote, 'Values are mean ± SD');
+  });
 });

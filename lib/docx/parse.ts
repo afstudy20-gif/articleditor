@@ -25,6 +25,7 @@ export type ParagraphNode = {
   table?: string[][];
   title?: string;
   footnote?: string;
+  isResolvedFootnote?: boolean;
 };
 
 /**
@@ -58,8 +59,45 @@ export async function parseDocx(file: ArrayBuffer | Uint8Array | Blob): Promise<
     parseAttributeValue: false,
   });
   const parsed = parser.parse(documentXml) as OOXMLNode;
+
+  // Build a map of footnote/endnote IDs to their resolved text contents.
+  const notesMap = new Map<string, string>();
+  const loadNotes = async (filename: string, tagName: 'w:footnote' | 'w:endnote') => {
+    const file = zip.file(filename);
+    if (!file) return;
+    try {
+      const xml = await file.async('string');
+      const tree = parser.parse(xml) as OOXMLNode;
+      const walkNotes = (n: OOXMLValue): void => {
+        if (Array.isArray(n)) {
+          for (const item of n) walkNotes(item);
+          return;
+        }
+        if (!isOOXMLNode(n)) return;
+        if (tagName in n) {
+          const attrs = isOOXMLNode(n[':@']) ? (n[':@'] as OOXMLNode) : undefined;
+          const id = String(attrs?.['@_w:id'] ?? '');
+          const text = extractParagraphText(n[tagName]).trim();
+          if (id && text) {
+            notesMap.set(`${tagName}_${id}`, text);
+          }
+        } else {
+          for (const k of Object.keys(n)) {
+            if (k !== ':@') walkNotes(n[k]);
+          }
+        }
+      };
+      walkNotes(tree);
+    } catch (err) {
+      console.warn(`Failed to parse ${filename}`, err);
+    }
+  };
+
+  await loadNotes('word/footnotes.xml', 'w:footnote');
+  await loadNotes('word/endnotes.xml', 'w:endnote');
+
   const paragraphs: ParagraphNode[] = [];
-  walk(parsed, paragraphs);
+  walk(parsed, paragraphs, notesMap);
 
   // Resolve list types (bullet vs ordered) from word/numbering.xml.
   const numFmtById = await parseNumberingMap(zip, parser);
@@ -70,9 +108,10 @@ export async function parseDocx(file: ArrayBuffer | Uint8Array | Blob): Promise<
     }
   }
 
-  // Post-process to detect and link table titles and footnotes
+  // Post-process to detect and link table titles and footnotes.
+  // Broader regex matches standard abbreviations, superscripts, daggers, or single letters/digits followed by dot/parenthesis.
   const processed: ParagraphNode[] = [];
-  const footnoteRegex = /^\s*(Note|Not|Values|Data|Mean|SD|p\s*[\d<>]|\*|†|‡|§|¶|#|Source|Kaynak)/i;
+  const footnoteRegex = /^\s*(Note|Not|Values|Data|Mean|SD|p\s*[\d<>]|Source|Kaynak|Abbreviation|Kısaltma|Statistical|İstatistik|[\*†‡§¶#¹²³⁴⁵⁶⁷⁸⁹⁺⁻ⁿⁱ₀₁₂₃₄₅₆₇₈₉\u00B2\u00B3\u00B9]|\b[a-z0-9](?:\.|\)|\]|\b))/i;
 
   for (let i = 0; i < paragraphs.length; i++) {
     const p = paragraphs[i];
@@ -93,25 +132,43 @@ export async function parseDocx(file: ArrayBuffer | Uint8Array | Blob): Promise<
         }
       }
 
-      // 2. Look ahead for a footnote
-      let footnote: string | undefined = undefined;
+      // 2. Look ahead for multiple adjacent footnote paragraphs
+      const footnotes: string[] = p.footnote ? [p.footnote] : [];
       let nextIdx = i + 1;
-      while (nextIdx < paragraphs.length && paragraphs[nextIdx].text.trim().length === 0) {
-        nextIdx++;
-      }
-      if (nextIdx < paragraphs.length) {
+      while (nextIdx < paragraphs.length) {
+        if (paragraphs[nextIdx].text.trim().length === 0) {
+          nextIdx++;
+          continue;
+        }
         const next = paragraphs[nextIdx];
         const nextText = next.text.trim();
+        
+        if (next.table) break;
+        
         const isHeadingStyle = next.style?.toLowerCase().includes('heading') || next.style?.toLowerCase() === 'title';
         const isHeadingText = ['references', 'kaynaklar', 'bibliography', 'literatür', 'introduction', 'giriş', 'methods', 'yöntem', 'results', 'bulgular', 'discussion', 'tartışma', 'abstract', 'öz', 'özet'].includes(
           nextText.toLowerCase().replace(/[\d.\s]+/g, ''),
         );
-        const isHeading = isHeadingStyle || isHeadingText;
+        if (isHeadingStyle || isHeadingText) break;
 
-        if (!next.table && !isHeading && (footnoteRegex.test(nextText) || nextText.length < 250)) {
-          footnote = nextText;
+        const isFootnoteStyle = next.style?.toLowerCase().includes('footnote') || next.style?.toLowerCase().includes('note');
+        const matchesRegex = footnoteRegex.test(nextText);
+        
+        // Match if it matches style, regex, isResolvedFootnote, or if we already started a footnote block and it is short.
+        const isFootnote = matchesRegex || isFootnoteStyle || next.isResolvedFootnote || (footnotes.length > 0 && nextText.length < 350);
+
+        if (isFootnote) {
+          footnotes.push(nextText);
           (next as any)._isFootnoteMerged = true;
+          nextIdx++;
+        } else {
+          break;
         }
+      }
+
+      let footnote: string | undefined = undefined;
+      if (footnotes.length > 0) {
+        footnote = footnotes.join('\n');
       }
 
       processed.push({
@@ -207,9 +264,41 @@ async function parseNumberingMap(
   }
 }
 
-function walk(node: OOXMLValue, out: ParagraphNode[]): void {
+function resolveNoteTexts(node: OOXMLValue, notesMap: Map<string, string>): string[] {
+  const texts: string[] = [];
+  const recurse = (item: OOXMLValue): void => {
+    if (Array.isArray(item)) {
+      for (const val of item) recurse(val);
+      return;
+    }
+    if (!isOOXMLNode(item)) return;
+    for (const k of Object.keys(item)) {
+      if (k === 'w:footnoteReference') {
+        const attrs = isOOXMLNode(item[':@']) ? (item[':@'] as OOXMLNode) : undefined;
+        const id = String(attrs?.['@_w:id'] ?? '');
+        if (id) {
+          const text = notesMap.get(`w:footnote_${id}`);
+          if (text) texts.push(text);
+        }
+      } else if (k === 'w:endnoteReference') {
+        const attrs = isOOXMLNode(item[':@']) ? (item[':@'] as OOXMLNode) : undefined;
+        const id = String(attrs?.['@_w:id'] ?? '');
+        if (id) {
+          const text = notesMap.get(`w:endnote_${id}`);
+          if (text) texts.push(text);
+        }
+      } else if (k !== ':@') {
+        recurse(item[k]);
+      }
+    }
+  };
+  recurse(node);
+  return texts;
+}
+
+function walk(node: OOXMLValue, out: ParagraphNode[], notesMap: Map<string, string>): void {
   if (Array.isArray(node)) {
-    for (const item of node) walk(item, out);
+    for (const item of node) walk(item, out, notesMap);
     return;
   }
   if (!isOOXMLNode(node)) return;
@@ -217,25 +306,40 @@ function walk(node: OOXMLValue, out: ParagraphNode[]): void {
     if (key === 'w:tbl') {
       const rows = extractTableRows(node[key]);
       if (rows.length > 0) {
-        out.push({
+        const tableFootnotes = resolveNoteTexts(node[key], notesMap);
+        const para: ParagraphNode = {
           text: rows.map((r) => r.join('\t')).join('\n'),
           table: rows,
-        });
+        };
+        if (tableFootnotes.length > 0) {
+          para.footnote = tableFootnotes.join('\n');
+        }
+        out.push(para);
       }
       // Do NOT recurse — cell paragraphs are already captured in `rows`.
     } else if (key === 'w:p') {
-      const text = extractParagraphText(node[key]);
+      const textParts = [extractParagraphText(node[key])];
+      const referencedTexts = resolveNoteTexts(node[key], notesMap);
+      let isResolvedFootnote = false;
+      if (referencedTexts.length > 0) {
+        textParts.push(...referencedTexts);
+        isResolvedFootnote = true;
+      }
+      const text = textParts.join(' ').trim();
       const style = extractStyle(node[key]);
       const runs = extractParagraphRuns(node[key]);
       const listInfo = extractListInfo(node[key]);
       const para: ParagraphNodeInternal = { text, style, runs };
+      if (isResolvedFootnote) {
+        para.isResolvedFootnote = true;
+      }
       if (listInfo) {
         para.list = { type: 'ordered', level: listInfo.ilvl }; // refined via numbering.xml
         para.numId = listInfo.numId;
       }
       out.push(para);
     } else if (key !== ':@') {
-      walk(node[key], out);
+      walk(node[key], out, notesMap);
     }
   }
 }
