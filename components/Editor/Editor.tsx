@@ -106,7 +106,7 @@ export function ArticleEditor({
       StarterKit.configure({ heading: { levels: [1, 2, 3] } }),
       Placeholder.configure({ placeholder: t('ed_placeholder') }),
       Link.configure({ openOnClick: false }),
-      ManuscriptTable.configure({ resizable: true, View: ManuscriptTableView }),
+      ManuscriptTable.configure({ resizable: true }),
       TableRow,
       TableHeader,
       TableCell,

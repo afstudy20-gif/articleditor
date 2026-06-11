@@ -23,6 +23,8 @@ export type ParagraphNode = {
   list?: { type: 'bullet' | 'ordered'; level: number };
   /** Present when this node is a table — rows × cells of plain text. */
   table?: string[][];
+  title?: string;
+  footnote?: string;
 };
 
 /**
@@ -68,8 +70,62 @@ export async function parseDocx(file: ArrayBuffer | Uint8Array | Blob): Promise<
     }
   }
 
-  const plainText = paragraphs.map((p) => p.text).join('\n');
-  return { paragraphs, plainText, zip, documentXml };
+  // Post-process to detect and link table titles and footnotes
+  const processed: ParagraphNode[] = [];
+  const footnoteRegex = /^\s*(Note|Not|Values|Data|Mean|SD|p\s*[\d<>]|\*|†|‡|§|¶|#|Source|Kaynak)/i;
+
+  for (let i = 0; i < paragraphs.length; i++) {
+    const p = paragraphs[i];
+    if (p.table && p.table.length > 0) {
+      // 1. Look back for a title
+      let title: string | undefined = undefined;
+      let prevIdx = processed.length - 1;
+      while (prevIdx >= 0 && processed[prevIdx].text.trim().length === 0) {
+        prevIdx--;
+      }
+      if (prevIdx >= 0) {
+        const prev = processed[prevIdx];
+        const prevText = prev.text.trim();
+        // If the preceding paragraph starts with Table/Tablo followed by a number
+        if (!prev.table && /^\s*(Table|Tablo)\s+\d+/i.test(prevText)) {
+          title = prevText;
+          processed.splice(prevIdx, 1);
+        }
+      }
+
+      // 2. Look ahead for a footnote
+      let footnote: string | undefined = undefined;
+      let nextIdx = i + 1;
+      while (nextIdx < paragraphs.length && paragraphs[nextIdx].text.trim().length === 0) {
+        nextIdx++;
+      }
+      if (nextIdx < paragraphs.length) {
+        const next = paragraphs[nextIdx];
+        const nextText = next.text.trim();
+        const isHeadingStyle = next.style?.toLowerCase().includes('heading') || next.style?.toLowerCase() === 'title';
+        const isHeadingText = ['references', 'kaynaklar', 'bibliography', 'literatür', 'introduction', 'giriş', 'methods', 'yöntem', 'results', 'bulgular', 'discussion', 'tartışma', 'abstract', 'öz', 'özet'].includes(
+          nextText.toLowerCase().replace(/[\d.\s]+/g, ''),
+        );
+        const isHeading = isHeadingStyle || isHeadingText;
+
+        if (!next.table && !isHeading && (footnoteRegex.test(nextText) || nextText.length < 250)) {
+          footnote = nextText;
+          (next as any)._isFootnoteMerged = true;
+        }
+      }
+
+      processed.push({
+        ...p,
+        title,
+        footnote,
+      });
+    } else if (!(p as any)._isFootnoteMerged) {
+      processed.push(p);
+    }
+  }
+
+  const plainText = processed.map((p) => p.text).join('\n');
+  return { paragraphs: processed, plainText, zip, documentXml };
 }
 
 type ParagraphNodeInternal = ParagraphNode & { numId?: string };

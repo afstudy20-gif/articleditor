@@ -9,6 +9,8 @@ export type ImportParagraph = {
   runs?: ImportRun[];
   list?: { type: 'bullet' | 'ordered'; level: number };
   table?: string[][];
+  title?: string;
+  footnote?: string;
 };
 
 export function buildDocWithCitations(
@@ -30,7 +32,10 @@ export function buildDocWithCitations(
   for (const paragraph of paragraphs) {
     if (paragraph.table && paragraph.table.length > 0) {
       flushList();
-      const tableNode = rowsToTiptapTable(paragraph.table, true);
+      const tableNode = rowsToTiptapTable(paragraph.table, true, {
+        title: paragraph.title,
+        footnote: paragraph.footnote,
+      });
       if (tableNode) content.push(tableNode);
       continue;
     }

@@ -42,4 +42,10 @@ export const ManuscriptTable = Table.extend({
       },
     };
   },
+
+  addNodeView() {
+    return ({ node }) => {
+      return new ManuscriptTableView(node, this.options.cellMinWidth);
+    };
+  },
 });

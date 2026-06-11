@@ -16,13 +16,16 @@ export function docxParagraphsToTables(paragraphs: ParagraphNode[]): ParsedTable
         while (normalized.length < maxColumns) normalized.push('');
         return normalized;
       });
-      return {
+      const res: ParsedTable = {
         rows,
         // Word's OOXML header metadata is not consistently present. Default to
         // the common case and let the user toggle this in the import preview.
         hasHeader: true,
         format: 'docx' as const,
       };
+      if (paragraph.title !== undefined) res.title = paragraph.title;
+      if (paragraph.footnote !== undefined) res.footnote = paragraph.footnote;
+      return res;
     })
     .filter((table): table is ParsedTable => table !== null);
 }

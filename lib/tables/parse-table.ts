@@ -8,6 +8,8 @@ export type ParsedTable = {
   hasHeader: boolean;
   /** Source format detected */
   format: 'html' | 'csv' | 'tsv' | 'text' | 'docx';
+  title?: string;
+  footnote?: string;
 };
 
 /** Try all formats in priority order. Returns null if nothing detected. */

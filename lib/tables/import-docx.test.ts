@@ -86,6 +86,7 @@ describe('docxParagraphsToTables', () => {
       ],
       hasHeader: true,
       format: 'docx',
+      title: 'Table 1.',
     }]);
   });
 });

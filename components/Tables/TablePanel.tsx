@@ -153,6 +153,8 @@ export function TablePanel({
         }
         setWordTables(tables);
         setImportPreview(tables[0]);
+        setImportTitle(tables[0].title ?? '');
+        setImportFootnote(tables[0].footnote ?? '');
         setImportText('');
         return;
       }
@@ -161,6 +163,8 @@ export function TablePanel({
       setImportText(text);
       const parsed = parseTable(text);
       setImportPreview(parsed);
+      setImportTitle(parsed?.title ?? '');
+      setImportFootnote(parsed?.footnote ?? '');
       if (!parsed) setImportError(t('tbl_import_invalid'));
     } catch (err: unknown) {
       setImportPreview(null);
@@ -177,6 +181,8 @@ export function TablePanel({
     if (!table) return;
     setWordTableIndex(index);
     setImportPreview(table);
+    setImportTitle(table.title ?? '');
+    setImportFootnote(table.footnote ?? '');
   }, [wordTables]);
 
   const toggleImportHeader = useCallback((hasHeader: boolean) => {
