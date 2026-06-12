@@ -258,10 +258,11 @@ ${this.rels.join('\n')}
         );
         legends.forEach((legend) => {
           const pPr = normalStyle ? `<w:pPr><w:pStyle w:val="${normalStyle}"/></w:pPr>` : '';
+          const cleanCap = cleanCaptionPrefix(legend.caption);
           paragraphs.push(
             `<w:p>${pPr}`
             + `<w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">${escapeXml(`Figure ${legend.number}.`)}</w:t></w:r>`
-            + (legend.caption ? textRun(` ${legend.caption}`) : '')
+            + (cleanCap ? textRun(` ${cleanCap}`) : '')
             + '</w:p>',
           );
         });
@@ -481,13 +482,19 @@ ${paragraphs.join('\n')}
     const label = figId ? this.figureLabel(figId) : `${kind} ?`;
     const moveFigureCaption = kind === 'Figure'
       && this.input.figureCaptionPlacement === 'after-bibliography';
-    if (!moveFigureCaption) {
-      const capStyle = this.sid('figureCaption');
-      const capPPr = capStyle
-        ? `<w:pPr><w:pStyle w:val="${capStyle}"/></w:pPr>`
-        : '<w:pPr><w:jc w:val="center"/></w:pPr>';
+    const capStyle = this.sid('figureCaption');
+    const capPPr = capStyle
+      ? `<w:pPr><w:pStyle w:val="${capStyle}"/></w:pPr>`
+      : '<w:pPr><w:jc w:val="center"/></w:pPr>';
+    const cleanCap = cleanCaptionPrefix(caption);
+    if (moveFigureCaption) {
+      // Brief inline label only — full caption goes to Figure Legends section.
       out.push(
-        `<w:p>${capPPr}<w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">${escapeXml(`${label}.`)}</w:t></w:r>${caption ? textRun(` ${caption}`) : ''}</w:p>`,
+        `<w:p>${capPPr}<w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">${escapeXml(`${label}.`)}</w:t></w:r></w:p>`,
+      );
+    } else {
+      out.push(
+        `<w:p>${capPPr}<w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">${escapeXml(`${label}.`)}</w:t></w:r>${cleanCap ? textRun(` ${cleanCap}`) : ''}</w:p>`,
       );
     }
     return out;
@@ -812,3 +819,11 @@ const NUMBERING_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:num w:numId="1"><w:abstractNumId w:val="1"/></w:num>
 <w:num w:numId="2"><w:abstractNumId w:val="2"/></w:num>
 </w:numbering>`;
+
+function cleanCaptionPrefix(caption: string): string {
+  const trimmed = caption.trim();
+  if (!trimmed) return '';
+  // Match things like "Figure 1.", "Fig. 2:", "Table 12 -", "Tablo 3" etc.
+  const regex = /^\s*(?:Figure|Fig|Resim|Res|Table|Tab|Tablo)\.?\s*\d+\s*[\.:\-—–\s]*/i;
+  return trimmed.replace(regex, '').trim();
+}

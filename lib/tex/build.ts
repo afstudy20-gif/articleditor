@@ -226,10 +226,11 @@ class LatexRenderer {
   renderFigureLegends(): string {
     const legends = collectFigureLegends(this.doc);
     if (legends.length === 0) return '';
-    const entries = legends.map((legend) =>
-      `\\noindent\\textbf{Figure ${legend.number}.}`
-      + `${legend.caption ? ` ${escapeTex(legend.caption)}` : ''}\\par`,
-    );
+    const entries = legends.map((legend) => {
+      const cleanCap = cleanCaptionPrefix(legend.caption);
+      return `\\noindent\\textbf{Figure ${legend.number}.}`
+        + `${cleanCap ? ` ${escapeTex(cleanCap)}` : ''}\\par`;
+    });
     return `\\clearpage
 \\section*{Figure Legends}
 
@@ -405,7 +406,8 @@ ${latex}
     }
     const moveFigureCaption = kind === 'figure'
       && this.figureCaptionPlacement === 'after-bibliography';
-    if (caption && !moveFigureCaption) body.push(`  \\caption{${escapeTex(caption)}}`);
+    const cleanCap = cleanCaptionPrefix(caption);
+    if (cleanCap && !moveFigureCaption) body.push(`  \\caption{${escapeTex(cleanCap)}}`);
     else if (label) body.push(`  \\refstepcounter{${kind}}`);
     if (label) body.push(`  \\label{${label}}`);
 
@@ -662,4 +664,12 @@ function escapeTex(value: string): string {
     .replace(/~/g, '\\textasciitilde{}')
     .replace(/—/g, '---')
     .replace(/–/g, '--');
+}
+
+function cleanCaptionPrefix(caption: string): string {
+  const trimmed = caption.trim();
+  if (!trimmed) return '';
+  // Match things like "Figure 1.", "Fig. 2:", "Table 12 -", "Tablo 3" etc.
+  const regex = /^\s*(?:Figure|Fig|Resim|Res|Table|Tab|Tablo)\.?\s*\d+\s*[\.:\-—–\s]*/i;
+  return trimmed.replace(regex, '').trim();
 }

@@ -230,6 +230,9 @@ const tr: Dict = {
   // Editor formatting
   ed_placeholder: 'Metinden kaynaklarınızın ayrıştırılması için import ile dosya ekleyiniz',
   ed_insert_table: 'Tablo ekle',
+  ed_edit_table_metadata: 'Tablo Başlığı/Dipnotu Düzenle',
+  ed_table_title_prompt: 'Tablo Başlığı:',
+  ed_table_footnote_prompt: 'Tablo Dipnotu (Footnote):',
   ed_insert_image: 'Resim ekle',
   ed_image_url: 'Resim URL\'si',
   ed_underline: 'Altı çizili',
@@ -492,6 +495,7 @@ const tr: Dict = {
   tbl_first_row_header: 'İlk satırı başlık olarak kullan',
   tbl_insert_to_editor: 'Editöre ekle',
   tbl_more_rows: 'satır daha',
+  tbl_import_all_tables: 'Tüm Tabloları İçe Aktar',
   hdr_tables: 'Tablo',
 
   // Find/Replace
@@ -974,6 +978,9 @@ const en: Dict = {
   // Editor formatting
   ed_placeholder: 'Please import a file to parse your references from the text',
   ed_insert_table: 'Insert table',
+  ed_edit_table_metadata: 'Edit Table Title/Footnote',
+  ed_table_title_prompt: 'Table Title:',
+  ed_table_footnote_prompt: 'Table Footnote:',
   ed_insert_image: 'Insert image',
   ed_image_url: 'Image URL',
   ed_underline: 'Underline',
@@ -1236,6 +1243,7 @@ const en: Dict = {
   tbl_first_row_header: 'Use first row as header',
   tbl_insert_to_editor: 'Insert into editor',
   tbl_more_rows: 'more rows',
+  tbl_import_all_tables: 'Insert All Tables',
   hdr_tables: 'Tables',
 
   // Find/Replace

@@ -748,6 +748,32 @@ function HighlightPicker({ editor, t }: { editor: any; t: (k: string) => string 
   );
 }
 
+function getActiveTableAttrs(editor: any) {
+  if (!editor) return null;
+  const { state } = editor;
+  const { selection } = state;
+  let tableNode: any = null;
+  let tablePos = -1;
+  state.doc.descendants((node: any, pos: number) => {
+    if (node.type.name === 'table') {
+      if (selection.from >= pos && selection.to <= pos + node.nodeSize) {
+        tableNode = node;
+        tablePos = pos;
+      }
+      return false;
+    }
+    return true;
+  });
+  if (tableNode) {
+    return {
+      pos: tablePos,
+      title: tableNode.attrs?.title ?? '',
+      footnote: tableNode.attrs?.footnote ?? '',
+    };
+  }
+  return null;
+}
+
 function TableMenu({
   editor,
   t,
@@ -780,7 +806,34 @@ function TableMenu({
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute top-full left-0 mt-1 z-20 bg-white border border-border rounded-lg shadow-lg w-40 py-1">
+          <div className="absolute top-full left-0 mt-1 z-20 bg-white border border-border rounded-lg shadow-lg w-48 py-1">
+            <button
+              onClick={() => {
+                const attrs = getActiveTableAttrs(editor);
+                if (attrs) {
+                  const newTitle = window.prompt(t('ed_table_title_prompt'), attrs.title);
+                  if (newTitle !== null) {
+                    const newFootnote = window.prompt(t('ed_table_footnote_prompt'), attrs.footnote);
+                    if (newFootnote !== null) {
+                      const node = editor.state.doc.nodeAt(attrs.pos);
+                      if (node) {
+                        editor.view.dispatch(
+                          editor.state.tr.setNodeMarkup(attrs.pos, undefined, {
+                            ...node.attrs,
+                            title: newTitle,
+                            footnote: newFootnote,
+                          })
+                        );
+                      }
+                    }
+                  }
+                }
+                setOpen(false);
+              }}
+              className="block w-full text-left px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal font-semibold border-b border-border"
+            >
+              📝 {t('ed_edit_table_metadata')}
+            </button>
             <button
               onClick={() => { editor.chain().focus().addColumnAfter().run(); setOpen(false); }}
               className="block w-full text-left px-3 py-1.5 text-xs hover:bg-teal-bg hover:text-teal"

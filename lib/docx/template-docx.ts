@@ -72,7 +72,7 @@ export async function buildTemplateDocx(
     style: template.citationStyle ?? input.style,
     bibHeading: input.bibHeading ?? template.bibHeading,
     styleMap: template.styleMap,
-    figureCaptionPlacement: 'inline',
+    figureCaptionPlacement: 'after-bibliography',
     // Templates ship their own media/imageN.* parts — avoid name collisions.
     imageNamePrefix: 'enr-image',
   });

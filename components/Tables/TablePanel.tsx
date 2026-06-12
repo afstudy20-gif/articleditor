@@ -212,6 +212,32 @@ export function TablePanel({
     setImportError('');
   }, [importPreview, importTitle, importFootnote, editor]);
 
+  const insertAllImportedTables = useCallback(() => {
+    if (wordTables.length === 0 || !editor) return;
+    let chain = editor.chain().focus();
+    wordTables.forEach((table, index) => {
+      const tableJson = rowsToTiptapTable(table.rows, table.hasHeader, {
+        title: index === wordTableIndex ? importTitle : (table.title ?? ''),
+        footnote: index === wordTableIndex ? importFootnote : (table.footnote ?? ''),
+      });
+      if (tableJson) {
+        chain = chain.insertContent(tableJson);
+        if (index < wordTables.length - 1) {
+          chain = chain.insertContent({ type: 'paragraph' });
+        }
+      }
+    });
+    chain.run();
+    setView('list');
+    setImportText('');
+    setImportPreview(null);
+    setImportTitle('');
+    setImportFootnote('');
+    setWordTables([]);
+    setWordTableIndex(0);
+    setImportError('');
+  }, [wordTables, wordTableIndex, importTitle, importFootnote, editor]);
+
   const createBlankTablePreview = useCallback(() => {
     const rows = Math.min(Math.max(blankRows, 1), 50);
     const cols = Math.min(Math.max(blankCols, 1), 20);
@@ -703,12 +729,22 @@ export function TablePanel({
                 </table>
               </div>
 
-              <button
-                onClick={insertImportedTable}
-                className="mt-2 w-full text-xs px-3 py-1.5 bg-teal text-white rounded hover:bg-teal-dark font-semibold"
-              >
-                {t('tbl_insert_to_editor')}
-              </button>
+              <div className="flex gap-2 mt-2">
+                <button
+                  onClick={insertImportedTable}
+                  className="flex-1 text-xs px-3 py-1.5 bg-teal text-white rounded hover:bg-teal-dark font-semibold"
+                >
+                  {t('tbl_insert_to_editor')}
+                </button>
+                {wordTables.length > 1 && (
+                  <button
+                    onClick={insertAllImportedTables}
+                    className="flex-1 text-xs px-3 py-1.5 border border-teal text-teal hover:bg-teal-bg rounded font-semibold animate-pulse-subtle"
+                  >
+                    {t('tbl_import_all_tables')}
+                  </button>
+                )}
+              </div>
             </div>
           )}
         </div>

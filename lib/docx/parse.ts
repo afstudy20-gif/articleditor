@@ -111,7 +111,18 @@ export async function parseDocx(file: ArrayBuffer | Uint8Array | Blob): Promise<
   // Post-process to detect and link table titles and footnotes.
   // Broader regex matches standard abbreviations, superscripts, daggers, or single letters/digits followed by dot/parenthesis.
   const processed: ParagraphNode[] = [];
-  const footnoteRegex = /^\s*(Note|Not|Values|Data|Mean|SD|p\s*[\d<>]|Source|Kaynak|Abbreviation|Kısaltma|Statistical|İstatistik|[\*†‡§¶#¹²³⁴⁵⁶⁷⁸⁹⁺⁻ⁿⁱ₀₁₂₃₄₅₆₇₈₉\u00B2\u00B3\u00B9]|\b[a-z0-9](?:\.|\)|\]|\b)|[A-Za-z0-9\s]{1,20}\s*[\:\-–—])/i;
+  const footnoteRegex = /^\s*(Note|Not|Values|Değerler|Data|Veri|Veriler|Mean|Ortalama|SD|p\s*[\d<>]|Source|Kaynak|Abbreviation|Kısaltma|Kısaltmalar|Statistical|İstatistik|Açıklama|Açıklamalar|[\*†‡§¶#¹²³⁴⁵⁶⁷⁸⁹⁺⁻ⁿⁱ₀₁₂₃₄₅₆₇₈₉\u00B2\u00B3\u00B9]|\b[a-z0-9](?:\.|\)|\]|:)|[A-Za-z0-9\s]{1,20}\s*[\:\-–—])/i;
+  const isTableTitle = (paragraph: ParagraphNode): boolean => {
+    const text = paragraph.text.trim();
+    const style = paragraph.style?.toLowerCase() ?? '';
+    const hasCaptionStyle = (
+      style.includes('caption') ||
+      style.includes('title') ||
+      style.includes('başlık') ||
+      style.includes('baslik')
+    ) && !style.includes('heading');
+    return /^\s*(Table|Tablo)\s+\d+/i.test(text) || hasCaptionStyle;
+  };
 
   for (let i = 0; i < paragraphs.length; i++) {
     const p = paragraphs[i];
@@ -125,8 +136,8 @@ export async function parseDocx(file: ArrayBuffer | Uint8Array | Blob): Promise<
       if (prevIdx >= 0) {
         const prev = processed[prevIdx];
         const prevText = prev.text.trim();
-        // If the preceding paragraph starts with Table/Tablo followed by a number
-        if (!prev.table && /^\s*(Table|Tablo)\s+\d+/i.test(prevText)) {
+        // If it starts with Table/Tablo followed by a number, or matches caption/title style
+        if (!prev.table && isTableTitle(prev)) {
           title = prevText;
           processed.splice(prevIdx, 1);
         }
@@ -144,6 +155,9 @@ export async function parseDocx(file: ArrayBuffer | Uint8Array | Blob): Promise<
         const nextText = next.text.trim();
         
         if (next.table) break;
+        // A following table caption belongs to the next table, even when a
+        // previous footnote paragraph started a short continuation block.
+        if (isTableTitle(next)) break;
         
         const isHeadingStyle = next.style?.toLowerCase().includes('heading') || next.style?.toLowerCase() === 'title';
         const isHeadingText = ['references', 'kaynaklar', 'bibliography', 'literatür', 'introduction', 'giriş', 'methods', 'yöntem', 'results', 'bulgular', 'discussion', 'tartışma', 'abstract', 'öz', 'özet'].includes(
@@ -151,7 +165,8 @@ export async function parseDocx(file: ArrayBuffer | Uint8Array | Blob): Promise<
         );
         if (isHeadingStyle || isHeadingText) break;
 
-        const isFootnoteStyle = next.style?.toLowerCase().includes('footnote') || next.style?.toLowerCase().includes('note');
+        const nextStyle = next.style?.toLowerCase() ?? '';
+        const isFootnoteStyle = nextStyle.includes('footnote') || nextStyle.includes('note') || nextStyle.includes('dipnot');
         const matchesRegex = footnoteRegex.test(nextText);
         
         // Match if it matches style, regex, isResolvedFootnote, or if we already started a footnote block and it is short.
