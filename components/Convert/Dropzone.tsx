@@ -1,12 +1,15 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import { useLang } from '@/lib/i18n/hooks';
 
 type Props = {
   onFile: (file: File) => void;
 };
 
 export function Dropzone({ onFile }: Props) {
+  const { lang } = useLang();
+  const tr = lang === 'tr';
   const inputRef = useRef<HTMLInputElement>(null);
   const [drag, setDrag] = useState(false);
 
@@ -39,8 +42,8 @@ export function Dropzone({ onFile }: Props) {
         }}
       />
       <div className="text-4xl mb-2">📄</div>
-      <p className="font-semibold text-primary">.docx dosyasını buraya bırak veya tıkla</p>
-      <p className="text-xs text-muted mt-1">Belge tarayıcıda işlenir; sunucuya yüklenmez.</p>
+      <p className="font-semibold text-primary">{tr ? '.docx dosyasını buraya bırak veya tıkla' : 'Drop a .docx file here or click'}</p>
+      <p className="text-xs text-muted mt-1">{tr ? 'Belge tarayıcıda işlenir; sunucuya yüklenmez.' : 'The document is processed in your browser; nothing is uploaded.'}</p>
     </div>
   );
 }

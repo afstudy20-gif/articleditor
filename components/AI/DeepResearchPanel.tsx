@@ -20,6 +20,7 @@ type Props = {
 
 export function DeepResearchPanel({ initialAbstract, onClose, onAddRef }: Props): JSX.Element {
   const { lang } = useLang();
+  const tr = lang === 'tr';
   const [title, setTitle] = useState('');
   const [abstract, setAbstract] = useState(initialAbstract);
   const [loading, setLoading] = useState(false);
@@ -29,7 +30,7 @@ export function DeepResearchPanel({ initialAbstract, onClose, onAddRef }: Props)
 
   async function run(): Promise<void> {
     if (abstract.trim().length < 50) {
-      setError('Özet en az 50 karakter olmalı.');
+      setError(tr ? 'Özet en az 50 karakter olmalı.' : 'The abstract must be at least 50 characters.');
       return;
     }
     setLoading(true);
@@ -60,8 +61,8 @@ export function DeepResearchPanel({ initialAbstract, onClose, onAddRef }: Props)
     <div className="card flex flex-col h-full">
       <div className="flex items-center justify-between border-b border-border px-3 py-2">
         <div>
-          <h3 className="font-semibold text-primary text-sm">🗺️ Related work haritası</h3>
-          <p className="text-xs text-muted">CrossRef + OpenAlex + PubMed → tematik kümeler</p>
+          <h3 className="font-semibold text-primary text-sm">🗺️ {tr ? 'Related work haritası' : 'Related work map'}</h3>
+          <p className="text-xs text-muted">CrossRef + OpenAlex + PubMed → {tr ? 'tematik kümeler' : 'thematic clusters'}</p>
         </div>
         <button onClick={onClose} className="text-muted hover:text-primary text-lg leading-none">
           ×
@@ -70,7 +71,7 @@ export function DeepResearchPanel({ initialAbstract, onClose, onAddRef }: Props)
 
       <div className="flex-1 overflow-auto p-3 space-y-3 text-sm">
         <div>
-          <label className="tool-label block mb-1">Başlık (opsiyonel)</label>
+          <label className="tool-label block mb-1">{tr ? 'Başlık (opsiyonel)' : 'Title (optional)'}</label>
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
@@ -78,7 +79,7 @@ export function DeepResearchPanel({ initialAbstract, onClose, onAddRef }: Props)
           />
         </div>
         <div>
-          <label className="tool-label block mb-1">Özet</label>
+          <label className="tool-label block mb-1">{tr ? 'Özet' : 'Abstract'}</label>
           <textarea
             value={abstract}
             onChange={(e) => setAbstract(e.target.value)}
@@ -91,13 +92,13 @@ export function DeepResearchPanel({ initialAbstract, onClose, onAddRef }: Props)
           disabled={loading}
           className="btn-primary text-sm px-4 py-1.5 disabled:opacity-50 w-full"
         >
-          {loading ? 'Harita oluşturuluyor (30-60s)…' : '🗺️ Haritayı oluştur'}
+          {loading ? (tr ? 'Harita oluşturuluyor (30-60s)…' : 'Building the map (30–60s)…') : (tr ? '🗺️ Haritayı oluştur' : '🗺️ Build the map')}
         </button>
         {error && <p className="text-red text-xs">{error}</p>}
 
         {positioning && (
           <div className="bg-teal-bg border border-teal/30 rounded-lg p-2 text-xs text-secondary">
-            <span className="tool-label">Konumlandırma</span>
+            <span className="tool-label">{tr ? 'Konumlandırma' : 'Positioning'}</span>
             <p className="mt-1 leading-relaxed">{positioning}</p>
           </div>
         )}
@@ -118,7 +119,7 @@ export function DeepResearchPanel({ initialAbstract, onClose, onAddRef }: Props)
               {c.refs.map((r) => (
                 <div key={r.id} className="flex items-start gap-2 border-t border-border pt-1">
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium text-primary truncate">{r.title ?? '(Başlıksız)'}</div>
+                    <div className="font-medium text-primary truncate">{r.title ?? (tr ? '(Başlıksız)' : '(Untitled)')}</div>
                     <div className="text-muted truncate">
                       {r.authors[0]?.family || '—'}
                       {r.authors.length > 1 ? ' et al.' : ''} · {r.year ?? '?'} ·{' '}
@@ -130,7 +131,7 @@ export function DeepResearchPanel({ initialAbstract, onClose, onAddRef }: Props)
                     onClick={() => onAddRef(r)}
                     className="text-[11px] text-teal hover:underline shrink-0"
                   >
-                    + Kütüphaneye
+                    + {tr ? 'Kütüphaneye' : 'To library'}
                   </button>
                 </div>
               ))}

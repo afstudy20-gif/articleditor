@@ -12,7 +12,8 @@ type Props = {
 };
 
 export function CitationInsertPicker({ allRefs, refOrder, onClose, onInsert }: Props): JSX.Element {
-  const { t } = useLang();
+  const { t, lang } = useLang();
+  const tr = lang === 'tr';
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const inputRef = useRef<HTMLInputElement>(null);
@@ -87,11 +88,12 @@ export function CitationInsertPicker({ allRefs, refOrder, onClose, onInsert }: P
             ref={inputRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Başlık, yazar, yıl, DOI ile ara…"
+            placeholder={tr ? 'Başlık, yazar, yıl, DOI ile ara…' : 'Search by title, author, year, DOI…'}
             className="w-full border border-border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-teal"
           />
           <p className="text-xs text-muted">
-            Tek tıkla anında yerleştir. <strong>Checkbox</strong> ile çoklu seç → birlikte yerleştir butonu (`[1,2,3]`).
+            {tr ? <>Tek tıkla anında yerleştir. <strong>Checkbox</strong> ile çoklu seç → birlikte yerleştir butonu (`[1,2,3]`).</>
+                : <>Click once to insert instantly. Use the <strong>checkbox</strong> to multi-select → insert together (`[1,2,3]`).</>}
           </p>
         </div>
 
@@ -127,10 +129,10 @@ export function CitationInsertPicker({ allRefs, refOrder, onClose, onInsert }: P
                   <div
                     className="flex-1 min-w-0 cursor-pointer"
                     onClick={() => insertSingle(r.id)}
-                    title="Tek tıkla yerleştir"
+                    title={tr ? 'Tek tıkla yerleştir' : 'Click to insert'}
                   >
                     <div className="font-medium text-primary leading-snug line-clamp-2">
-                      {r.title || '(Başlıksız)'}
+                      {r.title || (tr ? '(Başlıksız)' : '(Untitled)')}
                     </div>
                     <div className="text-xs text-muted truncate mt-0.5">
                       {r.authors[0]?.family || r.authors[0]?.literal || '—'}
@@ -141,7 +143,7 @@ export function CitationInsertPicker({ allRefs, refOrder, onClose, onInsert }: P
                     onClick={() => insertSingle(r.id)}
                     className="text-xs text-teal hover:underline shrink-0 self-center"
                   >
-                    Yerleştir →
+                    {tr ? 'Yerleştir →' : 'Insert →'}
                   </button>
                 </div>
               </li>
@@ -151,7 +153,9 @@ export function CitationInsertPicker({ allRefs, refOrder, onClose, onInsert }: P
 
         <div className="px-4 py-3 border-t border-border flex items-center justify-between gap-2">
           <span className="text-xs text-muted">
-            {selected.size > 0 ? `${selected.size} ref seçili` : 'Tek tıkla yerleştir veya checkbox ile çoklu seç'}
+            {selected.size > 0
+              ? (tr ? `${selected.size} ref seçili` : `${selected.size} refs selected`)
+              : (tr ? 'Tek tıkla yerleştir veya checkbox ile çoklu seç' : 'Click to insert one, or checkbox to multi-select')}
           </span>
           <div className="flex gap-2">
             <button onClick={onClose} className="btn-secondary text-xs">
@@ -162,7 +166,7 @@ export function CitationInsertPicker({ allRefs, refOrder, onClose, onInsert }: P
               disabled={selected.size === 0}
               className="btn-primary text-xs disabled:opacity-40"
             >
-              Birlikte yerleştir ({selected.size}) →
+              {tr ? 'Birlikte yerleştir' : 'Insert together'} ({selected.size}) →
             </button>
           </div>
         </div>

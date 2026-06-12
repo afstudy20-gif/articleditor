@@ -22,12 +22,21 @@ type Props = {
   refOrder: Map<string, number>;
 };
 
-const CLAIM_TYPE_LABELS: Record<string, string> = {
-  empirical: 'Ampirik',
-  theoretical: 'Teorik',
-  statistical: 'İstatistik',
-  attribution: 'Atfetme',
-  definition: 'Tanım',
+const CLAIM_TYPE_LABELS: Record<'tr' | 'en', Record<string, string>> = {
+  tr: {
+    empirical: 'Ampirik',
+    theoretical: 'Teorik',
+    statistical: 'İstatistik',
+    attribution: 'Atfetme',
+    definition: 'Tanım',
+  },
+  en: {
+    empirical: 'Empirical',
+    theoretical: 'Theoretical',
+    statistical: 'Statistical',
+    attribution: 'Attribution',
+    definition: 'Definition',
+  },
 };
 
 export function GapDetectPanel({
@@ -40,7 +49,8 @@ export function GapDetectPanel({
   onLoadSuggestions,
   refOrder,
 }: Props): JSX.Element {
-  const { t } = useLang();
+  const { t, lang } = useLang();
+  const tr = lang === 'tr';
   return (
     <div className="card flex flex-col h-full">
       <div className="flex items-center justify-between border-b border-border px-3 py-2">
@@ -65,6 +75,7 @@ export function GapDetectPanel({
           <ClaimCard
             key={i}
             t={t}
+            lang={lang}
             cs={cs}
             onJumpTo={onJumpTo}
             onInsertCitation={onInsertCitation}
@@ -79,6 +90,7 @@ export function GapDetectPanel({
 
 function ClaimCard({
   t,
+  lang,
   cs,
   onJumpTo,
   onInsertCitation,
@@ -86,23 +98,25 @@ function ClaimCard({
   refOrder,
 }: {
   t: (k: string) => string;
+  lang: 'tr' | 'en';
   cs: ClaimSuggestions;
   onJumpTo: (claim: ClaimT) => void;
   onInsertCitation: (claim: ClaimT, refIds: string[]) => void;
   onLoadSuggestions: (claim: ClaimT) => void;
   refOrder: Map<string, number>;
 }): JSX.Element {
+  const tr = lang === 'tr';
   return (
     <div className="border border-border rounded-lg p-2 text-xs hover:border-amber-300">
       <div className="flex items-center gap-2 mb-1">
         <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-300">
-          {CLAIM_TYPE_LABELS[cs.claim.claim_type] ?? cs.claim.claim_type}
+          {CLAIM_TYPE_LABELS[lang]?.[cs.claim.claim_type] ?? cs.claim.claim_type}
         </span>
         <button
           onClick={() => onJumpTo(cs.claim)}
           className="text-[11px] text-teal hover:underline ml-auto"
         >
-          ↑ Metinde bul
+          ↑ {tr ? 'Metinde bul' : 'Find in text'}
         </button>
       </div>
       <p className="text-primary italic mb-1 leading-snug">&ldquo;{cs.claim.quote}&rdquo;</p>
@@ -117,7 +131,7 @@ function ClaimCard({
         </button>
       )}
       {cs.loadingSuggestions && (
-        <p className="text-xs text-muted italic">Eşleşme aranıyor…</p>
+        <p className="text-xs text-muted italic">{tr ? 'Eşleşme aranıyor…' : 'Searching for matches…'}</p>
       )}
       {cs.suggestions.length > 0 && (
         <div className="space-y-1 mt-1 pt-1 border-t border-border">
@@ -131,7 +145,7 @@ function ClaimCard({
                 <div className="flex-1 min-w-0">
                   <div className="font-medium text-primary truncate">
                     {n ? `[${n}] ` : ''}
-                    {ref.title || '(Başlıksız)'}
+                    {ref.title || (tr ? '(Başlıksız)' : '(Untitled)')}
                   </div>
                   <div className="text-muted truncate">
                     {ref.authors[0]?.family || '—'} · {ref.year ?? '?'}
@@ -140,7 +154,7 @@ function ClaimCard({
                 <button
                   onClick={() => onInsertCitation(cs.claim, [ref.id])}
                   className="text-[10px] text-teal hover:underline shrink-0"
-                  title="Bu cümlenin sonuna atıf ekle"
+                  title={tr ? 'Bu cümlenin sonuna atıf ekle' : 'Add a citation at the end of this sentence'}
                 >
                   {t('ai_gaps_add')}
                 </button>

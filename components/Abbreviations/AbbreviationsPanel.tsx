@@ -119,7 +119,7 @@ export function AbbreviationsPanel({ editor, onClose, lang }: AbbreviationsPanel
         <button
           onClick={onClose}
           className="text-muted hover:text-primary text-xl font-semibold leading-none transition"
-          title="Kapat"
+          title={lang === 'tr' ? 'Kapat' : 'Close'}
         >
           ×
         </button>

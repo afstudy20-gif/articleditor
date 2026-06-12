@@ -214,7 +214,7 @@ export function ArticleEditor({
 
   const insertBtnRef = useRef<HTMLButtonElement>(null);
 
-  if (!editor) return <div className="card p-6 text-muted">Editör yükleniyor…</div>;
+  if (!editor) return <div className="card p-6 text-muted">{t('ed_loading')}</div>;
 
   return (
     <div className="card flex flex-col h-full">
@@ -328,7 +328,7 @@ export function ArticleEditor({
           ref={insertBtnRef}
           onClick={() => onInsertRequest?.()}
           className="px-3 py-1 rounded-md bg-teal text-white text-xs font-semibold hover:bg-teal-dark"
-          title="Sağdan kütüphaneden checkbox ile seçili referansları cursor konumuna ekle. Birden fazla seçilirse birleşik atıf (örn. [1,2,3]) yerleşir."
+          title={t('ed_insert_citation_hint')}
         >
           {t('ed_insert_citation')}
         </button>
@@ -504,7 +504,7 @@ function AIMenu({
               </div>
             )}
             {onScore && <MenuItem icon="📊" label={t('ed_ai_score')} onClick={() => pick(onScore)} />}
-            <MenuGroup label="Atıf" />
+            <MenuGroup label={t('ed_group_citation')} />
             {onSuggestCitation && (
               <MenuItem icon="🎯" label={t('ed_ai_suggest_citation')} onClick={() => pick(onSuggestCitation)} />
             )}

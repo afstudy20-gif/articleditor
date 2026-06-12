@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Ref } from '@/store/types';
+import { useLang } from '@/lib/i18n/hooks';
 
 type Highlight = { start: number; end: number; color: string };
 
@@ -43,10 +44,12 @@ function renderAbstract(text: string, highlights: Highlight[]): JSX.Element[] {
 }
 
 export function RefDetail({ reference: r, number, onUpdate }: Props): JSX.Element {
+  const { lang } = useLang();
+  const tr = lang === 'tr';
   if (!r) {
     return (
       <div className="card p-6 text-sm text-muted text-center">
-        Bir referansı seçince detayı burada görünecek.
+        {tr ? 'Bir referansı seçince detayı burada görünecek.' : 'Select a reference to see its details here.'}
       </div>
     );
   }
@@ -69,21 +72,21 @@ export function RefDetail({ reference: r, number, onUpdate }: Props): JSX.Elemen
             {number}
           </span>
         )}
-        <span className="text-xs uppercase tracking-wider text-muted font-semibold">Referans detayı</span>
+        <span className="text-xs uppercase tracking-wider text-muted font-semibold">{tr ? 'Referans detayı' : 'Reference details'}</span>
       </div>
 
-      <h4 className="text-sm font-bold text-primary leading-snug mb-3">{r.title || '(Başlık yok)'}</h4>
+      <h4 className="text-sm font-bold text-primary leading-snug mb-3">{r.title || (tr ? '(Başlık yok)' : '(No title)')}</h4>
 
       <dl className="text-xs space-y-2">
-        {authorStr && <Field label="Yazarlar" value={authorStr} />}
-        {r.containerTitle && <Field label="Dergi / kaynak" value={r.containerTitle} />}
+        {authorStr && <Field label={tr ? 'Yazarlar' : 'Authors'} value={authorStr} />}
+        {r.containerTitle && <Field label={tr ? 'Dergi / kaynak' : 'Journal / source'} value={r.containerTitle} />}
         <div className="flex flex-wrap gap-3">
-          {r.year && <MiniField label="Yıl" value={String(r.year)} />}
-          {r.volume && <MiniField label="Cilt" value={r.volume} />}
-          {r.issue && <MiniField label="Sayı" value={r.issue} />}
-          {r.pages && <MiniField label="Sayfa" value={r.pages} />}
+          {r.year && <MiniField label={tr ? 'Yıl' : 'Year'} value={String(r.year)} />}
+          {r.volume && <MiniField label={tr ? 'Cilt' : 'Volume'} value={r.volume} />}
+          {r.issue && <MiniField label={tr ? 'Sayı' : 'Issue'} value={r.issue} />}
+          {r.pages && <MiniField label={tr ? 'Sayfa' : 'Pages'} value={r.pages} />}
         </div>
-        {r.publisher && <Field label="Yayıncı" value={r.publisher} />}
+        {r.publisher && <Field label={tr ? 'Yayıncı' : 'Publisher'} value={r.publisher} />}
         {r.doi && (
           <Field
             label="DOI"
@@ -129,13 +132,13 @@ export function RefDetail({ reference: r, number, onUpdate }: Props): JSX.Elemen
             }
           />
         )}
-        {r.confidence != null && <Field label="Parser güveni" value={`${Math.round(r.confidence * 100)}%`} />}
+        {r.confidence != null && <Field label={tr ? 'Parser güveni' : 'Parser confidence'} value={`${Math.round(r.confidence * 100)}%`} />}
       </dl>
 
       {r.userNote && (
         <div className="mt-4 pt-3 border-t border-border">
           <div className="tool-label mb-1.5 flex items-center gap-1">
-            <span>📝 Notum</span>
+            <span>📝 {tr ? 'Notum' : 'My note'}</span>
           </div>
           <p className="text-xs text-secondary leading-relaxed whitespace-pre-wrap bg-teal-bg/30 border border-teal/20 rounded p-2">
             {r.userNote}
@@ -152,7 +155,7 @@ export function RefDetail({ reference: r, number, onUpdate }: Props): JSX.Elemen
 
       {r.raw && (
         <details className="mt-4 pt-3 border-t border-border">
-          <summary className="tool-label cursor-pointer hover:text-teal">Orijinal satır</summary>
+          <summary className="tool-label cursor-pointer hover:text-teal">{tr ? 'Orijinal satır' : 'Original line'}</summary>
           <p className="text-xs text-muted font-mono mt-2 leading-relaxed whitespace-pre-wrap break-words">{r.raw}</p>
         </details>
       )}
@@ -171,6 +174,8 @@ function AbstractWithHighlights({
   highlights: Highlight[];
   onChange?: (next: Highlight[]) => void;
 }): JSX.Element {
+  const { lang } = useLang();
+  const tr = lang === 'tr';
   const containerRef = useRef<HTMLParagraphElement>(null);
   const [selection, setSelection] = useState<{ start: number; end: number } | null>(null);
 
@@ -220,10 +225,10 @@ function AbstractWithHighlights({
   return (
     <div className="mt-4 pt-3 border-t border-border">
       <div className="flex items-center justify-between mb-1.5">
-        <div className="tool-label">Özet</div>
+        <div className="tool-label">{tr ? 'Özet' : 'Abstract'}</div>
         {text && onChange && normalized.length > 0 && (
           <button onClick={clearAll} className="text-[10px] text-muted hover:text-red">
-            ✕ vurguları temizle
+            ✕ {tr ? 'vurguları temizle' : 'clear highlights'}
           </button>
         )}
       </div>
@@ -239,7 +244,7 @@ function AbstractWithHighlights({
           </p>
           {selection && onChange && (
             <div className="mt-2 flex items-center gap-1.5 flex-wrap">
-              <span className="text-[10px] text-muted">Vurgula:</span>
+              <span className="text-[10px] text-muted">{tr ? 'Vurgula:' : 'Highlight:'}</span>
               {PALETTE.map((p) => (
                 <button
                   key={p.value}
@@ -256,14 +261,16 @@ function AbstractWithHighlights({
                 }}
                 className="text-[10px] text-muted hover:text-primary ml-1"
               >
-                iptal
+                {tr ? 'iptal' : 'cancel'}
               </button>
             </div>
           )}
         </>
       ) : (
         <p className="text-xs text-faint italic">
-          Açık erişimli özet bulunamadı. DOI tara ile CrossRef/OpenAlex/PubMed&apos;den çekilebilir.
+          {tr
+            ? "Açık erişimli özet bulunamadı. DOI tara ile CrossRef/OpenAlex/PubMed'den çekilebilir."
+            : 'No open-access abstract found. Use DOI lookup to fetch it from CrossRef/OpenAlex/PubMed.'}
         </p>
       )}
     </div>

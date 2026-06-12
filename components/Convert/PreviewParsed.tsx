@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react';
 import type { Ref, MarkerOccurrence } from '@/store/types';
+import { useLang } from '@/lib/i18n/hooks';
 
 type Props = {
   bodyText: string;
@@ -27,6 +28,8 @@ export function PreviewParsed({
   onReset,
   lookupAllBusy,
 }: Props) {
+  const { lang } = useLang();
+  const tr = lang === 'tr';
   const wordCount = bodyText.trim().split(/\s+/).filter(Boolean).length;
   const [selectedIdx, setSelectedIdx] = useState<number | null>(refs.length > 0 ? 0 : null);
   const [occurrenceCursor, setOccurrenceCursor] = useState(0);
@@ -122,10 +125,10 @@ export function PreviewParsed({
       {/* Body — full width, alt alta */}
       <div className="card p-4">
         <div className="flex items-center justify-between mb-2 gap-3 flex-wrap">
-          <h3 className="font-semibold text-primary">Gövde metin</h3>
+          <h3 className="font-semibold text-primary">{tr ? 'Gövde metin' : 'Body text'}</h3>
           <div className="flex items-center gap-2 text-xs text-muted">
             <span>
-              {wordCount} kelime · {markers.length} atıf
+              {wordCount} {tr ? 'kelime' : 'words'} · {markers.length} {tr ? 'atıf' : 'citations'}
             </span>
             {selectedIdx != null && activeMarkerList.length > 0 && (
               <>
@@ -137,7 +140,7 @@ export function PreviewParsed({
                   onClick={prevOccurrence}
                   disabled={activeMarkerList.length < 2}
                   className="px-2 py-0.5 rounded border border-border hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
-                  title="Önceki atıf"
+                  title={tr ? 'Önceki atıf' : 'Previous citation'}
                 >
                   ↑
                 </button>
@@ -145,7 +148,7 @@ export function PreviewParsed({
                   onClick={nextOccurrence}
                   disabled={activeMarkerList.length < 2}
                   className="px-2 py-0.5 rounded border border-border hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
-                  title="Sonraki atıf"
+                  title={tr ? 'Sonraki atıf' : 'Next citation'}
                 >
                   ↓
                 </button>
@@ -166,9 +169,9 @@ export function PreviewParsed({
         <div className="card p-4 min-w-0 flex-1">
           <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
             <div className="flex items-center gap-3">
-              <h3 className="font-semibold text-primary">Algılanan kaynakça ({refs.length})</h3>
+              <h3 className="font-semibold text-primary">{tr ? 'Algılanan kaynakça' : 'Detected references'} ({refs.length})</h3>
               {lowConfidence.length > 0 && (
-                <span className="text-xs text-red">{lowConfidence.length} düşük güven</span>
+                <span className="text-xs text-red">{lowConfidence.length} {tr ? 'düşük güven' : 'low confidence'}</span>
               )}
             </div>
             <div className="flex gap-2">
@@ -178,12 +181,12 @@ export function PreviewParsed({
                   onClick={onLookupAll}
                   disabled={lookupAllBusy || refs.length === 0}
                 >
-                  {lookupAllBusy ? 'Taranıyor…' : 'Tüm referansları DOI tara'}
+                  {lookupAllBusy ? (tr ? 'Taranıyor…' : 'Scanning…') : (tr ? 'Tüm referansları DOI tara' : 'Find DOIs for all references')}
                 </button>
               )}
               {onReset && (
                 <button className="btn-secondary text-xs" onClick={onReset}>
-                  Sıfırla
+                  {tr ? 'Sıfırla' : 'Reset'}
                 </button>
               )}
             </div>
@@ -207,7 +210,7 @@ export function PreviewParsed({
                     <span className="font-bold text-teal w-6 shrink-0">{i + 1}.</span>
                     <div className="flex-1 min-w-0">
                       <div className="text-primary font-medium leading-snug line-clamp-2">
-                        {r.title || r.raw?.slice(0, 100) || 'Başlık yok'}
+                        {r.title || r.raw?.slice(0, 100) || (tr ? 'Başlık yok' : 'No title')}
                       </div>
                       <div className="text-xs text-muted mt-0.5 truncate">
                         {(r.authors[0]?.family || r.authors[0]?.literal || '—') +
@@ -219,10 +222,10 @@ export function PreviewParsed({
                         {r.doi && <span className="bg-teal-bg text-teal px-1.5 py-0.5 rounded">DOI</span>}
                         {r.pmid && <span className="bg-teal-bg text-teal px-1.5 py-0.5 rounded">PMID</span>}
                         {r.abstract && (
-                          <span className="bg-slate-100 text-muted px-1.5 py-0.5 rounded">özet</span>
+                          <span className="bg-slate-100 text-muted px-1.5 py-0.5 rounded">{tr ? 'özet' : 'abstract'}</span>
                         )}
                         {r.confidence != null && (
-                          <span className="text-faint">güven: {Math.round(r.confidence * 100)}%</span>
+                          <span className="text-faint">{tr ? 'güven' : 'confidence'}: {Math.round(r.confidence * 100)}%</span>
                         )}
                         <button
                           onClick={(e) => {
@@ -232,7 +235,7 @@ export function PreviewParsed({
                           disabled={busyLookup === i}
                           className="ml-auto text-teal hover:underline text-xs"
                         >
-                          {busyLookup === i ? 'Aranıyor…' : 'DOI tara'}
+                          {busyLookup === i ? (tr ? 'Aranıyor…' : 'Searching…') : (tr ? 'DOI tara' : 'Find DOI')}
                         </button>
                       </div>
                     </div>
@@ -247,7 +250,7 @@ export function PreviewParsed({
         <div
           onMouseDown={onDividerMouseDown}
           className="hidden md:flex items-center justify-center w-2 mx-1 cursor-col-resize group shrink-0"
-          title="Sürükleyerek genişliği ayarla"
+          title={tr ? 'Sürükleyerek genişliği ayarla' : 'Drag to resize'}
         >
           <div className="w-0.5 h-12 bg-border group-hover:bg-teal rounded-full transition" />
         </div>
@@ -257,10 +260,10 @@ export function PreviewParsed({
           style={{ width: `min(100%, ${detailWidth}px)` }}
         >
           {selectedIdx != null && refs[selectedIdx] ? (
-            <RefDetail reference={refs[selectedIdx]} number={selectedIdx + 1} />
+            <RefDetail reference={refs[selectedIdx]} number={selectedIdx + 1} tr={tr} />
           ) : (
             <div className="card p-6 text-sm text-muted text-center">
-              Bir referansı seçince detayı burada görünecek.
+              {tr ? 'Bir referansı seçince detayı burada görünecek.' : 'Select a reference to see its details here.'}
             </div>
           )}
         </aside>
@@ -269,7 +272,7 @@ export function PreviewParsed({
   );
 }
 
-function RefDetail({ reference: r, number }: { reference: Ref; number: number }) {
+function RefDetail({ reference: r, number, tr }: { reference: Ref; number: number; tr: boolean }) {
   const authorStr = r.authors
     .map((a) => {
       if (a.literal) return a.literal;
@@ -286,25 +289,25 @@ function RefDetail({ reference: r, number }: { reference: Ref; number: number })
         <span className="w-8 h-8 rounded-md bg-teal text-white font-bold text-sm flex items-center justify-center">
           {number}
         </span>
-        <span className="text-xs uppercase tracking-wider text-muted font-semibold">Referans detayı</span>
+        <span className="text-xs uppercase tracking-wider text-muted font-semibold">{tr ? 'Referans detayı' : 'Reference details'}</span>
       </div>
 
       <h4 className="text-sm font-bold text-primary leading-snug mb-3">
-        {r.title || '(Başlık yok)'}
+        {r.title || (tr ? '(Başlık yok)' : '(No title)')}
       </h4>
 
       <dl className="text-xs space-y-2">
         {authorStr && (
-          <Field label="Yazarlar" value={authorStr} />
+          <Field label={tr ? 'Yazarlar' : 'Authors'} value={authorStr} />
         )}
-        {r.containerTitle && <Field label="Dergi / kaynak" value={r.containerTitle} />}
+        {r.containerTitle && <Field label={tr ? 'Dergi / kaynak' : 'Journal / source'} value={r.containerTitle} />}
         <div className="flex flex-wrap gap-3">
-          {r.year && <MiniField label="Yıl" value={String(r.year)} />}
-          {r.volume && <MiniField label="Cilt" value={r.volume} />}
-          {r.issue && <MiniField label="Sayı" value={r.issue} />}
-          {r.pages && <MiniField label="Sayfa" value={r.pages} />}
+          {r.year && <MiniField label={tr ? 'Yıl' : 'Year'} value={String(r.year)} />}
+          {r.volume && <MiniField label={tr ? 'Cilt' : 'Volume'} value={r.volume} />}
+          {r.issue && <MiniField label={tr ? 'Sayı' : 'Issue'} value={r.issue} />}
+          {r.pages && <MiniField label={tr ? 'Sayfa' : 'Pages'} value={r.pages} />}
         </div>
-        {r.publisher && <Field label="Yayıncı" value={r.publisher} />}
+        {r.publisher && <Field label={tr ? 'Yayıncı' : 'Publisher'} value={r.publisher} />}
         {r.doi && (
           <Field
             label="DOI"
@@ -351,24 +354,26 @@ function RefDetail({ reference: r, number }: { reference: Ref; number: number })
           />
         )}
         {r.confidence != null && (
-          <Field label="Parser güveni" value={`${Math.round(r.confidence * 100)}%`} />
+          <Field label={tr ? 'Parser güveni' : 'Parser confidence'} value={`${Math.round(r.confidence * 100)}%`} />
         )}
       </dl>
 
       <div className="mt-4 pt-3 border-t border-border">
-        <div className="tool-label mb-1.5">Özet</div>
+        <div className="tool-label mb-1.5">{tr ? 'Özet' : 'Abstract'}</div>
         {r.abstract ? (
           <p className="text-xs text-secondary leading-relaxed whitespace-pre-wrap">{r.abstract}</p>
         ) : (
           <p className="text-xs text-faint italic">
-            Bu kayıt için açık erişimli özet bulunamadı. DOI tara butonu ile CrossRef/OpenAlex/PubMed'den çekilebilir.
+            {tr
+              ? "Bu kayıt için açık erişimli özet bulunamadı. DOI tara butonu ile CrossRef/OpenAlex/PubMed'den çekilebilir."
+              : 'No open-access abstract found for this record. Use the Find DOI button to fetch it from CrossRef/OpenAlex/PubMed.'}
           </p>
         )}
       </div>
 
       {r.raw && (
         <details className="mt-4 pt-3 border-t border-border">
-          <summary className="tool-label cursor-pointer hover:text-teal">Orijinal satır</summary>
+          <summary className="tool-label cursor-pointer hover:text-teal">{tr ? 'Orijinal satır' : 'Original line'}</summary>
           <p className="text-xs text-muted font-mono mt-2 leading-relaxed whitespace-pre-wrap break-words">
             {r.raw}
           </p>

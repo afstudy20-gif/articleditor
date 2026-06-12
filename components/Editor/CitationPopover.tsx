@@ -36,7 +36,8 @@ export function CitationPopover({
   onDelete,
   onUpdateOpts,
 }: Props): JSX.Element {
-  const { t } = useLang();
+  const { t, lang } = useLang();
+  const tr = lang === 'tr';
   const [mode, setMode] = useState<'view' | 'replace' | 'add' | 'options'>('view');
   const [replaceTargetId, setReplaceTargetId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
@@ -107,12 +108,12 @@ export function CitationPopover({
           <>
             <div className="p-4 space-y-2 overflow-auto flex-1">
               <div className="tool-label">{t('cite_current_refs').replace('{count}', String(cited.length))}</div>
-              {cited.length === 0 && <p className="text-sm text-faint italic">Bu citation kütüphane ile eşleşmiyor.</p>}
+              {cited.length === 0 && <p className="text-sm text-faint italic">{tr ? 'Bu atıf kütüphane ile eşleşmiyor.' : 'This citation does not match the library.'}</p>}
               <ul className="space-y-2">
                 {cited.map((r) => (
                   <li key={r.id} className="border border-border rounded-lg p-2.5 text-sm">
                     <div className="font-semibold text-primary leading-snug line-clamp-2">
-                      {r.title || '(Başlıksız)'}
+                      {r.title || (tr ? '(Başlıksız)' : '(Untitled)')}
                     </div>
                     <div className="text-xs text-muted mt-0.5">
                       {r.authors[0]?.family || '—'}
@@ -253,19 +254,21 @@ export function CitationPopover({
           <>
             <div className="px-4 py-3 border-b border-border">
               <p className="text-xs text-muted mb-2">
-                {mode === 'replace' ? "Yerine kullanılacak ref'i seç:" : "Bu atıfa eklenecek ref'i seç:"}
+                {mode === 'replace'
+                  ? (tr ? "Yerine kullanılacak ref'i seç:" : 'Select the replacement reference:')
+                  : (tr ? "Bu atıfa eklenecek ref'i seç:" : 'Select a reference to add to this citation:')}
               </p>
               <input
                 autoFocus
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Başlık, yazar, yıl, DOI ara…"
+                placeholder={tr ? 'Başlık, yazar, yıl, DOI ara…' : 'Search by title, author, year, DOI…'}
                 className="w-full border border-border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-teal"
               />
             </div>
             <ul className="flex-1 overflow-auto p-2 space-y-1">
               {filtered.length === 0 && (
-                <li className="text-sm text-muted text-center py-6">Eşleşen ref yok.</li>
+                <li className="text-sm text-muted text-center py-6">{tr ? 'Eşleşen ref yok.' : 'No matching references.'}</li>
               )}
               {filtered.map((r) => (
                 <li
