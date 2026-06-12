@@ -93,7 +93,7 @@ export function ArticleEditor({
   onAIStructureCheck,
   aiDisabled,
 }: Props) {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const refsById = useMemo(() => {
     const m = new Map<string, Ref>();
     for (const r of refs) m.set(r.id, r);
@@ -211,6 +211,17 @@ export function ArticleEditor({
   useEffect(() => {
     if (editor && onReady) onReady(editor);
   }, [editor, onReady]);
+
+  // Placeholder text is captured once at editor creation; refresh it (and force
+  // a redraw) when the UI language changes so it doesn't stay in the old locale.
+  useEffect(() => {
+    if (!editor) return;
+    const ext = editor.extensionManager.extensions.find((e: any) => e.name === 'placeholder');
+    if (ext) {
+      ext.options.placeholder = t('ed_placeholder');
+      editor.view.dispatch(editor.state.tr);
+    }
+  }, [editor, lang, t]);
 
   const insertBtnRef = useRef<HTMLButtonElement>(null);
 
@@ -556,6 +567,7 @@ function MenuGroup({ label }: { label: string }): JSX.Element {
 }
 
 function SectionInserter({ editor }: { editor: any }): JSX.Element {
+  const { lang } = useLang();
   const [open, setOpen] = useState(false);
   return (
     <div className="relative">
@@ -563,7 +575,7 @@ function SectionInserter({ editor }: { editor: any }): JSX.Element {
         onClick={() => setOpen((v) => !v)}
         className="px-2.5 py-1 rounded-md text-xs font-semibold text-secondary hover:bg-slate-100"
       >
-        + Bölüm ▾
+        + {lang === 'tr' ? 'Bölüm' : 'Section'} ▾
       </button>
       {open && (
         <>

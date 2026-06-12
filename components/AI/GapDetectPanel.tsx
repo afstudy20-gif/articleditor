@@ -66,7 +66,7 @@ export function GapDetectPanel({
       </div>
 
       <div className="flex-1 overflow-auto p-3 space-y-2 text-sm">
-        {loading && <p className="text-muted text-xs italic">Metin taranıyor…</p>}
+        {loading && <p className="text-muted text-xs italic">{tr ? 'Metin taranıyor…' : 'Scanning the text…'}</p>}
         {error && <p className="text-red text-xs">{error}</p>}
         {!loading && !error && claims.length === 0 && (
           <p className="text-muted text-xs italic">{t('ai_gaps_empty')}</p>

@@ -1543,7 +1543,7 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
                 <h3 className="font-extrabold text-primary text-sm flex items-center gap-1.5">
                   ✨ {t('ws_create_doc')}
                 </h3>
-                <p className="text-[10px] text-muted">Akademik şablonlardan birini seçip gerekli bilgileri girin.</p>
+                <p className="text-[10px] text-muted">{lang === 'tr' ? 'Akademik şablonlardan birini seçip gerekli bilgileri girin.' : 'Pick an academic template and fill in the required details.'}</p>
               </div>
               <button
                 onClick={() => setShowWizard(false)}
@@ -1677,7 +1677,7 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
                       </div>
                       <input
                         className={inputCls}
-                        placeholder="Dr. Ahmet Yılmaz"
+                        placeholder={lang === 'tr' ? 'Dr. Ahmet Yılmaz' : 'Dr. Jane Smith'}
                         value={correspondingAuthor}
                         onChange={(e) => setCorrespondingAuthor(e.target.value)}
                       />
@@ -1752,7 +1752,7 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
                       </div>
                       <input
                         className={inputCls}
-                        placeholder="Dr. Ahmet Yılmaz"
+                        placeholder={lang === 'tr' ? 'Dr. Ahmet Yılmaz' : 'Dr. Jane Smith'}
                         value={correspondingAuthor}
                         onChange={(e) => setCorrespondingAuthor(e.target.value)}
                       />

@@ -1001,7 +1001,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
   const runAIScore = useCallback(async () => {
     const text = extractFullDocWithCitations();
     if (text.length < 50) {
-      alert('Skor için en az 50 karakterlik metin gerekli.');
+      alert(lang === 'tr' ? 'Skor için en az 50 karakterlik metin gerekli.' : 'At least 50 characters of text are required to score.');
       return;
     }
     setAiScore({ open: true, loading: true, error: null, result: null });
@@ -1044,7 +1044,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
       const sel = encodeSelection(state, from, to);
       const beforePreview = encodedToPreview(sel.encoded, sel.nodes, refOrder);
       if (beforePreview.length < 10) {
-        alert('İyileştirme için en az 10 karakterlik metin gerekli.');
+        alert(lang === 'tr' ? 'İyileştirme için en az 10 karakterlik metin gerekli.' : 'At least 10 characters of text are required to enhance.');
         return;
       }
       setAiEnhance({
@@ -1176,18 +1176,18 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
     if (!ed) return;
     const sel = extractSelectionWithCitations();
     if (!sel || sel.text.length < 20) {
-      alert('Atıf önerisi için en az 20 karakterlik metin seçmelisin (veya cursor’u bir paragrafa koy).');
+      alert(lang === 'tr' ? 'Atıf önerisi için en az 20 karakterlik metin seçmelisin (veya cursor’u bir paragrafa koy).' : 'Select at least 20 characters of text for citation suggestions (or place the cursor in a paragraph).');
       return;
     }
     setAiSuggest({ open: true, loading: true, error: null, query: sel.text, suggestions: [] });
     try {
       const library = await ensureLibraryEmbedded();
       if (library.length === 0) {
-        throw new Error('Kütüphane boş. Önce referans ekle.');
+        throw new Error(lang === 'tr' ? 'Kütüphane boş. Önce referans ekle.' : 'The library is empty. Add a reference first.');
       }
       const { embeddings } = await embedTexts([sel.text]);
       const query = embeddings[0];
-      if (!query) throw new Error('Sorgu gömme başarısız');
+      if (!query) throw new Error(lang === 'tr' ? 'Sorgu gömme başarısız' : 'Query embedding failed');
       const matches = topK(library, query, (r) => r.embedding, 8);
       setAiSuggest({
         open: true,
@@ -1215,7 +1215,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
   const runAIDetectGaps = useCallback(async () => {
     const text = extractFullDocWithCitations();
     if (text.length < 50) {
-      alert('Belge çok kısa.');
+      alert(lang === 'tr' ? 'Belge çok kısa.' : 'The document is too short.');
       return;
     }
     setAiGaps({ open: true, loading: true, error: null, items: [] });
@@ -1333,7 +1333,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
 
   const runAICompare = useCallback(() => {
     if (refs.length === 0) {
-      alert('Önce kütüphaneye en az bir referans ekle.');
+      alert(lang === 'tr' ? 'Önce kütüphaneye en az bir referans ekle.' : 'Add at least one reference to the library first.');
       return;
     }
     setCompareOpen(true);
@@ -1349,7 +1349,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
   const runAIStructureCheck = useCallback(async () => {
     const text = extractFullDocWithCitations();
     if (text.length < 100) {
-      alert('Yapı kontrolü için belge çok kısa.');
+      alert(lang === 'tr' ? 'Yapı kontrolü için belge çok kısa.' : 'The document is too short for a structure check.');
       return;
     }
     setAiReview({ open: true, loading: true, error: null, issues: [], summary: null });
@@ -1412,7 +1412,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
   const runAIReview = useCallback(async () => {
     const sel = extractSelectionWithCitations();
     if (!sel || sel.text.length < 20) {
-      alert('AI eleştirisi için en az 20 karakterlik metin seçmelisin (veya cursor’u bir paragrafa koy).');
+      alert(lang === 'tr' ? 'AI eleştirisi için en az 20 karakterlik metin seçmelisin (veya cursor’u bir paragrafa koy).' : 'Select at least 20 characters of text for AI critique (or place the cursor in a paragraph).');
       return;
     }
     setAiReview({ open: true, loading: true, error: null, issues: [], summary: null });
@@ -1797,7 +1797,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
       const text = await file.text();
       const backup = parseBackup(text);
       if (!backup.projects?.length) {
-        setImportError('Yedek boş.');
+        setImportError(lang === 'tr' ? 'Yedek boş.' : 'The backup is empty.');
         return;
       }
       const p = backup.projects[0];
@@ -1998,9 +1998,9 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
               <button
                 onClick={onExit}
                 className="text-secondary hover:text-primary font-bold flex items-center gap-1 transition"
-                title="Proje Çalışma Alanı"
+                title={lang === 'tr' ? 'Proje Çalışma Alanı' : 'Project Workspace'}
               >
-                📁 {t('ws_title') || 'Çalışma Alanı'}
+                📁 {t('ws_title') || (lang === 'tr' ? 'Çalışma Alanı' : 'Workspace')}
               </button>
             </div>
             <input
@@ -2027,7 +2027,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
                 setStyle(v as StyleId);
               }}
               className="border border-border rounded px-1.5 py-0.5 text-xs bg-white focus:outline-none focus:border-teal"
-              title="Atıf ve kaynakça stili"
+              title={lang === 'tr' ? 'Atıf ve kaynakça stili' : 'Citation & bibliography style'}
             >
               {styleOptions.map((s) => (
                 <option key={s.id} value={s.id}>
@@ -2047,13 +2047,13 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
             />
             <HeaderIcon
               onClick={() => setShowFind(true)}
-              title="Bul ve Değiştir (Ctrl+F / Ctrl+H)"
+              title={lang === 'tr' ? 'Bul ve Değiştir (Ctrl+F / Ctrl+H)' : 'Find & Replace (Ctrl+F / Ctrl+H)'}
               label="🔍"
               caption={t('hdr_find')}
             />
             <HeaderIcon
               onClick={updateAllCitations}
-              title="Atıfları yeniden numaralandır + orphan'ları temizle"
+              title={lang === 'tr' ? "Atıfları yeniden numaralandır + orphan'ları temizle" : 'Renumber citations + clean orphans'}
               label="↻"
               caption={t('hdr_renumber')}
             />
@@ -2282,7 +2282,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
                   onClick={() => jumpToCitation(-1)}
                   disabled={activeCitationCount < 2}
                   className="px-2 py-0.5 rounded border border-border hover:bg-white disabled:opacity-40"
-                  title="Önceki atıf"
+                  title={lang === 'tr' ? 'Önceki atıf' : 'Previous citation'}
                 >
                   ↑
                 </button>
@@ -2290,7 +2290,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
                   onClick={() => jumpToCitation(1)}
                   disabled={activeCitationCount < 2}
                   className="px-2 py-0.5 rounded border border-border hover:bg-white disabled:opacity-40"
-                  title="Sonraki atıf"
+                  title={lang === 'tr' ? 'Sonraki atıf' : 'Next citation'}
                 >
                   ↓
                 </button>
@@ -2347,7 +2347,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
           <div
             onMouseDown={startTopColDrag}
             className={`cursor-col-resize flex items-center justify-center group shrink-0 w-2 ${focusMode ? 'hidden' : ''}`}
-            title="Sürükle: üst sütun genişliği"
+            title={lang === 'tr' ? 'Sürükle: üst sütun genişliği' : 'Drag: top column width'}
           >
             <div className="w-0.5 h-12 bg-border group-hover:bg-teal rounded-full transition" />
           </div>
@@ -2393,7 +2393,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
         <div
           onMouseDown={startRowDrag}
           className={`cursor-row-resize flex items-center justify-center group shrink-0 h-2 ${focusMode ? 'hidden' : ''}`}
-          title="Sürükle: satır yüksekliği"
+          title={lang === 'tr' ? 'Sürükle: satır yüksekliği' : 'Drag: row height'}
         >
           <div className="h-0.5 w-24 bg-border group-hover:bg-teal rounded-full transition" />
         </div>
@@ -2415,7 +2415,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
           <div
             onMouseDown={startBottomColDrag}
             className="cursor-col-resize flex items-center justify-center group shrink-0 w-2"
-            title="Sürükle: alt sütun genişliği"
+            title={lang === 'tr' ? 'Sürükle: alt sütun genişliği' : 'Drag: bottom column width'}
           >
             <div className="w-0.5 h-12 bg-border group-hover:bg-teal rounded-full transition" />
           </div>
@@ -2843,11 +2843,12 @@ function ImportModal({
   preview: ImportPreview;
   onApply: (replace: boolean) => void;
 }): JSX.Element {
+  const { lang } = useLang();
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-auto">
         <div className="p-5 border-b border-border flex items-center justify-between">
-          <h2 className="font-bold text-primary">İçeri aktar</h2>
+          <h2 className="font-bold text-primary">{lang === 'tr' ? 'İçeri aktar' : 'Import'}</h2>
           <button onClick={onClose} className="text-muted hover:text-primary text-xl leading-none">
             ×
           </button>
@@ -2878,10 +2879,10 @@ function ImportModal({
                 />
               </div>
               <div>
-                <label className="tool-label block mb-1">Veya metin yapıştır</label>
+                <label className="tool-label block mb-1">{lang === 'tr' ? 'Veya metin yapıştır' : 'Or paste text'}</label>
                 <textarea
                   className="w-full min-h-[200px] font-mono text-sm border border-border rounded-lg p-3 outline-none focus:border-teal"
-                  placeholder="Belge metnini yapıştır. Kaynakça otomatik algılanır."
+                  placeholder={lang === 'tr' ? 'Belge metnini yapıştır. Kaynakça otomatik algılanır.' : 'Paste the document text. The bibliography is detected automatically.'}
                   value={pasteText}
                   onChange={(e) => setPasteText(e.target.value)}
                   onPaste={(e) => {
@@ -2923,7 +2924,7 @@ function ImportModal({
                   {preview.refs.map((r, i) => (
                     <li key={i} className="text-secondary">
                       <span className="font-bold">{i + 1}.</span>{' '}
-                      {r.title || r.raw?.slice(0, 80) || '(başlıksız)'}
+                      {r.title || r.raw?.slice(0, 80) || (lang === 'tr' ? '(başlıksız)' : '(untitled)')}
                     </li>
                   ))}
                 </ol>

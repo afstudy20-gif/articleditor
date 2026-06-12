@@ -277,7 +277,7 @@ export function CitationPopover({
                   className="border border-border rounded-lg p-2 text-xs hover:bg-teal-bg hover:border-teal cursor-pointer transition"
                 >
                   <div className="font-medium text-primary leading-snug line-clamp-2">
-                    {r.title || '(Başlıksız)'}
+                    {r.title || (tr ? '(Başlıksız)' : '(Untitled)')}
                   </div>
                   <div className="text-muted mt-0.5">
                     {r.authors[0]?.family || '—'}

@@ -21,6 +21,7 @@ import { backupFilename, backupToBlob, buildBackup, parseBackup } from '@/lib/pr
 import { Dropzone } from '@/components/Convert/Dropzone';
 import { PasteBox } from '@/components/Convert/PasteBox';
 import { useLang } from '@/lib/i18n/hooks';
+import { DRTR_TOOLS } from '@/lib/i18n';
 import { newId } from '@/lib/id';
 import { parseDocx } from '@/lib/docx/parse';
 import { splitBodyAndBiblio, parseBiblioLines } from '@/lib/refs/parse-biblio';
@@ -116,7 +117,7 @@ function EditPageInner() {
       const text = await file.text();
       const backup = parseBackup(text);
       if (!Array.isArray(backup.projects) || backup.projects.length === 0) {
-        setImportMsg('Yedek boş.');
+        setImportMsg(lang === 'tr' ? 'Yedek boş.' : 'The backup is empty.');
         return;
       }
       const existing = await listProjects();
@@ -149,12 +150,12 @@ function EditPageInner() {
       const { paragraphs, plainText } = await parseDocx(buf);
       await convertAndOpen(
         plainText,
-        file.name.replace(/\.docx$/i, '') || 'Dönüştürülen Makale',
+        file.name.replace(/\.docx$/i, '') || (lang === 'tr' ? 'Dönüştürülen Makale' : 'Converted Manuscript'),
         paragraphs,
       );
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
-      setConversionError(`Dosya işlenemedi: ${msg}`);
+      setConversionError(`${lang === 'tr' ? 'Dosya işlenemedi' : 'Could not process the file'}: ${msg}`);
     } finally {
       setConversionBusy(false);
     }
@@ -166,7 +167,7 @@ function EditPageInner() {
     try {
       await convertAndOpen(
         text,
-        'Yapıştırılan Metin',
+        lang === 'tr' ? 'Yapıştırılan Metin' : 'Pasted Text',
         html ? parseHtmlToParagraphs(html) : undefined,
       );
     } catch (e: unknown) {
@@ -586,6 +587,27 @@ function EditPageInner() {
               )}
             </section>
           )}
+
+          <section className="mt-8 border-t border-border pt-6">
+            <h2 className="text-lg font-bold text-primary text-center">{t('ecosystem_title')}</h2>
+            <p className="mt-1 text-xs text-muted text-center">{t('ecosystem_desc')}</p>
+            <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-4">
+              {DRTR_TOOLS.map((tool) => (
+                <a
+                  key={tool.url}
+                  href={tool.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="card group px-3 py-2 transition hover:border-teal hover:shadow-md"
+                >
+                  <div className="text-sm font-bold text-primary transition group-hover:text-teal">
+                    {tool.name}
+                  </div>
+                  <div className="mt-0.5 text-xs leading-snug text-muted">{tool.desc[lang]}</div>
+                </a>
+              ))}
+            </div>
+          </section>
         </main>
       </div>
     );
