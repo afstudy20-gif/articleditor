@@ -213,15 +213,20 @@ export function ArticleEditor({
   }, [editor, onReady]);
 
   // Placeholder text is captured once at editor creation; refresh it (and force
-  // a redraw) when the UI language changes so it doesn't stay in the old locale.
+  // one redraw) when the UI language changes so it doesn't stay in the old
+  // locale. Depend on `lang` only and guard on a real change — keeping `t` out
+  // of the deps and dispatching unconditionally would loop (dispatch → render →
+  // new `t` → effect → dispatch …).
   useEffect(() => {
     if (!editor) return;
     const ext = editor.extensionManager.extensions.find((e: any) => e.name === 'placeholder');
-    if (ext) {
-      ext.options.placeholder = t('ed_placeholder');
-      editor.view.dispatch(editor.state.tr);
+    const next = t('ed_placeholder');
+    if (ext && ext.options.placeholder !== next) {
+      ext.options.placeholder = next;
+      editor.view.dispatch(editor.state.tr.setMeta('addToHistory', false));
     }
-  }, [editor, lang, t]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editor, lang]);
 
   const insertBtnRef = useRef<HTMLButtonElement>(null);
 

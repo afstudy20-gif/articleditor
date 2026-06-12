@@ -1,13 +1,12 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import type { Editor } from '@tiptap/react';
 import {
-  extractAbbreviations,
-  findSuggestions,
+  analyzeAbbreviations,
   replaceTextInEditor,
-  type Abbreviation,
-  type AbbrSuggestion
+  type AbbreviationScope,
+  type ScopedAbbreviation,
 } from '@/lib/editor/abbreviations';
 
 interface AbbreviationsPanelProps {
@@ -21,61 +20,67 @@ const localizations = {
     title: 'Kısaltma Takibi',
     tabDict: 'Sözlük',
     tabSuggs: 'Öneriler',
-    dictTitle: 'Tanımlı Kısaltmalar',
-    suggsTitle: 'İyileştirme Önerileri',
     helpTitle: 'Nasıl Tanımlanır?',
-    helpText: 'Kısaltmaları metinde ilk kez kullanırken açık hali ve parantez içinde kısaltması şeklinde yazın (Örn: Deep Neural Network (DNN)). Sistem bunu otomatik olarak algılayacaktır.',
+    helpText: 'Kısaltmaları metinde ilk kez kullanırken açık hali ve parantez içinde kısaltması şeklinde yazın (Örn: Deep Neural Network (DNN)). Sistem bunu otomatik olarak algılayacaktır. Özet, ana metin ve her tablo ayrı ayrı takip edilir.',
     occurrences: 'kullanım',
     noAbbrs: 'Metinde henüz kısaltma tanımlanmadı.',
     noSuggs: 'Kısaltma kullanım hatası bulunmadı. Harika!',
     replace: 'Değiştir',
     replaceAll: 'Hepsini Değiştir',
     searchAbbrs: 'Kısaltmalarda ara...',
-    insertTooltip: 'Metne ekle',
+    add: 'ekle',
+    insertTooltip: 'Kısaltmayı metne ekle',
     replaceTooltip: 'Kısaltma ile değiştir',
     replaceAllTooltip: 'Metindeki tümünü kısaltma ile değiştir',
-    suggestLabel: 'yerine kısaltmasını kullanın:'
+    suggestLabel: 'yerine kısaltmasını kullanın:',
+    jumpHint: 'Geçtiği yerlere sırayla gitmek için tıklayın',
+    scopeAbstract: 'Özet',
+    scopeMain: 'Ana Metin',
+    scopeTable: 'Tablo',
   },
   en: {
     title: 'Abbreviation Tracker',
     tabDict: 'Dictionary',
     tabSuggs: 'Suggestions',
-    dictTitle: 'Defined Abbreviations',
-    suggsTitle: 'Usage Suggestions',
     helpTitle: 'How to define?',
-    helpText: 'Define abbreviations at their first occurrence by writing the full term followed by the acronym in parentheses (e.g. Deep Neural Network (DNN)). The system will detect it automatically.',
+    helpText: 'Define abbreviations at their first occurrence by writing the full term followed by the acronym in parentheses (e.g. Deep Neural Network (DNN)). The system detects it automatically. The abstract, main text and each table are tracked separately.',
     occurrences: 'occurrences',
     noAbbrs: 'No abbreviations defined in the text yet.',
     noSuggs: 'No abbreviation usage errors found. Excellent!',
     replace: 'Replace',
     replaceAll: 'Replace All',
     searchAbbrs: 'Search abbreviations...',
-    insertTooltip: 'Insert to text',
+    add: 'add',
+    insertTooltip: 'Insert acronym into the text',
     replaceTooltip: 'Replace with acronym',
     replaceAllTooltip: 'Replace all instances with acronym',
-    suggestLabel: 'use acronym instead of full term:'
-  }
+    suggestLabel: 'use the acronym instead of:',
+    jumpHint: 'Click to jump through its occurrences in order',
+    scopeAbstract: 'Abstract',
+    scopeMain: 'Main Text',
+    scopeTable: 'Table',
+  },
 };
+
+function scopeLabel(scope: AbbreviationScope, t: (typeof localizations)['en']): string {
+  if (scope.kind === 'abstract') return t.scopeAbstract;
+  if (scope.kind === 'table') return `${t.scopeTable} ${scope.index ?? ''}`.trim();
+  return t.scopeMain;
+}
 
 export function AbbreviationsPanel({ editor, onClose, lang }: AbbreviationsPanelProps): JSX.Element {
   const t = localizations[lang] || localizations.en;
   const [activeTab, setActiveTab] = useState<'dict' | 'suggs'>('dict');
   const [searchQuery, setSearchQuery] = useState('');
-  const [abbrList, setAbbrList] = useState<Abbreviation[]>([]);
-  const [suggestions, setSuggestions] = useState<AbbrSuggestion[]>([]);
+  const [scopes, setScopes] = useState<AbbreviationScope[]>([]);
+  // Per-abbreviation occurrence cursor: key `${scopeKey}:${acronym}` -> next index.
+  const navCursor = useRef<Map<string, number>>(new Map());
+  const [activeJump, setActiveJump] = useState<string>('');
 
-  // Scan editor text dynamically on transactions
+  // Re-analyze the editor on every transaction.
   useEffect(() => {
-    if (!editor || editor.isDestroyed) return;
-
-    const update = () => {
-      const text = editor.getText();
-      const list = extractAbbreviations(text);
-      setAbbrList(list);
-      const warns = findSuggestions(text, list);
-      setSuggestions(warns);
-    };
-
+    if (!editor || editor.isDestroyed) return undefined;
+    const update = (): void => setScopes(analyzeAbbreviations(editor));
     update();
     editor.on('transaction', update);
     return () => {
@@ -83,30 +88,55 @@ export function AbbreviationsPanel({ editor, onClose, lang }: AbbreviationsPanel
     };
   }, [editor]);
 
-  // Filter dictionary based on search query
-  const filteredAbbrs = useMemo(() => {
-    if (!searchQuery.trim()) return abbrList;
-    const q = searchQuery.toLowerCase();
-    return abbrList.filter(
-      (a) => a.acronym.toLowerCase().includes(q) || a.definition.toLowerCase().includes(q)
-    );
-  }, [abbrList, searchQuery]);
+  const totals = useMemo(() => {
+    let abbrs = 0;
+    let suggs = 0;
+    for (const s of scopes) {
+      abbrs += s.abbreviations.length;
+      suggs += s.suggestions.length;
+    }
+    return { abbrs, suggs };
+  }, [scopes]);
 
-  // Insert acronym at cursor
-  const handleInsertAcronym = (acronym: string) => {
+  const filteredScopes = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return scopes;
+    return scopes
+      .map((s) => ({
+        ...s,
+        abbreviations: s.abbreviations.filter(
+          (a) => a.acronym.toLowerCase().includes(q) || a.definition.toLowerCase().includes(q),
+        ),
+      }))
+      .filter((s) => s.abbreviations.length > 0);
+  }, [scopes, searchQuery]);
+
+  // Insert acronym at cursor.
+  const handleInsertAcronym = (acronym: string): void => {
     if (!editor || editor.isDestroyed) return;
     editor.chain().focus().insertContent(acronym).run();
   };
 
-  // Replace one full definition usage
-  const handleReplaceOne = (definition: string, acronym: string) => {
-    replaceTextInEditor(editor, definition, acronym, false);
+  // Cycle through the occurrences of an abbreviation, selecting + scrolling to each.
+  const jumpToNext = (scopeKey: string, abbr: ScopedAbbreviation): void => {
+    if (!editor || editor.isDestroyed || abbr.occurrences.length === 0) return;
+    const key = `${scopeKey}:${abbr.acronym}`;
+    const next = navCursor.current.get(key) ?? 0;
+    const occ = abbr.occurrences[next % abbr.occurrences.length];
+    navCursor.current.set(key, next + 1);
+    setActiveJump(`${key}#${next % abbr.occurrences.length}`);
+    editor.chain().focus().setTextSelection({ from: occ.from, to: occ.to }).scrollIntoView().run();
   };
 
-  // Replace all full definition usages
-  const handleReplaceAll = (definition: string, acronym: string) => {
+  const handleReplaceOne = (definition: string, acronym: string): void => {
+    replaceTextInEditor(editor, definition, acronym, false);
+  };
+  const handleReplaceAll = (definition: string, acronym: string): void => {
     replaceTextInEditor(editor, definition, acronym, true);
   };
+
+  const scopesWithAbbrs = filteredScopes.filter((s) => s.abbreviations.length > 0);
+  const scopesWithSuggs = scopes.filter((s) => s.suggestions.length > 0);
 
   return (
     <div className="card flex flex-col h-full bg-white border border-border rounded-xl shadow-lg">
@@ -135,7 +165,7 @@ export function AbbreviationsPanel({ editor, onClose, lang }: AbbreviationsPanel
               : 'border-transparent text-secondary hover:text-primary hover:bg-slate-100/50'
           }`}
         >
-          {t.tabDict} ({abbrList.length})
+          {t.tabDict} ({totals.abbrs})
         </button>
         <button
           onClick={() => setActiveTab('suggs')}
@@ -145,7 +175,7 @@ export function AbbreviationsPanel({ editor, onClose, lang }: AbbreviationsPanel
               : 'border-transparent text-secondary hover:text-primary hover:bg-slate-100/50'
           }`}
         >
-          {t.tabSuggs} ({suggestions.length})
+          {t.tabSuggs} ({totals.suggs})
         </button>
       </div>
 
@@ -153,45 +183,66 @@ export function AbbreviationsPanel({ editor, onClose, lang }: AbbreviationsPanel
       <div className="flex-1 flex flex-col min-h-0 bg-white p-3">
         {activeTab === 'dict' && (
           <div className="flex-1 flex flex-col min-h-0 space-y-3">
-            {/* Search */}
-            <div>
-              <input
-                type="text"
-                placeholder={t.searchAbbrs}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full text-xs px-2.5 py-1.5 border border-border rounded-lg focus:outline-none focus:border-teal bg-slate-50/30"
-              />
-            </div>
+            <input
+              type="text"
+              placeholder={t.searchAbbrs}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full text-xs px-2.5 py-1.5 border border-border rounded-lg focus:outline-none focus:border-teal bg-slate-50/30"
+            />
 
-            {/* List */}
-            <div className="flex-1 overflow-y-auto pr-0.5 space-y-2">
-              {filteredAbbrs.length === 0 ? (
+            <div className="flex-1 overflow-y-auto pr-0.5 space-y-3">
+              {scopesWithAbbrs.length === 0 ? (
                 <div className="py-8 text-center text-xs text-muted italic">{t.noAbbrs}</div>
               ) : (
-                filteredAbbrs.map((a) => (
-                  <div
-                    key={a.acronym}
-                    className="p-2.5 rounded-lg border border-border hover:border-teal/30 bg-slate-50/20 flex items-center justify-between gap-3 transition"
-                  >
-                    <div className="min-w-0">
-                      <div className="flex items-baseline gap-1.5 flex-wrap">
-                        <strong className="text-xs text-primary font-extrabold">{a.acronym}</strong>
-                        <span className="text-[10px] text-muted">
-                          ({a.count} {t.occurrences})
-                        </span>
-                      </div>
-                      <div className="text-[11px] text-secondary truncate mt-0.5" title={a.definition}>
-                        {a.definition}
-                      </div>
+                scopesWithAbbrs.map((scope) => (
+                  <div key={scope.key} className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-bold uppercase tracking-wide text-teal">{scopeLabel(scope, t)}</span>
+                      <span className="text-[10px] text-muted">({scope.abbreviations.length})</span>
+                      <div className="flex-1 h-px bg-border" />
                     </div>
-                    <button
-                      onClick={() => handleInsertAcronym(a.acronym)}
-                      className="p-1.5 text-teal hover:bg-teal/10 rounded-lg font-bold transition text-xs shrink-0 bg-white border border-border hover:border-teal/30"
-                      title={t.insertTooltip}
-                    >
-                      ➕
-                    </button>
+                    {scope.abbreviations.map((a) => {
+                      const key = `${scope.key}:${a.acronym}`;
+                      const cur = navCursor.current.get(key);
+                      const showingIdx = activeJump.startsWith(`${key}#`)
+                        ? Number(activeJump.split('#')[1]) + 1
+                        : null;
+                      return (
+                        <div
+                          key={a.acronym}
+                          className="p-2.5 rounded-lg border border-border hover:border-teal/40 bg-slate-50/20 flex items-center justify-between gap-3 transition"
+                        >
+                          <button
+                            type="button"
+                            onClick={() => jumpToNext(scope.key, a)}
+                            title={t.jumpHint}
+                            className="min-w-0 flex-1 text-left group"
+                          >
+                            <div className="flex items-baseline gap-1.5 flex-wrap">
+                              <strong className="text-xs text-primary font-extrabold group-hover:text-teal">{a.acronym}</strong>
+                              <span className="text-[10px] text-muted">
+                                ({a.count} {t.occurrences})
+                              </span>
+                              {showingIdx !== null && (
+                                <span className="text-[10px] font-semibold text-teal">→ {showingIdx}/{a.occurrences.length}</span>
+                              )}
+                            </div>
+                            <div className="text-[11px] text-secondary truncate mt-0.5" title={a.definition}>
+                              {a.definition}
+                            </div>
+                          </button>
+                          <button
+                            onClick={() => handleInsertAcronym(a.acronym)}
+                            className="shrink-0 flex flex-col items-center justify-center px-2 py-1 text-teal hover:bg-teal/10 rounded-lg transition bg-white border border-border hover:border-teal/40"
+                            title={t.insertTooltip}
+                          >
+                            <span className="text-sm font-bold leading-none">＋</span>
+                            <span className="text-[8px] leading-none mt-0.5 text-muted">{t.add}</span>
+                          </button>
+                        </div>
+                      );
+                    })}
                   </div>
                 ))
               )}
@@ -200,40 +251,49 @@ export function AbbreviationsPanel({ editor, onClose, lang }: AbbreviationsPanel
         )}
 
         {activeTab === 'suggs' && (
-          <div className="flex-1 flex flex-col min-h-0 space-y-3">
-            <div className="overflow-y-auto flex-1 pr-0.5 space-y-2.5">
-              {suggestions.length === 0 ? (
+          <div className="flex-1 flex flex-col min-h-0">
+            <div className="overflow-y-auto flex-1 pr-0.5 space-y-3">
+              {scopesWithSuggs.length === 0 ? (
                 <div className="py-8 text-center text-xs text-muted italic flex flex-col items-center justify-center gap-1">
                   <span>🎉</span>
                   <span>{t.noSuggs}</span>
                 </div>
               ) : (
-                suggestions.map((s, idx) => (
-                  <div
-                    key={`${s.acronym}-${idx}`}
-                    className="p-3 rounded-lg border border-amber-200 bg-amber-50/20 flex flex-col gap-2.5 transition text-xs"
-                  >
-                    <div>
-                      <span className="font-semibold text-primary">{s.textFound}</span>{' '}
-                      <span className="text-muted">{t.suggestLabel}</span>{' '}
-                      <strong className="text-teal font-extrabold">{s.acronym}</strong>
+                scopesWithSuggs.map((scope) => (
+                  <div key={scope.key} className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-bold uppercase tracking-wide text-amber-600">{scopeLabel(scope, t)}</span>
+                      <span className="text-[10px] text-muted">({scope.suggestions.length})</span>
+                      <div className="flex-1 h-px bg-border" />
                     </div>
-                    <div className="flex gap-1.5">
-                      <button
-                        onClick={() => handleReplaceOne(s.textFound, s.acronym)}
-                        className="text-[10px] px-2.5 py-1 rounded-md border border-border bg-white text-secondary hover:text-teal hover:border-teal transition font-semibold"
-                        title={t.replaceTooltip}
+                    {scope.suggestions.map((s, idx) => (
+                      <div
+                        key={`${s.acronym}-${idx}`}
+                        className="p-3 rounded-lg border border-amber-200 bg-amber-50/20 flex flex-col gap-2.5 transition text-xs"
                       >
-                        {t.replace}
-                      </button>
-                      <button
-                        onClick={() => handleReplaceAll(s.definition, s.acronym)}
-                        className="text-[10px] px-2.5 py-1 rounded-md bg-teal text-white hover:bg-teal-dark transition font-semibold"
-                        title={t.replaceAllTooltip}
-                      >
-                        {t.replaceAll}
-                      </button>
-                    </div>
+                        <div>
+                          <span className="font-semibold text-primary">{s.textFound}</span>{' '}
+                          <span className="text-muted">{t.suggestLabel}</span>{' '}
+                          <strong className="text-teal font-extrabold">{s.acronym}</strong>
+                        </div>
+                        <div className="flex gap-1.5">
+                          <button
+                            onClick={() => handleReplaceOne(s.textFound, s.acronym)}
+                            className="text-[10px] px-2.5 py-1 rounded-md border border-border bg-white text-secondary hover:text-teal hover:border-teal transition font-semibold"
+                            title={t.replaceTooltip}
+                          >
+                            {t.replace}
+                          </button>
+                          <button
+                            onClick={() => handleReplaceAll(s.definition, s.acronym)}
+                            className="text-[10px] px-2.5 py-1 rounded-md bg-teal text-white hover:bg-teal-dark transition font-semibold"
+                            title={t.replaceAllTooltip}
+                          >
+                            {t.replaceAll}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 ))
               )}

@@ -4,8 +4,20 @@ import {
   isAcronymMatch,
   findExactDefinition,
   extractAbbreviations,
-  findSuggestions
+  findSuggestions,
+  splitScopes,
+  analyzeBlocks,
+  type DocBlock,
 } from './abbreviations';
+
+function block(text: string, pos: number, opts: { heading?: boolean; table?: boolean } = {}): DocBlock {
+  return {
+    isTable: opts.table ?? false,
+    isHeading: opts.heading ?? false,
+    text,
+    pieces: [{ text, pos }],
+  };
+}
 
 describe('isAcronymMatch', () => {
   it('matches standard acronyms', () => {
@@ -85,5 +97,70 @@ describe('findSuggestions', () => {
     assert.equal(suggestions.length, 1);
     assert.equal(suggestions[0].acronym, 'DNN');
     assert.equal(suggestions[0].definition, 'Deep Neural Network');
+  });
+});
+
+describe('splitScopes', () => {
+  it('separates abstract, main text and each table', () => {
+    const blocks: DocBlock[] = [
+      block('Abstract', 1, { heading: true }),
+      block('Uses magnetic resonance imaging (MRI).', 11),
+      block('Introduction', 60, { heading: true }),
+      block('We repeated magnetic resonance imaging (MRI) here.', 75),
+      block('systolic blood pressure (SBP) row', 200, { table: true }),
+    ];
+    const { abstract, main, tables, sawAbstract } = splitScopes(blocks);
+    assert.equal(sawAbstract, true);
+    assert.ok(abstract.some((p) => p.text.includes('Uses magnetic')));
+    assert.ok(!abstract.some((p) => p.text.includes('repeated')), 'main text not in abstract');
+    assert.ok(main.some((p) => p.text.includes('repeated magnetic')));
+    assert.equal(tables.length, 1);
+    assert.ok(tables[0].some((p) => p.text.includes('systolic')));
+  });
+
+  it('puts everything in main when there is no abstract', () => {
+    const { abstract, main, sawAbstract } = splitScopes([block('Just body text (BT) here.', 1)]);
+    assert.equal(sawAbstract, false);
+    assert.equal(abstract.length, 0);
+    assert.ok(main.length > 0);
+  });
+});
+
+describe('analyzeBlocks', () => {
+  it('tracks the same acronym independently in abstract and main, with occurrence positions', () => {
+    const blocks: DocBlock[] = [
+      block('Abstract', 1, { heading: true }),
+      block('Magnetic resonance imaging (MRI). MRI is shown.', 11),
+      block('Methods', 70, { heading: true }),
+      block('Magnetic resonance imaging (MRI) again. MRI helps. MRI again.', 85),
+    ];
+    const scopes = analyzeBlocks(blocks);
+    const abstract = scopes.find((s) => s.kind === 'abstract');
+    const main = scopes.find((s) => s.kind === 'main');
+    assert.ok(abstract && main);
+
+    const aMri = abstract.abbreviations.find((a) => a.acronym === 'MRI');
+    const mMri = main.abbreviations.find((a) => a.acronym === 'MRI');
+    assert.ok(aMri && mMri, 'MRI tracked in both scopes');
+    assert.equal(aMri.count, 2);
+    assert.equal(mMri.count, 3);
+    assert.equal(aMri.occurrences.length, 2);
+
+    // Occurrence positions fall inside the abstract block (starts at pos 11).
+    for (const occ of aMri.occurrences) {
+      assert.ok(occ.from >= 11 && occ.from < 11 + blocks[1].text.length, 'occurrence maps into abstract block');
+      assert.equal(occ.to - occ.from, 3);
+    }
+  });
+
+  it('reports table abbreviations in their own table scope', () => {
+    const scopes = analyzeBlocks([
+      block('Body without abbreviations.', 1),
+      block('Left ventricular ejection fraction (LVEF). LVEF noted.', 100, { table: true }),
+    ]);
+    const table = scopes.find((s) => s.kind === 'table');
+    assert.ok(table);
+    assert.equal(table.index, 1);
+    assert.ok(table.abbreviations.some((a) => a.acronym === 'LVEF'));
   });
 });

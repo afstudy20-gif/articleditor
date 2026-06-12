@@ -13,6 +13,181 @@ export interface AbbrSuggestion {
   index: number;
 }
 
+/** A single occurrence of an acronym in the document, as editor positions. */
+export interface AbbrOccurrence {
+  from: number;
+  to: number;
+}
+
+export interface ScopedAbbreviation extends Abbreviation {
+  occurrences: AbbrOccurrence[];
+}
+
+export type AbbrevScopeKind = 'abstract' | 'main' | 'table';
+
+export interface AbbreviationScope {
+  key: string; // 'abstract' | 'main' | 'table-1' …
+  kind: AbbrevScopeKind;
+  /** 1-based table number when kind === 'table'. */
+  index?: number;
+  abbreviations: ScopedAbbreviation[];
+  suggestions: AbbrSuggestion[];
+}
+
+/** A run of text and the editor position where it starts. */
+interface Piece {
+  text: string;
+  /** Editor (ProseMirror) position of the first character; -1 for separators. */
+  pos: number;
+}
+
+/** A top-level document block, normalized for scope splitting. */
+export interface DocBlock {
+  isTable: boolean;
+  isHeading: boolean;
+  text: string;
+  pieces: Piece[];
+}
+
+const SEPARATOR: Piece = { text: '\n', pos: -1 };
+
+// Section-heading detection — drives the Abstract vs Main split.
+const ABSTRACT_HEADING_RE = /^(abstract|öz|özet|summary|structured abstract)\b/i;
+const SECTION_HEADING_RE =
+  /^(introduction|background|methods?|materials?|patients?|results?|findings?|discussion|conclusions?|references?|bibliography|keywords?|acknowledg|funding|giri[şs]|y[öo]ntem|materyal|bulgular|tart[ıi][şs]ma|sonu[çc]|kaynak|anahtar)/i;
+
+function blockRole(block: DocBlock): 'abstract' | 'break' | null {
+  const text = block.text.trim();
+  const looksHeading =
+    block.isHeading || (text.length > 0 && text.length <= 60 && (ABSTRACT_HEADING_RE.test(text) || SECTION_HEADING_RE.test(text)));
+  if (!looksHeading) return null;
+  if (ABSTRACT_HEADING_RE.test(text)) return 'abstract';
+  return 'break';
+}
+
+/**
+ * Split document blocks into independent abbreviation scopes: the abstract is
+ * tracked on its own, the main text on its own, and each table separately —
+ * matching journal rules that abbreviations be (re)defined per section.
+ */
+export function splitScopes(blocks: DocBlock[]): {
+  abstract: Piece[];
+  main: Piece[];
+  tables: Piece[][];
+  sawAbstract: boolean;
+} {
+  const abstract: Piece[] = [];
+  const main: Piece[] = [];
+  const tables: Piece[][] = [];
+  let scope: 'abstract' | 'main' = 'main';
+  let sawAbstract = false;
+
+  for (const block of blocks) {
+    if (block.isTable) {
+      tables.push([...block.pieces, SEPARATOR]);
+      continue;
+    }
+    const role = blockRole(block);
+    if (role === 'abstract') {
+      scope = 'abstract';
+      sawAbstract = true;
+    } else if (role === 'break') {
+      scope = 'main';
+    }
+    const target = scope === 'abstract' ? abstract : main;
+    for (const piece of block.pieces) target.push(piece);
+    target.push(SEPARATOR);
+  }
+
+  return { abstract, main, tables, sawAbstract };
+}
+
+function assembleSegment(pieces: Piece[]): { text: string; map: Array<{ start: number; len: number; pos: number }> } {
+  let text = '';
+  const map: Array<{ start: number; len: number; pos: number }> = [];
+  for (const piece of pieces) {
+    map.push({ start: text.length, len: piece.text.length, pos: piece.pos });
+    text += piece.text;
+  }
+  return { text, map };
+}
+
+function offsetToPos(map: Array<{ start: number; len: number; pos: number }>, offset: number): number | null {
+  for (const entry of map) {
+    if (entry.pos >= 0 && offset >= entry.start && offset < entry.start + entry.len) {
+      return entry.pos + (offset - entry.start);
+    }
+  }
+  return null;
+}
+
+function findOccurrences(text: string, map: ReturnType<typeof assembleSegment>['map'], acronym: string): AbbrOccurrence[] {
+  const occurrences: AbbrOccurrence[] = [];
+  const regex = new RegExp(`\\b${escapeRegExp(acronym)}\\b`, 'g');
+  let match;
+  while ((match = regex.exec(text)) !== null) {
+    const from = offsetToPos(map, match.index);
+    if (from !== null) occurrences.push({ from, to: from + acronym.length });
+    if (match.index === regex.lastIndex) regex.lastIndex++;
+  }
+  return occurrences;
+}
+
+function buildScope(key: string, kind: AbbrevScopeKind, index: number | undefined, pieces: Piece[]): AbbreviationScope {
+  const { text, map } = assembleSegment(pieces);
+  const abbreviations = extractAbbreviations(text).map((abbr): ScopedAbbreviation => {
+    const occurrences = findOccurrences(text, map, abbr.acronym);
+    return { ...abbr, count: occurrences.length, occurrences };
+  });
+  const suggestions = findSuggestions(text, abbreviations);
+  return { key, kind, index, abbreviations, suggestions };
+}
+
+/** Normalize a TipTap doc into top-level blocks with absolute text positions. */
+function docToBlocks(doc: any): DocBlock[] {
+  const blocks: DocBlock[] = [];
+  doc.forEach((node: any, offset: number) => {
+    const pieces: Piece[] = [];
+    if (node.isText && node.text) {
+      pieces.push({ text: node.text, pos: offset });
+    } else {
+      node.descendants((child: any, rel: number) => {
+        if (child.isText && child.text) pieces.push({ text: child.text, pos: offset + 1 + rel });
+      });
+    }
+    blocks.push({
+      isTable: node.type?.name === 'table',
+      isHeading: node.type?.name === 'heading',
+      text: node.textContent ?? '',
+      pieces,
+    });
+  });
+  return blocks;
+}
+
+/** Pure core: turn normalized blocks into scoped abbreviation results. */
+export function analyzeBlocks(blocks: DocBlock[]): AbbreviationScope[] {
+  const { abstract, main, tables, sawAbstract } = splitScopes(blocks);
+  const scopes: AbbreviationScope[] = [];
+  if (sawAbstract) scopes.push(buildScope('abstract', 'abstract', undefined, abstract));
+  scopes.push(buildScope('main', 'main', undefined, main));
+  tables.forEach((pieces, i) => {
+    const scope = buildScope(`table-${i + 1}`, 'table', i + 1, pieces);
+    if (scope.abbreviations.length > 0 || scope.suggestions.length > 0) scopes.push(scope);
+  });
+  return scopes;
+}
+
+/**
+ * Analyze the editor and return abbreviations grouped by scope (Abstract,
+ * Main Text, each Table). Each abbreviation carries the editor positions of
+ * every occurrence so the UI can jump through them in order.
+ */
+export function analyzeAbbreviations(editor: Editor): AbbreviationScope[] {
+  if (!editor || editor.isDestroyed) return [];
+  return analyzeBlocks(docToBlocks(editor.state.doc));
+}
+
 /**
  * Escapes characters for safe regular expression matching
  */
