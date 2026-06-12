@@ -4,7 +4,13 @@ import Link from 'next/link';
 import { useLang, useTheme } from '@/lib/i18n/hooks';
 import { APP_NAME, APP_AUTHOR, APP_YEAR } from '@/lib/i18n';
 
-export function SiteHeader({ showNav = true }: { showNav?: boolean }): JSX.Element {
+export function SiteHeader({
+  showNav = true,
+  showWorkspaceLink = true,
+}: {
+  showNav?: boolean;
+  showWorkspaceLink?: boolean;
+}): JSX.Element {
   const { lang, setLang, t } = useLang();
   const { theme, setTheme } = useTheme();
   return (
@@ -18,12 +24,14 @@ export function SiteHeader({ showNav = true }: { showNav?: boolean }): JSX.Eleme
         </Link>
         {showNav && (
           <nav className="flex items-center gap-2 flex-wrap">
-            <Link
-              href="/edit"
-              className="text-sm font-semibold text-teal hover:underline px-3 py-1.5 rounded-md hover:bg-teal-bg"
-            >
-              {t('nav_workspace')} →
-            </Link>
+            {showWorkspaceLink && (
+              <Link
+                href="/"
+                className="text-sm font-semibold text-teal hover:underline px-3 py-1.5 rounded-md hover:bg-teal-bg"
+              >
+                {t('nav_workspace')} →
+              </Link>
+            )}
             <Link
               href="/tutorial"
               className="text-sm text-secondary hover:text-primary px-2 py-1.5"

@@ -1,7 +1,6 @@
 'use client';
 
 import { Suspense, useEffect, useRef, useState } from 'react';
-import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useSearchParams, useRouter } from 'next/navigation';
 import type { Project, Ref } from '@/store/types';
@@ -37,6 +36,7 @@ const EditorClient = dynamic(() => import('./EditorClient').then((m) => m.Editor
 });
 
 import { ProjectWorkspace } from '@/components/Workspace/ProjectWorkspace';
+import { SiteHeader } from '@/components/SiteChrome';
 
 function EditPageInner() {
   const { t, lang } = useLang();
@@ -650,19 +650,7 @@ export default function EditPage() {
 }
 
 function Header() {
-  return (
-    <header className="border-b border-border bg-surface sticky top-0 z-50">
-      <div className="max-w-5xl mx-auto px-6 py-3 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2 font-bold text-primary">
-          <span className="w-7 h-7 rounded-md bg-primary text-teal text-xs flex items-center justify-center font-extrabold">
-            ENR
-          </span>
-          Article Editor
-        </Link>
-        <span className="text-xs text-muted">Çalışma alanı</span>
-      </div>
-    </header>
-  );
+  return <SiteHeader showWorkspaceLink={false} />;
 }
 
 function triggerDownload(blob: Blob, filename: string): void {
