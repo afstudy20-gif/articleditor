@@ -9,6 +9,12 @@ import { RefsPanel } from '@/components/RefsPanel/RefsPanel';
 import { tiptapToBuildInput } from '@/lib/editor/to-export';
 import { buildRichDocx } from '@/lib/docx/build-rich';
 import { buildTemplateDocx, getDocxTemplate } from '@/lib/docx/template-docx';
+import {
+  buildPrintDocumentHtml,
+  printStylesheet,
+  PRINT_STYLE_ID,
+  PRINT_HOST_CLASS,
+} from '@/lib/export/print-html';
 import { refsToRis } from '@/lib/refs/ris';
 import { parseDocx } from '@/lib/docx/parse';
 import { splitBodyAndBiblio, parseBiblioLines } from '@/lib/refs/parse-biblio';
@@ -46,6 +52,7 @@ import { SnapshotsPanel } from '@/components/Snapshots/SnapshotsPanel';
 import { FiguresPanel } from '@/components/Figures/FiguresPanel';
 import { TablePanel } from '@/components/Tables/TablePanel';
 import { JournalCheckPanel } from '@/components/Journal/JournalCheckPanel';
+import { ChecklistPanel } from '@/components/Checklist/ChecklistPanel';
 import { LettersPanel } from '@/components/Letters/LettersPanel';
 import { PhrasebankPanel } from '@/components/Phrasebank/PhrasebankPanel';
 import { SupplementaryPanel } from '@/components/Supplementary/SupplementaryPanel';
@@ -212,6 +219,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
   const [tablesOpen, setTablesOpen] = useState(false);
   const [tablePanelView, setTablePanelView] = useState<'list' | 'import'>('list');
   const [journalOpen, setJournalOpen] = useState(false);
+  const [checklistOpen, setChecklistOpen] = useState(false);
   const [lettersOpen, setLettersOpen] = useState(false);
   const [phrasebankOpen, setPhrasebankOpen] = useState(false);
   const [supplementary, setSupplementary] = useState<string>(project.supplementary ?? '');
@@ -1727,6 +1735,57 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
     download(blob, `${slug}-latex.zip`);
   }
 
+  /**
+   * "Save as PDF" via the browser print pipeline. A faithful snapshot of the
+   * live editor DOM (citation markers, figures, KaTeX, three-line tables are
+   * already rendered by the node views) is dropped into a print host in the
+   * same document — keeping blob image URLs valid — and printed with an
+   * academic stylesheet. The bibliography is appended in the active style.
+   */
+  function exportPdf(): void {
+    const ed = editorInstance.current;
+    if (!ed?.view?.dom) return;
+
+    const { orderedRefs } = tiptapToBuildInput(doc as any, refsById, refOrder, style);
+
+    const clone = ed.view.dom.cloneNode(true) as HTMLElement;
+    clone.removeAttribute('contenteditable');
+    clone.querySelectorAll('[contenteditable]').forEach((el) => el.removeAttribute('contenteditable'));
+    // Strip editor-only artifacts; unwrap search highlights to keep their text.
+    clone.querySelectorAll('.ProseMirror-trailingBreak, .ProseMirror-gapcursor').forEach((el) => el.remove());
+    clone.querySelectorAll('.enr-find-match').forEach((el) => el.replaceWith(...Array.from(el.childNodes)));
+
+    const html = buildPrintDocumentHtml({
+      title,
+      bodyHtml: clone.innerHTML,
+      orderedRefs,
+      style,
+      lang,
+      bibHeading: 'References',
+    });
+
+    if (!document.getElementById(PRINT_STYLE_ID)) {
+      const styleEl = document.createElement('style');
+      styleEl.id = PRINT_STYLE_ID;
+      styleEl.textContent = printStylesheet();
+      document.head.appendChild(styleEl);
+    }
+    let host = document.querySelector(`.${PRINT_HOST_CLASS}`) as HTMLElement | null;
+    if (!host) {
+      host = document.createElement('div');
+      host.className = PRINT_HOST_CLASS;
+      document.body.appendChild(host);
+    }
+    host.innerHTML = html;
+
+    const cleanup = (): void => {
+      if (host) host.innerHTML = '';
+      window.removeEventListener('afterprint', cleanup);
+    };
+    window.addEventListener('afterprint', cleanup);
+    window.print();
+  }
+
   function exportProjectJson(): void {
     const p: Project = { ...project, title, refs, doc };
     const blob = backupToBlob(buildBackup([p]));
@@ -1900,6 +1959,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
       },
     },
     { id: 'journal-check', group: t('cmd_g_doc'), label: t('ed_journal_check'), run: () => setJournalOpen(true) },
+    { id: 'checklist', group: t('cmd_g_doc'), label: t('ed_checklist'), run: () => setChecklistOpen(true) },
     { id: 'letters', group: t('cmd_g_doc'), label: t('ed_letters'), run: () => { if (onGoToDocuments) onGoToDocuments(); else setLettersOpen(true); } },
     { id: 'snapshot-now', group: t('cmd_g_doc'), label: t('snap_create'), run: () => { void autoSnapshot(t('snap_manual_label')); setSnapshotsOpen(true); } },
     { id: 'settings', group: t('cmd_g_view'), label: t('ai_settings_title'), run: () => setSettingsOpen(true) },
@@ -1915,6 +1975,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
     { id: 'export-ris', group: t('cmd_g_export'), label: t('ed_export_ris'), run: exportRis },
     { id: 'export-jcm', group: t('cmd_g_export'), label: t('ed_export_jcm'), run: () => void exportDocxTemplate('jcm') },
     { id: 'export-latex', group: t('cmd_g_export'), label: t('ed_export_latex'), run: exportLatex },
+    { id: 'export-pdf', group: t('cmd_g_export'), label: t('ed_export_pdf'), run: exportPdf },
     { id: 'export-json', group: t('cmd_g_export'), label: 'JSON', run: exportProjectJson },
     { id: 'import-docx', group: t('cmd_g_doc'), label: t('ed_import_docx'), run: () => { setShowImportModal(true); setImportPreview(null); setImportError(null); setImportPasteText(''); setPastedHtmlParagraphs(null); setPastedPlainReference(null); } },
     { id: 'lookup-all', group: t('cmd_g_doc'), label: t('rp_scan_all'), run: lookupAllRefs },
@@ -2041,6 +2102,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
               <DropItem onClick={() => void exportDocxTemplate('jcm')}>📰 {t('ed_export_jcm')}</DropItem>
               <DropItem onClick={exportRis}>🗂️ {t('ed_export_ris')}</DropItem>
               <DropItem onClick={exportLatex}>📐 {t('ed_export_latex')}</DropItem>
+              <DropItem onClick={exportPdf}>📄 {t('ed_export_pdf')}</DropItem>
               <DropItem onClick={exportProjectJson}>💾 {t('ed_export_json')}</DropItem>
             </HeaderDropdown>
             <HeaderIcon onClick={() => setPaletteOpen(true)} title={`${t('cmd_open')} (⌘K)`} label="⌘K" caption={t('hdr_palette')} />
@@ -2048,6 +2110,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
             <HeaderIcon onClick={() => setStatsOpen(true)} title={t('ed_stats')} label="📊" caption={t('hdr_stats')} />
             <HeaderIcon onClick={() => setSnapshotsOpen(true)} title={t('ed_snapshots')} label="🕓" caption={t('hdr_versions')} />
             <HeaderIcon onClick={() => setJournalOpen(true)} title={t('ed_journal_check')} label="📋" caption={t('hdr_journal')} />
+            <HeaderIcon onClick={() => setChecklistOpen(true)} title={t('ed_checklist')} label="✅" caption={t('hdr_checklist')} />
             <HeaderIcon onClick={() => setFocusMode(true)} title={`${t('ed_focus_mode')} (⌘.)`} label="🎯" caption={t('hdr_focus')} />
             <HeaderIcon
               onClick={() => setSettingsOpen(true)}
@@ -2678,6 +2741,28 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
             onReferenceStyleChange={(nextStyle) => setStyle(nextStyle)}
             onClose={() => setJournalOpen(false)}
             t={t}
+          />
+        </div>
+      )}
+
+      {checklistOpen && (
+        <div className="fixed right-4 top-24 bottom-4 w-[380px] z-40 shadow-2xl">
+          <ChecklistPanel
+            docJson={doc}
+            projectId={project.id}
+            manuscriptTitle={title}
+            lang={lang}
+            t={t}
+            onClose={() => setChecklistOpen(false)}
+            onInsertText={(text) => {
+              const ed = editorInstance.current;
+              if (!ed) return;
+              const paragraphs = text
+                .split('\n')
+                .map((line) => ({ type: 'paragraph', content: line.trim() ? [{ type: 'text', text: line }] : [] }));
+              ed.chain().focus('end').insertContent(paragraphs).run();
+              setChecklistOpen(false);
+            }}
           />
         </div>
       )}
