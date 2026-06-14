@@ -1,5 +1,5 @@
 // Article Editor Service Worker — app shell offline support.
-const VERSION = 'v1';
+const VERSION = 'v2';
 const CACHE = `article-editor-${VERSION}`;
 
 self.addEventListener('install', (e) => {

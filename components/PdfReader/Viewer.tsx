@@ -27,7 +27,7 @@ export function PdfViewer({ file, onDocLoaded, scale = 1.4 }: Props) {
       try {
         const source =
           typeof file === 'string'
-            ? { url: file }
+            ? { url: `/api/pdf-proxy?url=${encodeURIComponent(file)}` }
             : { data: file instanceof File ? await file.arrayBuffer() : file };
         const task = pdfjsLib.getDocument(source);
         doc = await task.promise;
