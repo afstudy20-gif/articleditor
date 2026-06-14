@@ -25,13 +25,11 @@ export function PdfViewer({ file, onDocLoaded, scale = 1.4 }: Props) {
       setLoading(true);
       setError(null);
       try {
-        const data =
-          file instanceof File
-            ? await file.arrayBuffer()
-            : typeof file === 'string'
-              ? file
-              : file;
-        const task = pdfjsLib.getDocument({ data: data as ArrayBuffer });
+        const source =
+          typeof file === 'string'
+            ? { url: file }
+            : { data: file instanceof File ? await file.arrayBuffer() : file };
+        const task = pdfjsLib.getDocument(source);
         doc = await task.promise;
         if (cancelled) return;
         setPageCount(doc.numPages);
@@ -64,7 +62,12 @@ export function PdfViewer({ file, onDocLoaded, scale = 1.4 }: Props) {
         setLoading(false);
       } catch (e: unknown) {
         if (!cancelled) {
-          setError(e instanceof Error ? e.message : String(e));
+          const message = e instanceof Error ? e.message : String(e);
+          setError(
+            typeof file === 'string'
+              ? `${message} The PDF host may block cross-origin access; download the file and use “Open file”.`
+              : message,
+          );
           setLoading(false);
         }
       }
