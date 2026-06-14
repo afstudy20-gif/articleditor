@@ -89,3 +89,50 @@ describe('JCM section compliance', () => {
     assert.match(issue?.message ?? '', /generated from 19 cited references/);
   });
 });
+
+describe('Journal of International Medical Research compliance', () => {
+  const template = getJournalTemplate('journal-international-medical-research');
+  assert.ok(template);
+
+  it('requires the dedicated SAGE Vancouver style', () => {
+    const matching = checkCompliance({
+      template,
+      stats,
+      plainText: '',
+      sectionHeadings: [],
+      referenceStyle: 'sage-vancouver',
+    });
+    const mismatch = checkCompliance({
+      template,
+      stats,
+      plainText: '',
+      sectionHeadings: [],
+      referenceStyle: 'vancouver',
+    });
+
+    assert.equal(
+      matching.issues.find((item) => item.category === 'reference-style')?.severity,
+      'ok',
+    );
+    assert.equal(
+      mismatch.issues.find((item) => item.category === 'reference-style')?.severity,
+      'warn',
+    );
+  });
+
+  it('reports that abstract structure depends on article type', () => {
+    const report = checkCompliance({
+      template,
+      stats,
+      plainText: '',
+      sectionHeadings: [],
+      referenceStyle: 'sage-vancouver',
+    });
+    const issue = report.issues.find((item) => item.category === 'structure');
+
+    assert.equal(issue?.severity, 'info');
+    assert.equal(issue?.confidence, 'heuristic');
+    assert.match(issue?.message ?? '', /depends on the article type/i);
+    assert.doesNotMatch(issue?.message ?? '', /no structured-abstract requirement/i);
+  });
+});

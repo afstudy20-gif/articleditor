@@ -35,6 +35,11 @@ export const DEFAULT_REQUIRED_STATEMENTS: readonly RequiredStatement[] = [
     keywords: ['informed consent', 'consent'],
   },
   {
+    id: 'consent-publication',
+    label: 'Consent for Publication',
+    keywords: ['consent for publication', 'consent to publish', 'publication consent'],
+  },
+  {
     id: 'funding',
     label: 'Funding',
     keywords: ['funding', 'financial support', 'grant', 'supported by'],
@@ -87,6 +92,7 @@ function pickStatements(...ids: readonly string[]): RequiredStatement[] {
 
 // Citation-style aliases for readability at the call sites below.
 const VANCOUVER: CitationStyleId = 'vancouver';
+const SAGE_VANCOUVER: CitationStyleId = 'sage-vancouver';
 const APA: CitationStyleId = 'apa';
 const MDPI_ACS: CitationStyleId = 'mdpi-acs';
 const MDPI_CHICAGO: CitationStyleId = 'mdpi-chicago';
@@ -312,6 +318,74 @@ export const JOURNAL_TEMPLATES: readonly JournalTemplate[] = [
     ),
     notes:
       'This preset targets original research articles. JCM sets no maximum manuscript length, but expects concise reporting. Original research and systematic reviews use an approximately 250-word structured abstract with Background/Objectives, Methods, Results, and Conclusions; reviews use a 200-word unstructured abstract. Add 3-10 keywords. Conclusions are optional, and Results and Discussion may be combined. Data Availability is required; ethics approval and informed-consent statements must be supplied when applicable (or handled as instructed by the journal). JCM accepts consistently formatted references at submission but recommends the numbered MDPI ACS full-title layout for the final reference list. A cover letter is required. Systematic/scoping reviews must also follow the relevant PRISMA guidance and include the checklist and flow diagram. Figures should be placed near their first citation and supplied at preferably 600 dpi or higher.',
+  },
+  {
+    id: 'journal-international-medical-research',
+    sourceUrl: 'https://journals.sagepub.com/author-instructions/IMR',
+    rulesUpdatedAt: '2026-06-13',
+    name: 'Journal of International Medical Research',
+    publisher: 'SAGE Publishing',
+    description:
+      'Journal-specific submission profile covering SAGE Vancouver references, article-type limits, reporting guidelines, and mandatory declarations.',
+    referenceStyle: SAGE_VANCOUVER,
+    referenceStylePolicy: 'required',
+    publisherReferenceStyles: [SAGE_VANCOUVER],
+    referenceGuideUrl: 'https://journals.sagepub.com/page/new/reference-style-guide',
+    referenceRules: [
+      'Use SAGE Vancouver and number references in the order of first appearance.',
+      'Display in-text reference numbers as superscript Arabic numerals after punctuation.',
+      'Separate non-consecutive citations with commas and compress runs of three or more with a dash.',
+      'List up to three authors; for four or more, give the first three followed by et al.',
+      'Do not place full stops or spaces between author initials; add a full stop after the last author or et al.',
+      'Use Index Medicus journal-title abbreviations and verify records that contain a full journal name.',
+      'Every in-text citation must correspond to one reference-list entry and vice versa.',
+      'Replace preprint references with the peer-reviewed version when one becomes available.',
+    ],
+    requirements: [
+      'Randomised Clinical Trials: structured abstract 200-400 words; manuscript 4,000-6,000 words; maximum 6 figures/tables and 70 references; CONSORT checklist and registration required.',
+      'Observational Studies: structured abstract 200-300 words; manuscript 3,000-5,000 words; maximum 5 figures/tables and 50 references; STROBE or the relevant EQUATOR guideline required.',
+      'Systematic Reviews or Meta-analyses: structured abstract 200-300 words; manuscript 3,000-5,000 words; maximum 6 figures/tables and 100 references; PRISMA-family or MOOSE reporting and PROSPERO/INPLASY registration required.',
+      'Case Reports or Case Series: unstructured abstract 150-250 words; manuscript 2,000-4,000 words; maximum 3 figures/tables and 30 references; CARE reporting required.',
+      'Preclinical Studies: structured abstract 200-300 words; manuscript 3,000-5,000 words; maximum 5 figures/tables and 50 references; ARRIVE 2.0 applies to animal studies.',
+      'Narrative Reviews: unstructured abstract 150-250 words; manuscript 3,000-5,000 words; maximum 3 figures/tables and 50 references; include the rationale, aim, and search strategy.',
+      'Structured abstracts use OBJECTIVE, METHODS, RESULTS, and CONCLUSIONS headings. Trial registration details belong at the end of the abstract.',
+      'Include a minimum of 5 keywords after the abstract; make them as specific as possible to the research topic.',
+      'Add a Statements and Declarations section and retain every required subheading, writing Not applicable where appropriate.',
+      'Number figures consecutively in order of citation and supply figure files at 300 dpi.',
+      'Preferred manuscript file type is Word; LaTeX is also accepted and no journal template is mandatory.',
+      'Upload the relevant EQUATOR checklist as Research Data and include required ethics/IRB documentation.',
+    ],
+    submissionQuestions: [
+      'Please explain clearly how your manuscript demonstrates evidence of direct or indirect clinical relevance.',
+      'Please explain clearly how clinical practice might be influenced by the results of your study.',
+      'Please explain clearly how the subjects were selected in clinical studies and treatments allocated.',
+      'Please explain clearly why your submission is appropriate to an international medical journal with a general readership rather than to a specialist publication.',
+    ],
+    abstractStructure: 'any',
+    abstractWordLimit: 400,
+    sections: [
+      { heading: 'Abstract', level: 2, required: true },
+      { heading: 'Keywords', level: 2, required: true },
+      { heading: 'Introduction', level: 2, required: true },
+      { heading: 'Methods', level: 2, required: true },
+      { heading: 'Results', level: 2, required: true },
+      { heading: 'Discussion', level: 2, required: true },
+      { heading: 'Conclusions', level: 2, required: false },
+      { heading: 'Statements and Declarations', level: 2, required: true },
+      { heading: 'References', level: 2, required: true },
+    ],
+    requiredStatements: pickStatements(
+      'author-contributions',
+      'acknowledgments',
+      'ethics',
+      'informed-consent',
+      'consent-publication',
+      'conflict-of-interest',
+      'funding',
+      'data-availability',
+    ),
+    notes:
+      'Limits depend on article type. The bundled 400-word abstract ceiling is the broadest journal maximum; confirm the lower limit for your selected article type before submission.',
   },
   {
     id: 'apa-psych',

@@ -457,6 +457,49 @@ export function JournalCheckPanel({
           </div>
         ) : null}
 
+        {template?.requirements && template.requirements.length > 0 && (
+          <details className="mx-3 mt-3 rounded border border-border bg-white">
+            <summary className="cursor-pointer px-3 py-2 text-xs font-semibold text-primary hover:bg-slate-50">
+              {template.name} · {t('jc_requirements')}
+            </summary>
+            <div className="border-t border-border px-3 py-2">
+              {template.description && (
+                <p className="mb-2 text-[10px] leading-snug text-secondary">
+                  {template.description}
+                </p>
+              )}
+              <ul className="space-y-1.5 text-[10px] leading-snug text-secondary">
+                {template.requirements.map((requirement) => (
+                  <li key={requirement} className="flex gap-1.5">
+                    <span className="text-teal">•</span>
+                    <span>{requirement}</span>
+                  </li>
+                ))}
+              </ul>
+              {template.submissionQuestions && template.submissionQuestions.length > 0 && (
+                <div className="mt-3 border-t border-border pt-2">
+                  <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted">
+                    {t('jc_submission_questions')}
+                  </div>
+                  <p className="mb-2 text-[10px] leading-snug text-secondary">
+                    {t('jc_submission_questions_help')}
+                  </p>
+                  <ol className="list-decimal space-y-1.5 pl-4 text-[10px] leading-snug text-secondary">
+                    {template.submissionQuestions.map((question) => (
+                      <li key={question}>{question}</li>
+                    ))}
+                  </ol>
+                </div>
+              )}
+              {template.notes && (
+                <p className="mt-2 rounded bg-amber-50 px-2 py-1.5 text-[10px] text-amber-800">
+                  {template.notes}
+                </p>
+              )}
+            </div>
+          </details>
+        )}
+
         <div className="p-2 space-y-1.5">
           {report?.issues.map((issue, i) => (
             <div key={i} className={`rounded border px-2 py-1.5 text-xs ${SEVERITY_STYLE[issue.severity]}`}>

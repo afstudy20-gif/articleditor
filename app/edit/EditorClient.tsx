@@ -36,7 +36,25 @@ import { CitationSuggestionsPanel, type Suggestion } from '@/components/AI/Citat
 import { GapDetectPanel } from '@/components/AI/GapDetectPanel';
 import { CompareModal } from '@/components/AI/CompareModal';
 import { DeepResearchPanel } from '@/components/AI/DeepResearchPanel';
-import type { ReviewIssueT, ScoreResultT, EnhanceModeT, ClaimT } from '@/lib/ai/schemas';
+import { ManuscriptToolModal } from '@/components/AI/ManuscriptToolModal';
+import { IntegrityModal } from '@/components/AI/IntegrityModal';
+import type {
+  AcademicReviewSuggestionT,
+  ScoreResultT,
+  EnhanceModeT,
+  ClaimT,
+  ManuscriptToolModeT,
+  ManuscriptToolResultT,
+} from '@/lib/ai/schemas';
+import {
+  chunkReviewBlocks,
+  type AcademicReviewIssue,
+  type ReviewBlock,
+} from '@/lib/ai/academic-review';
+import {
+  academicReviewPluginKey,
+  type AcademicReviewDecoration,
+} from '@/components/Editor/extensions/academic-review-plugin';
 import {
   newHistoryId,
   type HistoryEntry,
@@ -60,6 +78,7 @@ import { AbbreviationsPanel } from '@/components/Abbreviations/AbbreviationsPane
 import { useTabSync } from '@/lib/hooks/useTabSync';
 import { useIsDesktop } from '@/lib/hooks/useIsDesktop';
 import { computeWritingStats } from '@/lib/stats/writing-stats';
+import { scanMedicalStatistics } from '@/lib/stats/medical-reporting';
 import {
   buildDocWithCitations,
   parseHtmlToParagraphs,
@@ -177,9 +196,17 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
     open: boolean;
     loading: boolean;
     error: string | null;
-    issues: ReviewIssueT[];
+    issues: AcademicReviewIssue[];
     summary: string | null;
-  }>({ open: false, loading: false, error: null, issues: [], summary: null });
+    progress: { completed: number; total: number };
+  }>({
+    open: false,
+    loading: false,
+    error: null,
+    issues: [],
+    summary: null,
+    progress: { completed: 0, total: 0 },
+  });
   const [aiScore, setAiScore] = useState<{
     open: boolean;
     loading: boolean;
@@ -209,8 +236,28 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
   const [embedBusy, setEmbedBusy] = useState<{ done: number; total: number } | null>(null);
   const [compareOpen, setCompareOpen] = useState(false);
   const [researchOpen, setResearchOpen] = useState(false);
+  const [manuscriptTool, setManuscriptTool] = useState<{
+    open: boolean;
+    mode: ManuscriptToolModeT;
+    loading: boolean;
+    error: string | null;
+    result: ManuscriptToolResultT | null;
+    targetRange: { from: number; to: number } | null;
+    citationNodes: CitationNodeJSON[];
+    outputEncoded: string;
+  }>({
+    open: false,
+    mode: 'abstract',
+    loading: false,
+    error: null,
+    result: null,
+    targetRange: null,
+    citationNodes: [],
+    outputEncoded: '',
+  });
   const [aiConfigured, setAiConfigured] = useState<boolean | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [integrityOpen, setIntegrityOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
@@ -1343,44 +1390,6 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
     setResearchOpen(true);
   }, []);
 
-  // C3: doc-scope structural review reuses Reviewer with full doc text.
-  // The reviewer prompt is generic enough to surface structural/coherence issues
-  // when given the whole manuscript.
-  const runAIStructureCheck = useCallback(async () => {
-    const text = extractFullDocWithCitations();
-    if (text.length < 100) {
-      alert(lang === 'tr' ? 'Yapı kontrolü için belge çok kısa.' : 'The document is too short for a structure check.');
-      return;
-    }
-    setAiReview({ open: true, loading: true, error: null, issues: [], summary: null });
-    try {
-      const res = await fetch('/api/ai/review', {
-        method: 'POST',
-        headers: aiHeaders(),
-        body: JSON.stringify({
-          text,
-          lang,
-          section: lang === 'tr' ? 'Tüm belge (yapı kontrolü)' : 'Whole document (structure check)',
-        }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
-        throw new Error(data.error || `HTTP ${res.status}`);
-      }
-      const data = await res.json();
-      setAiReview({
-        open: true,
-        loading: false,
-        error: null,
-        issues: data.issues ?? [],
-        summary: data.summary ?? null,
-      });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setAiReview({ open: true, loading: false, error: msg, issues: [], summary: null });
-    }
-  }, [extractFullDocWithCitations]);
-
   const insertCitationForClaim = useCallback((claim: ClaimT, refIds: string[]) => {
     const ed = editorInstance.current;
     if (!ed || !claim.quote) return;
@@ -1410,62 +1419,342 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
   }, []);
 
   const runAIReview = useCallback(async () => {
-    const sel = extractSelectionWithCitations();
-    if (!sel || sel.text.length < 20) {
-      alert(lang === 'tr' ? 'AI eleştirisi için en az 20 karakterlik metin seçmelisin (veya cursor’u bir paragrafa koy).' : 'Select at least 20 characters of text for AI critique (or place the cursor in a paragraph).');
+    const ed = editorInstance.current;
+    if (!ed) return;
+    const runtimeBlocks = extractAcademicReviewBlocks(ed);
+    const blocks = runtimeBlocks.map(({ positions: _positions, ...block }) => block);
+    const chunks = chunkReviewBlocks(blocks, 8_000);
+    if (chunks.length === 0) {
+      alert(lang === 'tr' ? 'İncelenecek metin bulunamadı.' : 'No manuscript text was found.');
       return;
     }
-    setAiReview({ open: true, loading: true, error: null, issues: [], summary: null });
+
+    ed.view.dispatch(
+      ed.view.state.tr.setMeta(academicReviewPluginKey, { type: 'clear' }),
+    );
+    setAiReview({
+      open: true,
+      loading: true,
+      error: null,
+      issues: [],
+      summary: null,
+      progress: { completed: 0, total: chunks.length },
+    });
+
+    const sourceById = new Map(runtimeBlocks.map((block) => [block.id, block]));
+    const collected: AcademicReviewIssue[] = runtimeBlocks.flatMap((block) =>
+      scanMedicalStatistics(block.text).flatMap((statIssue) => {
+        const from = block.positions[statIssue.start];
+        const last = block.positions[statIssue.end - 1];
+        if (from == null || last == null) return [];
+        return [{
+          id: newId('stat'),
+          category: 'statistics' as const,
+          severity: statIssue.severity,
+          blockId: block.id,
+          quote: statIssue.quote,
+          explanation: lang === 'tr' ? statIssue.message.tr : statIssue.message.en,
+          replacement: statIssue.replacement,
+          confidence: 1,
+          status: 'open' as const,
+          from,
+          to: last + 1,
+        }];
+      }),
+    );
+    const summaries: string[] = [];
+    let completedChunks = 0;
+
+    if (collected.length > 0) {
+      ed.view.dispatch(
+        ed.view.state.tr.setMeta(academicReviewPluginKey, {
+          type: 'set',
+          items: collected.map((issue) => ({
+            id: issue.id,
+            from: issue.from!,
+            to: issue.to!,
+            category: issue.category,
+          })),
+        }),
+      );
+      setAiReview((previous) => ({ ...previous, issues: [...collected] }));
+    }
+
     try {
-      const res = await fetch('/api/ai/review', {
-        method: 'POST',
-        headers: aiHeaders(),
-        body: JSON.stringify({ text: sel.text, context: sel.context, lang }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
-        throw new Error(data.error || `HTTP ${res.status}`);
+      for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex += 1) {
+        const chunk = chunks[chunkIndex];
+        const response = await fetch('/api/ai/academic-review', {
+          method: 'POST',
+          headers: aiHeaders(),
+          body: JSON.stringify({
+            blocks: chunk.blocks.map((block) => ({
+              id: block.id,
+              text: block.text,
+              section: block.section,
+            })),
+            lang,
+          }),
+        });
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
+          throw new Error(data.error || `HTTP ${response.status}`);
+        }
+        const data = (await response.json()) as {
+          issues: AcademicReviewSuggestionT[];
+          summary?: string;
+        };
+        if (data.summary?.trim()) summaries.push(data.summary.trim());
+        completedChunks = chunkIndex + 1;
+
+        const sentById = new Map(chunk.blocks.map((block) => [block.id, block]));
+        for (const suggestion of data.issues ?? []) {
+          const sentBlock = sentById.get(suggestion.blockId);
+          if (!sentBlock) continue;
+          const sourceBlock = sourceById.get(sentBlock.sourceId ?? sentBlock.id);
+          if (!sourceBlock) continue;
+          const range = locateAcademicSuggestion(suggestion, sentBlock, sourceBlock, ed);
+          const duplicate = collected.some(
+            (issue) =>
+              issue.category === suggestion.category &&
+              issue.blockId === suggestion.blockId &&
+              issue.quote === suggestion.quote &&
+              issue.replacement === suggestion.replacement,
+          );
+          if (duplicate) continue;
+          collected.push({
+            id: newId('ai'),
+            ...suggestion,
+            status: range ? 'open' : 'stale',
+            from: range?.from,
+            to: range?.to,
+          });
+        }
+
+        const openDecorations: AcademicReviewDecoration[] = collected
+          .filter(
+            (issue): issue is AcademicReviewIssue & { from: number; to: number } =>
+              issue.status === 'open' && issue.from != null && issue.to != null,
+          )
+          .map((issue) => ({
+            id: issue.id,
+            from: issue.from,
+            to: issue.to,
+            category: issue.category,
+          }));
+        ed.view.dispatch(
+          ed.view.state.tr.setMeta(academicReviewPluginKey, {
+            type: 'set',
+            items: openDecorations,
+          }),
+        );
+        setAiReview({
+          open: true,
+          loading: chunkIndex + 1 < chunks.length,
+          error: null,
+          issues: [...collected],
+          summary: summaries.at(-1) ?? null,
+          progress: { completed: chunkIndex + 1, total: chunks.length },
+        });
       }
-      const data = await res.json();
+    } catch (error) {
       setAiReview({
         open: true,
         loading: false,
-        error: null,
-        issues: data.issues ?? [],
-        summary: data.summary ?? null,
+        error: error instanceof Error ? error.message : String(error),
+        issues: [...collected],
+        summary: summaries.at(-1) ?? null,
+        progress: { completed: completedChunks, total: chunks.length },
       });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setAiReview({ open: true, loading: false, error: msg, issues: [], summary: null });
     }
-  }, [extractSelectionWithCitations]);
+  }, [lang]);
 
-  const jumpToIssue = useCallback((issue: ReviewIssueT) => {
+  const runAIStructureCheck = runAIReview;
+
+  const jumpToIssue = useCallback((issue: AcademicReviewIssue) => {
     const ed = editorInstance.current;
-    if (!ed || !issue.quote) return;
-    const plain = ed.getText() as string;
-    const idx = plain.indexOf(issue.quote);
-    if (idx < 0) return;
-    // ProseMirror positions don't equal plain-text indices exactly; use a
-    // best-effort textBetween scan over the doc.
-    const { doc } = ed.state;
-    let found = -1;
-    doc.descendants((node: any, pos: number) => {
-      if (found >= 0) return false;
-      if (node.isText) {
-        const i = (node.text ?? '').indexOf(issue.quote);
-        if (i >= 0) {
-          found = pos + i;
-          return false;
-        }
-      }
-      return true;
-    });
-    if (found >= 0) {
-      const to = found + issue.quote.length;
-      ed.chain().focus().setTextSelection({ from: found, to }).scrollIntoView().run();
-    }
+    if (!ed) return;
+    const mapped = academicReviewPluginKey
+      .getState(ed.state)
+      ?.items.find((item) => item.id === issue.id);
+    const from = mapped?.from ?? issue.from;
+    const to = mapped?.to ?? issue.to;
+    if (from == null || to == null) return;
+    ed.view.dispatch(
+      ed.view.state.tr.setMeta(academicReviewPluginKey, { type: 'active', id: issue.id }),
+    );
+    ed.chain().focus().setTextSelection({ from, to }).scrollIntoView().run();
   }, []);
+
+  const dismissAIReviewIssue = useCallback((issue: AcademicReviewIssue) => {
+    const ed = editorInstance.current;
+    if (ed) {
+      ed.view.dispatch(
+        ed.view.state.tr.setMeta(academicReviewPluginKey, { type: 'remove', id: issue.id }),
+      );
+    }
+    setAiReview((previous) => ({
+      ...previous,
+      issues: previous.issues.map((item) =>
+        item.id === issue.id ? { ...item, status: 'dismissed' } : item,
+      ),
+    }));
+  }, []);
+
+  const applyAIReviewIssue = useCallback(async (issue: AcademicReviewIssue) => {
+    const ed = editorInstance.current;
+    if (!ed || !issue.replacement) return;
+    const mapped = academicReviewPluginKey
+      .getState(ed.state)
+      ?.items.find((item) => item.id === issue.id);
+    const from = mapped?.from ?? issue.from;
+    const to = mapped?.to ?? issue.to;
+    if (from == null || to == null) return;
+    const currentText = ed.state.doc.textBetween(from, to, '', '');
+    if (currentText !== issue.quote) {
+      ed.view.dispatch(
+        ed.view.state.tr.setMeta(academicReviewPluginKey, { type: 'remove', id: issue.id }),
+      );
+      setAiReview((previous) => ({
+        ...previous,
+        issues: previous.issues.map((item) =>
+          item.id === issue.id ? { ...item, status: 'stale' } : item,
+        ),
+      }));
+      return;
+    }
+    await autoSnapshot(t('snap_auto_label'));
+    ed.chain()
+      .focus()
+      .insertContentAt({ from, to }, issue.replacement)
+      .run();
+    ed.view.dispatch(
+      ed.view.state.tr.setMeta(academicReviewPluginKey, { type: 'remove', id: issue.id }),
+    );
+    setAiReview((previous) => ({
+      ...previous,
+      issues: previous.issues.map((item) =>
+        item.id === issue.id ? { ...item, status: 'accepted' } : item,
+      ),
+    }));
+  }, [autoSnapshot, t]);
+
+  const clearAIReview = useCallback(() => {
+    const ed = editorInstance.current;
+    if (ed) {
+      ed.view.dispatch(
+        ed.view.state.tr.setMeta(academicReviewPluginKey, { type: 'clear' }),
+      );
+    }
+    setAiReview({
+      open: false,
+      loading: false,
+      error: null,
+      issues: [],
+      summary: null,
+      progress: { completed: 0, total: 0 },
+    });
+  }, []);
+
+  const runAIManuscriptTool = useCallback(async (mode: ManuscriptToolModeT) => {
+    const ed = editorInstance.current;
+    if (!ed) return;
+    const fullText = extractFullDocWithCitations().slice(0, 30_000);
+    const target = mode === 'titles' ? null : findManuscriptSection(ed, mode);
+    if ((mode === 'discussion' || mode === 'conclusion') && !target) {
+      alert(
+        lang === 'tr'
+          ? `${mode === 'discussion' ? 'Discussion' : 'Conclusion'} bölümü bulunamadı.`
+          : `No ${mode === 'discussion' ? 'Discussion' : 'Conclusion'} section was found.`,
+      );
+      return;
+    }
+
+    let primaryText = fullText;
+    let context: string | undefined;
+    let citationNodes: CitationNodeJSON[] = [];
+    if (target) {
+      const encoded = encodeSelection(ed.state, target.from, target.to);
+      primaryText = encoded.encoded;
+      citationNodes = encoded.nodes;
+      context = mode === 'abstract' ? fullText : detectAbstract() || undefined;
+    } else if (mode === 'titles') {
+      primaryText = detectAbstract() || fullText.slice(0, 12_000);
+    }
+    if (primaryText.trim().length < 20) {
+      alert(lang === 'tr' ? 'Bu araç için yeterli metin yok.' : 'There is not enough text for this tool.');
+      return;
+    }
+
+    setManuscriptTool({
+      open: true,
+      mode,
+      loading: true,
+      error: null,
+      result: null,
+      targetRange: target ? { from: target.from, to: target.to } : null,
+      citationNodes,
+      outputEncoded: '',
+    });
+    try {
+      const response = await fetch('/api/ai/manuscript-tool', {
+        method: 'POST',
+        headers: aiHeaders(),
+        body: JSON.stringify({
+          mode,
+          text: primaryText,
+          context,
+          lang,
+          preserveCitations: citationNodes.length > 0,
+        }),
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
+        throw new Error(data.error || `HTTP ${response.status}`);
+      }
+      const result = (await response.json()) as ManuscriptToolResultT;
+      const outputEncoded = result.output ?? '';
+      const displayResult = outputEncoded
+        ? {
+            ...result,
+            output: encodedToPreview(outputEncoded, citationNodes, refOrder),
+          }
+        : result;
+      setManuscriptTool((previous) => ({
+        ...previous,
+        loading: false,
+        result: displayResult,
+        outputEncoded,
+      }));
+    } catch (error) {
+      setManuscriptTool((previous) => ({
+        ...previous,
+        loading: false,
+        error: error instanceof Error ? error.message : String(error),
+      }));
+    }
+  }, [detectAbstract, extractFullDocWithCitations, lang, refOrder]);
+
+  const applyManuscriptTool = useCallback(async (text: string) => {
+    const ed = editorInstance.current;
+    if (!ed || !text.trim()) return;
+    await autoSnapshot(t('snap_auto_label'));
+    if (manuscriptTool.mode === 'titles') {
+      applySuggestedTitle(ed, text.trim());
+      setTitle(text.trim());
+    } else if (manuscriptTool.targetRange) {
+      const content = decodeToTipTapContent(
+        manuscriptTool.outputEncoded || text,
+        manuscriptTool.citationNodes,
+      );
+      ed.chain()
+        .focus()
+        .insertContentAt(manuscriptTool.targetRange, content)
+        .run();
+    } else {
+      insertGeneratedAbstract(ed, text);
+    }
+    setManuscriptTool((previous) => ({ ...previous, open: false }));
+  }, [autoSnapshot, manuscriptTool, t]);
 
   // Install click handler on window so Citation NodeView can call it.
   useEffect(() => {
@@ -2338,6 +2627,8 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
               onAICompare={runAICompare}
               onAIDeepResearch={runAIDeepResearch}
               onAIStructureCheck={runAIStructureCheck}
+              onAIManuscriptTool={runAIManuscriptTool}
+              onIntegrityCheck={() => setIntegrityOpen(true)}
               aiDisabled={aiConfigured === false}
             />
           </div>
@@ -2460,6 +2751,8 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
               onAICompare={runAICompare}
               onAIDeepResearch={runAIDeepResearch}
               onAIStructureCheck={runAIStructureCheck}
+              onAIManuscriptTool={runAIManuscriptTool}
+              onIntegrityCheck={() => setIntegrityOpen(true)}
               aiDisabled={aiConfigured === false}
         />
         <RefsPanel
@@ -2556,8 +2849,14 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
             summary={aiReview.summary ?? undefined}
             loading={aiReview.loading}
             error={aiReview.error}
+            progress={aiReview.progress}
             onClose={() => setAiReview((s) => ({ ...s, open: false }))}
             onJumpTo={jumpToIssue}
+            onApply={(issue) => {
+              void applyAIReviewIssue(issue);
+            }}
+            onDismiss={dismissAIReviewIssue}
+            onClear={clearAIReview}
           />
         </div>
       )}
@@ -2569,6 +2868,27 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
         onClose={closeEnhance}
         onRetry={retryEnhance}
       />
+
+      {manuscriptTool.open && (
+        <ManuscriptToolModal
+          mode={manuscriptTool.mode}
+          result={manuscriptTool.result}
+          loading={manuscriptTool.loading}
+          error={manuscriptTool.error}
+          onClose={() => setManuscriptTool((previous) => ({ ...previous, open: false }))}
+          onApply={(text) => {
+            void applyManuscriptTool(text);
+          }}
+        />
+      )}
+
+      {integrityOpen && (
+        <IntegrityModal
+          text={extractFullDocWithCitations()}
+          title={title}
+          onClose={() => setIntegrityOpen(false)}
+        />
+      )}
 
       {aiSuggest.open && (
         <div className="fixed left-4 top-24 bottom-4 w-[400px] z-40 shadow-2xl">
@@ -3106,6 +3426,137 @@ function DropItem({
 
 function truncate(s: string, n: number): string {
   return s.length > n ? s.slice(0, n) + '…' : s;
+}
+
+type RuntimeReviewBlock = ReviewBlock & { positions: number[] };
+
+function extractAcademicReviewBlocks(editor: any): RuntimeReviewBlock[] {
+  const blocks: RuntimeReviewBlock[] = [];
+  let section = 'Manuscript';
+  editor.state.doc.forEach((node: any, offset: number, index: number) => {
+    const characters: string[] = [];
+    const positions: number[] = [];
+    node.descendants((child: any, relativePos: number) => {
+      if (!child.isText || !child.text) return true;
+      for (let charIndex = 0; charIndex < child.text.length; charIndex += 1) {
+        characters.push(child.text[charIndex]);
+        positions.push(offset + 1 + relativePos + charIndex);
+      }
+      return true;
+    });
+    const text = characters.join('');
+    if (!text.trim()) return;
+    if (node.type?.name === 'heading') section = text.trim();
+    blocks.push({
+      id: `block-${index}-${offset}`,
+      text,
+      section,
+      from: positions[0],
+      to: positions.at(-1) != null ? positions.at(-1)! + 1 : undefined,
+      positions,
+    });
+  });
+  return blocks;
+}
+
+function locateAcademicSuggestion(
+  suggestion: AcademicReviewSuggestionT,
+  sentBlock: ReviewBlock,
+  sourceBlock: RuntimeReviewBlock,
+  editor: any,
+): { from: number; to: number } | null {
+  const localOffset = nthIndexOf(
+    sentBlock.text,
+    suggestion.quote,
+    suggestion.occurrence ?? 0,
+  );
+  if (localOffset < 0) return null;
+  const sourceOffset = (sentBlock.textOffset ?? 0) + localOffset;
+  const first = sourceBlock.positions[sourceOffset];
+  const last = sourceBlock.positions[sourceOffset + suggestion.quote.length - 1];
+  if (first == null || last == null) return null;
+  const range = { from: first, to: last + 1 };
+  let containsProtectedNode = false;
+  editor.state.doc.nodesBetween(range.from, range.to, (node: any) => {
+    if (node.type?.name === 'citation' || node.type?.name === 'equation') {
+      containsProtectedNode = true;
+      return false;
+    }
+    return true;
+  });
+  return containsProtectedNode ? null : range;
+}
+
+function nthIndexOf(text: string, query: string, occurrence: number): number {
+  if (!query || occurrence < 0) return -1;
+  let from = 0;
+  let result = -1;
+  for (let index = 0; index <= occurrence; index += 1) {
+    result = text.indexOf(query, from);
+    if (result < 0) return -1;
+    from = result + Math.max(1, query.length);
+  }
+  return result;
+}
+
+function findManuscriptSection(
+  editor: any,
+  mode: Exclude<ManuscriptToolModeT, 'titles'>,
+): { from: number; to: number } | null {
+  const aliases: Record<Exclude<ManuscriptToolModeT, 'titles'>, RegExp> = {
+    abstract: /^(abstract|summary|öz|özet)\b/i,
+    discussion: /^(discussion|tartışma)\b/i,
+    conclusion: /^(conclusion|conclusions|sonuç|sonuçlar)\b/i,
+  };
+  let from: number | null = null;
+  let to: number | null = null;
+  editor.state.doc.forEach((node: any, offset: number) => {
+    if (node.type?.name !== 'heading') return;
+    const heading = node.textContent.trim();
+    if (from == null && aliases[mode].test(heading)) {
+      from = offset + node.nodeSize;
+      return;
+    }
+    if (from != null && to == null) to = offset;
+  });
+  if (from == null) return null;
+  const end = to ?? editor.state.doc.content.size;
+  return end > from ? { from, to: end } : null;
+}
+
+function applySuggestedTitle(editor: any, title: string): void {
+  let headingRange: { from: number; to: number } | null = null;
+  editor.state.doc.forEach((node: any, offset: number) => {
+    if (headingRange || node.type?.name !== 'heading' || node.attrs?.level !== 1) return;
+    headingRange = { from: offset + 1, to: offset + node.nodeSize - 1 };
+  });
+  if (headingRange) {
+    editor.chain().focus().insertContentAt(headingRange, title).run();
+    return;
+  }
+  editor.chain().focus().insertContentAt(0, {
+    type: 'heading',
+    attrs: { level: 1 },
+    content: [{ type: 'text', text: title }],
+  }).run();
+}
+
+function insertGeneratedAbstract(editor: any, text: string): void {
+  let position = 0;
+  editor.state.doc.forEach((node: any, offset: number) => {
+    if (node.type?.name === 'heading' && node.attrs?.level === 1) {
+      position = offset + node.nodeSize;
+    }
+  });
+  const paragraphs = decodeToTipTapContent(text, []);
+  editor.chain().focus().insertContentAt(position, [
+    {
+      type: 'heading',
+      attrs: { level: 2 },
+      content: [{ type: 'text', text: 'Abstract' }],
+    },
+    ...paragraphs,
+  ]).run();
 }
 
 function findHeading1Text(doc: any): string | null {

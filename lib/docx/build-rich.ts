@@ -6,6 +6,7 @@ import {
   formatInTextCitation,
   orderRefsForBib,
   type StyleId,
+  isSuperscriptCitationStyle,
 } from '@/lib/refs/styles';
 import {
   collectFigureLegends,
@@ -464,9 +465,10 @@ ${paragraphs.join('\n')}
       suffix: n.attrs?.suffix || undefined,
       suppressAuthor: n.attrs?.suppressAuthor || undefined,
     });
-    if (this.input.mode === 'active') return activeEndNoteField(cited, display);
+    const superscript = isSuperscriptCitationStyle(this.input.style);
+    if (this.input.mode === 'active') return activeEndNoteField(cited, display, superscript);
     if (this.input.mode === 'placeholder') return textRun(placeholderText(cited));
-    return textRun(display);
+    return textRun(display, superscript);
   }
 
   private figure(n: Json): string[] {
@@ -625,9 +627,12 @@ function orderByMap(refsById: Map<string, Ref>, refOrder: Map<string, number>): 
   return out;
 }
 
-function textRun(text: string): string {
-  if (text === '') return '<w:r><w:t xml:space="preserve"> </w:t></w:r>';
-  return `<w:r><w:t xml:space="preserve">${escapeXml(text)}</w:t></w:r>`;
+function textRun(text: string, superscript = false): string {
+  const properties = superscript
+    ? '<w:rPr><w:vertAlign w:val="superscript"/></w:rPr>'
+    : '';
+  if (text === '') return `<w:r>${properties}<w:t xml:space="preserve"> </w:t></w:r>`;
+  return `<w:r>${properties}<w:t xml:space="preserve">${escapeXml(text)}</w:t></w:r>`;
 }
 
 function parseDataUrl(dataUrl: string): { data: Uint8Array; ext: string } | null {

@@ -337,7 +337,16 @@ function checkStructure(
   template: JournalTemplate,
   abstractText: string | undefined,
 ): ComplianceIssue {
-  if (template.abstractStructure !== 'structured') {
+  if (template.abstractStructure === 'any') {
+    return {
+      severity: 'info',
+      category: 'structure',
+      message: 'Abstract structure depends on the article type.',
+      detail: 'Check the journal-specific requirements for whether this submission needs a structured or unstructured abstract.',
+      confidence: 'heuristic',
+    };
+  }
+  if (template.abstractStructure === 'unstructured') {
     return {
       severity: 'ok',
       category: 'structure',

@@ -20,6 +20,7 @@ import { CitationWithView } from './extensions/citation-view';
 import { Equation } from './extensions/equation';
 import { Figure, FigureRef } from './extensions/figure';
 import { ManuscriptTable, ManuscriptTableView } from './extensions/manuscript-table';
+import { AcademicReviewDecorations } from './extensions/academic-review-plugin';
 import type { Ref } from '@/store/types';
 import { useLang } from '@/lib/i18n/hooks';
 import { getNextNumbering, isNumberingPrefix } from '@/lib/editor/numbering';
@@ -39,6 +40,8 @@ type Props = {
   onAICompare?: () => void;
   onAIDeepResearch?: () => void;
   onAIStructureCheck?: () => void;
+  onAIManuscriptTool?: (mode: 'abstract' | 'titles' | 'discussion' | 'conclusion') => void;
+  onIntegrityCheck?: () => void;
   aiDisabled?: boolean;
 };
 
@@ -91,6 +94,8 @@ export function ArticleEditor({
   onAICompare,
   onAIDeepResearch,
   onAIStructureCheck,
+  onAIManuscriptTool,
+  onIntegrityCheck,
   aiDisabled,
 }: Props) {
   const { t, lang } = useLang();
@@ -122,6 +127,7 @@ export function ArticleEditor({
       Figure,
       FigureRef,
       CitationWithView,
+      AcademicReviewDecorations,
     ],
     content: initialContent || { type: 'doc', content: [{ type: 'paragraph' }] },
     immediatelyRender: false,
@@ -348,7 +354,7 @@ export function ArticleEditor({
         >
           {t('ed_insert_citation')}
         </button>
-        {(onAIReview || onAIScore || onAIEnhance || onAISuggestCitation || onAIDetectGaps || onAICompare || onAIDeepResearch || onAIStructureCheck) && (
+        {(onAIReview || onAIScore || onAIEnhance || onAISuggestCitation || onAIDetectGaps || onAICompare || onAIDeepResearch || onAIStructureCheck || onAIManuscriptTool) && (
           <>
             <Sep />
             <AIMenu
@@ -361,9 +367,18 @@ export function ArticleEditor({
               onCompare={onAICompare}
               onDeepResearch={onAIDeepResearch}
               onStructureCheck={onAIStructureCheck}
+              onManuscriptTool={onAIManuscriptTool}
               t={t}
             />
           </>
+        )}
+        {onIntegrityCheck && (
+          <button
+            onClick={onIntegrityCheck}
+            className="px-2.5 py-1 rounded-md border border-violet-300 text-violet-700 text-xs font-semibold hover:bg-violet-50"
+          >
+            {lang === 'tr' ? 'Özgünlük' : 'Integrity'}
+          </button>
         )}
       </div>
       <div
@@ -453,6 +468,7 @@ function AIMenu({
   onCompare,
   onDeepResearch,
   onStructureCheck,
+  onManuscriptTool,
   t,
 }: {
   disabled?: boolean;
@@ -464,6 +480,7 @@ function AIMenu({
   onCompare?: () => void;
   onDeepResearch?: () => void;
   onStructureCheck?: () => void;
+  onManuscriptTool?: (mode: 'abstract' | 'titles' | 'discussion' | 'conclusion') => void;
   t: (k: string) => string;
 }): JSX.Element {
   const [open, setOpen] = useState(false);
@@ -536,6 +553,14 @@ function AIMenu({
             )}
             {onStructureCheck && (
               <MenuItem icon="🩺" label={t('ed_ai_structure_check')} onClick={() => pick(onStructureCheck)} />
+            )}
+            {onManuscriptTool && (
+              <>
+                <MenuItem icon="A" label={t('ed_ai_abstract')} onClick={() => pick(() => onManuscriptTool('abstract'))} />
+                <MenuItem icon="T" label={t('ed_ai_titles')} onClick={() => pick(() => onManuscriptTool('titles'))} />
+                <MenuItem icon="D" label={t('ed_ai_discussion')} onClick={() => pick(() => onManuscriptTool('discussion'))} />
+                <MenuItem icon="C" label={t('ed_ai_conclusion')} onClick={() => pick(() => onManuscriptTool('conclusion'))} />
+              </>
             )}
           </div>
         </>

@@ -2,6 +2,47 @@
 // failure the provider layer retries once with a schema-reminder appended.
 
 import { z } from 'zod';
+import { ACADEMIC_REVIEW_CATEGORIES } from './academic-review';
+
+// ── Full-document academic review ───────────────────────────────────
+export const AcademicReviewCategory = z.enum(ACADEMIC_REVIEW_CATEGORIES);
+
+export const AcademicReviewSuggestion = z.object({
+  category: AcademicReviewCategory,
+  severity: z.enum(['low', 'med', 'high']),
+  blockId: z.string().min(1),
+  quote: z.string().min(1).max(240),
+  occurrence: z.number().int().min(0).optional(),
+  explanation: z.string().min(1).max(800),
+  replacement: z.string().max(1_500).optional(),
+  confidence: z.number().min(0).max(1).optional(),
+});
+
+export const AcademicReviewResult = z.object({
+  issues: z.array(AcademicReviewSuggestion).max(40),
+  summary: z.string().max(1_500).optional(),
+});
+
+export type AcademicReviewSuggestionT = z.infer<typeof AcademicReviewSuggestion>;
+export type AcademicReviewResultT = z.infer<typeof AcademicReviewResult>;
+
+// ── Section-specific manuscript tools ───────────────────────────────
+export const ManuscriptToolMode = z.enum([
+  'abstract',
+  'titles',
+  'discussion',
+  'conclusion',
+]);
+
+export const ManuscriptToolResult = z.object({
+  output: z.string().max(12_000).optional(),
+  options: z.array(z.string().min(1).max(500)).max(12).optional(),
+  rationale: z.string().max(1_500).optional(),
+  cautions: z.array(z.string().max(500)).max(8).optional(),
+});
+
+export type ManuscriptToolModeT = z.infer<typeof ManuscriptToolMode>;
+export type ManuscriptToolResultT = z.infer<typeof ManuscriptToolResult>;
 
 // ── Reviewer (A1) ───────────────────────────────────────────────────
 export const ReviewIssueCategory = z.enum([

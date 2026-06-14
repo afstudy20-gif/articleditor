@@ -17,6 +17,32 @@ const onePixelPng =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
 
 describe('buildLatex', () => {
+  it('uses superscript citations and a three-author bibliography limit for SAGE Vancouver', () => {
+    const doc = {
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: 'Clinical finding.' },
+            { type: 'citation', attrs: { refIds: ['smith'] } },
+          ],
+        },
+      ],
+    };
+    const output = buildLatex({
+      doc,
+      refs: [ref],
+      title: 'SAGE manuscript',
+      style: 'sage-vancouver',
+      language: 'en',
+    });
+
+    assert.ok(output.tex.includes('\\supercite{smith2024}'));
+    assert.ok(output.tex.includes('maxbibnames=3'));
+    assert.ok(output.tex.includes('minbibnames=3'));
+  });
+
   it('generates a TeXworks/LuaLaTeX document and preserves rich blocks', () => {
     const doc = {
       type: 'doc',

@@ -4,7 +4,11 @@ import { useEffect, useState } from 'react';
 import { NodeViewWrapper, ReactNodeViewRenderer } from '@tiptap/react';
 import { Citation as CitationCore } from './Citation';
 import type { Ref } from '@/store/types';
-import { formatInTextCitation, type StyleId } from '@/lib/refs/styles';
+import {
+  formatInTextCitation,
+  isSuperscriptCitationStyle,
+  type StyleId,
+} from '@/lib/refs/styles';
 
 type RefMap = Map<string, number>;
 
@@ -57,6 +61,7 @@ function CitationNodeView({ node, getPos }: any) {
   };
   const display =
     resolvedRefs.length > 0 ? formatInTextCitation(style, resolvedRefs, numbers, citeOpts) : '[?]';
+  const superscript = isSuperscriptCitationStyle(style);
 
   const titleAttr = refIds
     .map((id) => {
@@ -67,14 +72,16 @@ function CitationNodeView({ node, getPos }: any) {
     })
     .join(' | ');
 
-  const baseCls = 'enr-citation inline-block px-1 mx-0.5 rounded text-xs cursor-pointer select-none align-baseline transition-colors duration-300';
+  const baseCls = `enr-citation inline-block px-1 mx-0.5 rounded text-xs cursor-pointer select-none transition-colors duration-300 ${
+    superscript ? 'align-super' : 'align-baseline'
+  }`;
   const className = highlighted
     ? `${baseCls} bg-red text-white font-bold shadow-sm`
     : `${baseCls} bg-teal-bg text-teal font-semibold`;
 
   return (
     <NodeViewWrapper
-      as="span"
+      as={superscript ? 'sup' : 'span'}
       className={className}
       title={titleAttr}
       data-ref-ids={refIds.join(',')}

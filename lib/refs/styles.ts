@@ -12,6 +12,7 @@ import {
 // A style id is either a built-in name or a 'custom:<uuid>' id.
 export type CitationStyle =
   | 'vancouver'
+  | 'sage-vancouver'
   | 'apa'
   | 'ama'
   | 'ieee'
@@ -22,6 +23,7 @@ export type StyleId = CitationStyle | string;
 
 const BUILTIN_IDS: readonly CitationStyle[] = [
   'vancouver',
+  'sage-vancouver',
   'apa',
   'ama',
   'ieee',
@@ -36,6 +38,7 @@ export function isBuiltinStyle(id: string): id is CitationStyle {
 
 export const STYLE_LABELS: Record<CitationStyle, string> = {
   vancouver: 'Vancouver',
+  'sage-vancouver': 'SAGE Vancouver',
   apa: 'APA 7',
   ama: 'AMA',
   ieee: 'IEEE',
@@ -102,12 +105,43 @@ export function formatInTextCitation(
       return formatChicagoInText(refs, opts);
     case 'mdpi-acs':
       return formatMdpiNumericWithOpts(numbers, opts);
+    case 'sage-vancouver':
+      return formatSageNumericWithOpts(numbers, opts);
     case 'vancouver':
     case 'ama':
     case 'ieee':
     default:
       return formatNumericWithOpts(numbers, opts);
   }
+}
+
+function formatSageNumericWithOpts(numbers: number[], opts?: CiteOptions): string {
+  const sorted = [...new Set(numbers)].sort((a, b) => a - b);
+  const parts: string[] = [];
+  let start = sorted[0];
+  let previous = sorted[0];
+  const flush = (): void => {
+    if (start == null || previous == null) return;
+    const length = previous - start + 1;
+    parts.push(length >= 3 ? `${start}–${previous}` : length === 2 ? `${start},${previous}` : `${start}`);
+  };
+  for (let index = 1; index < sorted.length; index += 1) {
+    const current = sorted[index];
+    if (current === previous + 1) {
+      previous = current;
+    } else {
+      flush();
+      start = current;
+      previous = current;
+    }
+  }
+  flush();
+  let out = parts.join(',');
+  if (!opts) return out;
+  if (opts.locator) out = `${out} p ${opts.locator}`;
+  if (opts.prefix) out = `${opts.prefix} ${out}`;
+  if (opts.suffix) out = `${out} ${opts.suffix}`;
+  return out;
 }
 
 function formatMdpiNumericWithOpts(numbers: number[], opts?: CiteOptions): string {
@@ -227,6 +261,8 @@ export function formatBibEntry(style: StyleId, r: Ref, n: number): string {
       return formatMdpiAcsEntry(r, n);
     case 'mdpi-chicago':
       return formatMdpiChicagoEntry(r);
+    case 'sage-vancouver':
+      return formatSageVancouverEntry(r, n);
     case 'vancouver':
     case 'ama':
       return formatVancouverEntry(r, n);
@@ -235,6 +271,23 @@ export function formatBibEntry(style: StyleId, r: Ref, n: number): string {
     default:
       return formatVancouverEntry(r, n);
   }
+}
+
+function formatSageVancouverEntry(r: Ref, n: number): string {
+  const parts: string[] = [`${n}.`];
+  const authors = vancouverAuthorList(r.authors, 3);
+  if (authors) parts.push(`${authors}.`);
+  if (r.title) parts.push(`${stripPeriod(r.title)}.`);
+  if (r.containerTitle) parts.push(`${stripPeriod(r.containerTitle)}.`);
+  const details: string[] = [];
+  if (r.year) details.push(String(r.year));
+  if (r.volume) details.push(`;${r.volume}`);
+  if (r.issue) details.push(`(${r.issue})`);
+  if (r.pages) details.push(`:${r.pages}`);
+  if (details.length > 0) parts.push(`${details.join('')}.`);
+  if (r.doi) parts.push(`doi:${r.doi}`);
+  else if (r.url) parts.push(r.url);
+  return parts.join(' ');
 }
 
 function formatMdpiAcsEntry(r: Ref, n: number): string {
@@ -424,7 +477,12 @@ export function isNumericStyle(style: StyleId): boolean {
     return spec ? isNumericSpec(spec) : true;
   }
   return style === 'vancouver'
+    || style === 'sage-vancouver'
     || style === 'ama'
     || style === 'ieee'
     || style === 'mdpi-acs';
+}
+
+export function isSuperscriptCitationStyle(style: StyleId): boolean {
+  return style === 'sage-vancouver';
 }

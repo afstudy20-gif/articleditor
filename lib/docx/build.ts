@@ -1,7 +1,13 @@
 import JSZip from 'jszip';
 import type { Ref, MarkerOccurrence } from '@/store/types';
 import { buildEnCiteXmlMulti, formatVancouverDisplay, escapeXml } from '@/lib/refs/enxml';
-import { formatBibEntry, formatInTextCitation, type StyleId, isNumericStyle } from '@/lib/refs/styles';
+import {
+  formatBibEntry,
+  formatInTextCitation,
+  type StyleId,
+  isNumericStyle,
+  isSuperscriptCitationStyle,
+} from '@/lib/refs/styles';
 
 export type BuildMode = 'active' | 'placeholder' | 'plain';
 
@@ -117,12 +123,13 @@ function buildParagraph(
     }
     const resolved = resolveRefs(m.refNumbers, refs);
     const display = formatInTextCitation(style, resolved, m.refNumbers, m.cite);
+    const superscript = isSuperscriptCitationStyle(style);
     if (mode === 'active' && resolved.length > 0) {
-      runs.push(activeEndNoteField(resolved, display));
+      runs.push(activeEndNoteField(resolved, display, superscript));
     } else if (mode === 'placeholder' && resolved.length > 0) {
       runs.push(runXml(placeholderText(resolved)));
     } else {
-      runs.push(runXml(display));
+      runs.push(runXml(display, superscript));
     }
     cursor = m.endIndex;
   }
@@ -144,12 +151,19 @@ export function placeholderText(refs: Ref[]): string {
     .join('');
 }
 
-export function activeEndNoteField(refs: Ref[], displayText: string): string {
+export function activeEndNoteField(
+  refs: Ref[],
+  displayText: string,
+  superscript = false,
+): string {
   const xmlPayload = buildEnCiteXmlMulti(refs, displayText);
   const instr = ` ADDIN EN.CITE ${xmlPayload} `;
+  const resultProperties = superscript
+    ? '<w:rPr><w:vertAlign w:val="superscript"/></w:rPr>'
+    : '';
   return `<w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText xml:space="preserve">${escapeXml(
     instr,
-  )}</w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:t xml:space="preserve">${escapeXml(
+  )}</w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r><w:r>${resultProperties}<w:t xml:space="preserve">${escapeXml(
     displayText,
   )}</w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r>`;
 }
@@ -158,9 +172,12 @@ function paragraphXml(inner: string): string {
   return `<w:p>${inner}</w:p>`;
 }
 
-function runXml(text: string): string {
+function runXml(text: string, superscript = false): string {
   if (text === '') return '';
-  return `<w:r><w:t xml:space="preserve">${escapeXml(text)}</w:t></w:r>`;
+  const properties = superscript
+    ? '<w:rPr><w:vertAlign w:val="superscript"/></w:rPr>'
+    : '';
+  return `<w:r>${properties}<w:t xml:space="preserve">${escapeXml(text)}</w:t></w:r>`;
 }
 
 // formatRefVancouver moved to lib/refs/styles.ts (formatBibEntry).

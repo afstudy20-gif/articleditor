@@ -128,6 +128,21 @@ describe('buildRichDocx', () => {
     assert.ok(/\(Zeta,?\s*2020\)/.test(xml), 'APA in-text citation for the actually cited ref');
   });
 
+  it('exports SAGE Vancouver citations as superscript EndNote fields', async () => {
+    const blob = await buildRichDocx({
+      doc,
+      refsById,
+      refOrder,
+      style: 'sage-vancouver',
+      mode: 'active',
+    });
+    const xml = await documentXml(blob);
+
+    assert.ok(xml.includes('ADDIN EN.CITE'));
+    assert.ok(xml.includes('<w:vertAlign w:val="superscript"/>'));
+    assert.ok(xml.includes('1. Zeta A. Title Zeta. J Test. 2020.'));
+  });
+
   it('exports MDPI ACS citations and full-title bibliography entries', async () => {
     const blob = await buildRichDocx({
       doc,

@@ -33,6 +33,12 @@ export function SiteHeader({
               </Link>
             )}
             <Link
+              href="/reader"
+              className="text-sm text-secondary hover:text-primary px-2 py-1.5"
+            >
+              PDF
+            </Link>
+            <Link
               href="/tutorial"
               className="text-sm text-secondary hover:text-primary px-2 py-1.5"
             >

@@ -61,6 +61,11 @@ docker run -p 3000:3000 article-editor
    | `ANTHROPIC_API_KEY` | Optional AI features (server fallback; users can BYO-key in UI) |
    | `OPENAI_API_KEY` | Same, OpenAI-compatible providers |
    | `OPENAI_BASE_URL` | Custom OpenAI-compatible endpoint (LM Studio, Groq, OpenRouter) |
+   | `COPYLEAKS_EMAIL` | Copyleaks account email for AI-writing and similarity checks |
+   | `COPYLEAKS_API_KEY` | Copyleaks server API key |
+   | `COPYLEAKS_WEBHOOK_SECRET` | Long random secret used to authenticate plagiarism callbacks |
+   | `COPYLEAKS_WEBHOOK_BASE_URL` | Public HTTPS app origin, e.g. `https://articleditor.drtr.uk` |
+   | `COPYLEAKS_SANDBOX` | Set to `true` while testing with Copyleaks mock results |
 
 8. **Domain** — point your subdomain (e.g. `articleditor.drtr.uk`) at Coolify
 9. **Persistent volume** — none required (all data is client-side IndexedDB)
@@ -86,6 +91,7 @@ services:
 - All projects, article text and your reference library live in **IndexedDB on your device**
 - DOI/PubMed lookups send only the reference **title + first author + year** to public APIs (CrossRef / OpenAlex / NCBI E-utilities)
 - Optional AI features use **your own API key** stored only in your browser
+- AI-writing and similarity checks are opt-in; when started, the manuscript text is sent to **Copyleaks** through the app server
 - **No tracking, no analytics, no cookies**
 
 See `/privacy` in the running app for full details.

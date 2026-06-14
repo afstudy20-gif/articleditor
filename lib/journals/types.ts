@@ -2,6 +2,7 @@
 
 export type CitationStyleId =
   | 'vancouver'
+  | 'sage-vancouver'
   | 'apa'
   | 'ama'
   | 'ieee'
@@ -46,6 +47,10 @@ export interface JournalTemplate {
   publisherReferenceStyles?: CitationStyleId[];
   /** Detailed journal-specific citation and bibliography requirements. */
   referenceRules?: string[];
+  /** Human-readable journal requirements shown in the compliance panel. */
+  requirements?: string[];
+  /** Questions the journal asks authors to answer in the submission system. */
+  submissionQuestions?: string[];
   /** Publisher or journal reference-list guide. */
   referenceGuideUrl?: string;
   abstractStructure: AbstractStructure;

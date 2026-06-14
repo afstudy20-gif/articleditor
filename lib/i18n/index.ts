@@ -53,13 +53,13 @@ const tr: Dict = {
     'Article Editor tarayıcıda çalışan tek-kullanıcı bir uygulamadır. Verileriniz cihazınızdadır.',
   privacy_local_title: 'Tüm veriler yerel',
   privacy_local_desc:
-    'Projeler, makale metinleri ve kaynakça kütüphaneniz tarayıcınızın IndexedDB veritabanında saklanır. Sunucumuza yüklenmez.',
+    'Projeler, makale metinleri ve kaynakça kütüphaneniz tarayıcınızın IndexedDB veritabanında saklanır. Yalnızca açıkça başlattığınız çevrim içi AI, AI-yazım veya benzerlik denetimlerinde ilgili metin sağlayıcıya gönderilir.',
   privacy_lookup_title: 'DOI / PubMed / OpenAlex aramaları',
   privacy_lookup_desc:
     'Bir referansın DOI bilgisini taradığınızda yalnızca başlık, yazar adı ve yıl bilgisi sunucumuz üzerinden (proxy) public CrossRef/OpenAlex/PubMed API uç noktalarına iletilir. Tam metin asla gönderilmez. Sunucu bu istekleri saklamaz ve loglamaz; yanıt doğrudan tarayıcınıza döner.',
   privacy_ai_title: 'Opsiyonel AI özelliği',
   privacy_ai_desc:
-    'AI özellikleri etkinleştirilirse kendi API anahtarınızı (Gemini, Anthropic, OpenAI, DeepSeek, NVIDIA) kullanırsınız. Anahtar tarayıcınızın localStorage alanında düz metin olarak saklanır — bu nedenle yalnızca bu uygulama için oluşturulmuş, harcama limiti tanımlı bir anahtar kullanmanızı öneririz. Her AI isteğinde seçili metin ve anahtarınız sunucumuz üzerinden ilgili sağlayıcıya iletilir; sunucu bunları saklamaz ve loglamaz.',
+    'Akademik düzenleme özellikleri etkinleştirilirse kendi API anahtarınızı (Gemini, Anthropic, OpenAI, DeepSeek, NVIDIA) kullanırsınız. Anahtar tarayıcınızın localStorage alanında düz metin olarak saklanır; ilgili seçili metin, bölüm veya makale sunucumuz üzerinden sağlayıcıya iletilir. Ayrı olarak başlattığınız AI-yazım ve benzerlik denetimlerinde makale metni Copyleaks’e gönderilir. Bu denetimler otomatik değildir.',
   privacy_export_title: 'Çıktılar',
   privacy_export_desc:
     'Tüm dışa aktarma (.docx, .ris, LaTeX, JSON yedek) tarayıcınızda oluşturulur ve indirilir.',
@@ -229,6 +229,10 @@ const tr: Dict = {
   ed_ai_compare: 'Karşılaştır',
   ed_ai_deep_research: 'Derin araştırma',
   ed_ai_structure_check: 'Yapı kontrolü',
+  ed_ai_abstract: 'Abstract iyileştir',
+  ed_ai_titles: 'Başlık öner',
+  ed_ai_discussion: 'Discussion güçlendir',
+  ed_ai_conclusion: 'Conclusion güçlendir',
   ed_ai_disabled: 'AI yapılandırılmamış',
 
   // Editor formatting
@@ -382,6 +386,9 @@ const tr: Dict = {
   jc_preferred_style: 'önerilen',
   jc_apply_ref_style: 'Bu stili kullan',
   jc_publisher_styles: 'Yayıncının stil seçenekleri',
+  jc_requirements: 'Dergi gereksinimleri',
+  jc_submission_questions: 'Gönderim soruları',
+  jc_submission_questions_help: 'Bu sorular makale metninin parçası değildir; gönderim sistemi için yanıtlarınızı önceden hazırlayın.',
   jc_reference_guide: 'Referans kılavuzunu aç',
   jc_reference_rules: 'referans kuralı',
   jc_generic_template: 'Genel şablon — belirli bir derginin resmi kurallarını temsil etmez.',
@@ -809,13 +816,13 @@ const en: Dict = {
     'Article Editor is a single-user browser application. Your data stays on your device.',
   privacy_local_title: 'All data local',
   privacy_local_desc:
-    'Projects, article text and your reference library are stored in your browser’s IndexedDB. Nothing is uploaded to our server.',
+    'Projects, article text and your reference library are stored in your browser’s IndexedDB. Text is sent to a provider only when you explicitly start an online AI, AI-writing, or similarity check.',
   privacy_lookup_title: 'DOI / PubMed / OpenAlex lookups',
   privacy_lookup_desc:
     'When you scan a reference for DOI, only its title, first author and year are relayed through our server (as a proxy) to the public CrossRef / OpenAlex / PubMed API endpoints. The full text is never sent. The server does not store or log these requests; responses return directly to your browser.',
   privacy_ai_title: 'Optional AI features',
   privacy_ai_desc:
-    'If enabled, AI features use your own API key (Gemini, Anthropic, OpenAI, DeepSeek, NVIDIA). The key is stored unencrypted in your browser\'s localStorage — we recommend a dedicated key with a spending limit created just for this app. On each AI request the selected text and your key pass through our server to the chosen provider; the server does not store or log them.',
+    'Academic editing features use your own API key (Gemini, Anthropic, OpenAI, DeepSeek, NVIDIA). The key is stored unencrypted in your browser\'s localStorage; the relevant selection, section, or manuscript passes through our server to that provider. Separately initiated AI-writing and similarity checks send manuscript text to Copyleaks. These checks never run automatically.',
   privacy_export_title: 'Exports',
   privacy_export_desc:
     'All exports (.docx, .ris, LaTeX, JSON backup) are generated in your browser and downloaded directly.',
@@ -984,6 +991,10 @@ const en: Dict = {
   ed_ai_compare: 'Compare',
   ed_ai_deep_research: 'Deep research',
   ed_ai_structure_check: 'Structure check',
+  ed_ai_abstract: 'Improve Abstract',
+  ed_ai_titles: 'Suggest titles',
+  ed_ai_discussion: 'Strengthen Discussion',
+  ed_ai_conclusion: 'Strengthen Conclusion',
   ed_ai_disabled: 'AI not configured',
 
   // Editor formatting
@@ -1137,6 +1148,9 @@ const en: Dict = {
   jc_preferred_style: 'preferred',
   jc_apply_ref_style: 'Use this style',
   jc_publisher_styles: 'Publisher style options',
+  jc_requirements: 'Journal requirements',
+  jc_submission_questions: 'Submission questions',
+  jc_submission_questions_help: 'These are not manuscript sections; prepare separate answers for the journal submission system.',
   jc_reference_guide: 'Open reference guide',
   jc_reference_rules: 'reference rules',
   jc_generic_template: 'Generic template — does not represent any specific journal\'s official rules.',

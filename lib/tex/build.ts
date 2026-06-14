@@ -42,6 +42,12 @@ const STYLE_PACKAGE: Record<CitationStyle, BibliographyConfig> = {
   // Use styles bundled with core biblatex for broad TeX Live/MiKTeX
   // compatibility. Journal-specific punctuation still needs final review.
   vancouver: { biblatexStyle: 'numeric-comp', sorting: 'none' },
+  'sage-vancouver': {
+    biblatexStyle: 'numeric-comp',
+    sorting: 'none',
+    maxBibNames: 3,
+    minBibNames: 3,
+  },
   ama: { biblatexStyle: 'numeric-comp', sorting: 'none' },
   ieee: { biblatexStyle: 'numeric-comp', sorting: 'none' },
   apa: { biblatexStyle: 'authoryear', sorting: 'nyt' },
@@ -71,6 +77,7 @@ export function buildLatex(input: TexBuildInput): TexBuildOutput {
     input.style === 'ama'
     || input.style === 'ieee'
     || input.style === 'vancouver'
+    || input.style === 'sage-vancouver'
     || input.style === 'mdpi-acs'
   ) {
     renderer.addExportWarning(
@@ -484,7 +491,15 @@ ${text}
       command = citationCommand('citeyear', keys, locator);
       command = `\\mkbibparens{${command}}`;
     } else {
-      command = citationCommand(isNumericStyle(this.style) ? 'cite' : 'parencite', keys, locator);
+      command = citationCommand(
+        this.style === 'sage-vancouver'
+          ? 'supercite'
+          : isNumericStyle(this.style)
+            ? 'cite'
+            : 'parencite',
+        keys,
+        locator,
+      );
     }
 
     return `${prefix ? `${escapeTex(prefix)} ` : ''}${command}${suffix ? ` ${escapeTex(suffix)}` : ''}`;
@@ -573,7 +588,11 @@ ${content}
   }
 }
 
-function citationCommand(command: 'cite' | 'parencite' | 'citeyear', keys: string[], locator: string): string {
+function citationCommand(
+  command: 'cite' | 'parencite' | 'citeyear' | 'supercite',
+  keys: string[],
+  locator: string,
+): string {
   const postnote = locator ? `[${escapeTex(locator)}]` : '';
   return `\\${command}${postnote}{${keys.join(',')}}`;
 }

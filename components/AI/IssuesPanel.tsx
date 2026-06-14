@@ -1,97 +1,247 @@
 'use client';
 
-import type { ReviewIssueT } from '@/lib/ai/schemas';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  groupAcademicIssues,
+  type AcademicReviewCategory,
+  type AcademicReviewIssue,
+} from '@/lib/ai/academic-review';
 import { useLang } from '@/lib/i18n/hooks';
 
 type Props = {
-  issues: ReviewIssueT[];
+  issues: AcademicReviewIssue[];
   summary?: string;
   loading?: boolean;
   error?: string | null;
+  progress?: { completed: number; total: number };
   onClose: () => void;
-  onJumpTo?: (issue: ReviewIssueT) => void;
+  onJumpTo?: (issue: AcademicReviewIssue) => void;
+  onApply?: (issue: AcademicReviewIssue) => void;
+  onDismiss?: (issue: AcademicReviewIssue) => void;
+  onClear?: () => void;
 };
 
-const CATEGORY_KEY: Record<string, string> = {
-  clarity: 'ai_issues_clarity',
-  tone: 'ai_issues_tone',
-  structure: 'ai_issues_structure',
-  evidence: 'ai_issues_evidence',
-  grammar: 'ai_issues_grammar',
+const LABELS: Record<AcademicReviewCategory, { tr: string; en: string; description: { tr: string; en: string } }> = {
+  mechanics: {
+    tr: 'Yazım mekaniği ve stil',
+    en: 'Mechanics and style',
+    description: { tr: 'Noktalama, büyük harf, boşluk, yazım ve tireleme', en: 'Punctuation, capitalization, spacing, spelling, and hyphenation' },
+  },
+  grammar: {
+    tr: 'Dilbilgisi',
+    en: 'Grammar',
+    description: { tr: 'Uyum, zaman, artikel, edat ve sözdizimi', en: 'Agreement, tense, articles, prepositions, and syntax' },
+  },
+  'academic-tone': {
+    tr: 'Akademik ton',
+    en: 'Academic tone',
+    description: { tr: 'Resmiyet, nesnellik ve bilimsel ihtiyat', en: 'Formality, objectivity, and scientific caution' },
+  },
+  'word-choice': {
+    tr: 'Kelime seçimi',
+    en: 'Word choice',
+    description: { tr: 'Daha kesin ve alana uygun sözcük kullanımı', en: 'More precise and discipline-appropriate vocabulary' },
+  },
+  readability: {
+    tr: 'Okunabilirlik',
+    en: 'Readability',
+    description: { tr: 'Cümle yoğunluğu, belirsizlik ve geçişler', en: 'Sentence density, ambiguity, and transitions' },
+  },
+  phrasing: {
+    tr: 'Akıcılık ve ifade',
+    en: 'Fluency and phrasing',
+    description: { tr: 'Tekrar, hantallık, özlülük ve doğal ifade', en: 'Redundancy, awkwardness, concision, and fluency' },
+  },
+  structure: {
+    tr: 'Yapı',
+    en: 'Structure',
+    description: { tr: 'Paragraf amacı, mantıksal sıra ve bölüm organizasyonu', en: 'Paragraph purpose, logical order, and section organization' },
+  },
+  evidence: {
+    tr: 'Kanıt ve iddialar',
+    en: 'Evidence and claims',
+    description: { tr: 'Aşırı yorum, destek ve niteleme eksikleri', en: 'Overstatement, support, and missing qualification' },
+  },
+  statistics: {
+    tr: 'İstatistik raporlama',
+    en: 'Statistical reporting',
+    description: { tr: 'Tıbbi istatistiklerin eksik veya tutarsız sunumu', en: 'Incomplete or inconsistent medical statistical reporting' },
+  },
+  consistency: {
+    tr: 'Tutarlılık',
+    en: 'Consistency',
+    description: { tr: 'Terimler, kısaltmalar, zaman ve İngilizce varyantı', en: 'Terminology, abbreviations, tense, and English variant' },
+  },
 };
 
-const SEVERITY_STYLES: Record<string, string> = {
+const SEVERITY_STYLE = {
   high: 'bg-red-bg text-red border-red',
   med: 'bg-amber-50 text-amber-700 border-amber-300',
   low: 'bg-slate-100 text-secondary border-border',
 };
 
-const SEVERITY_KEY: Record<string, string> = {
-  high: 'ai_severity_high',
-  med: 'ai_severity_med',
-  low: 'ai_severity_low',
-};
+export function IssuesPanel({
+  issues,
+  summary,
+  loading,
+  error,
+  progress,
+  onClose,
+  onJumpTo,
+  onApply,
+  onDismiss,
+  onClear,
+}: Props): JSX.Element {
+  const { lang } = useLang();
+  const tr = lang === 'tr';
+  const groups = useMemo(() => groupAcademicIssues(issues), [issues]);
+  const openCount = issues.filter((issue) => issue.status === 'open').length;
+  const passed = groups.filter((group) => group.passed);
+  const [expanded, setExpanded] = useState<Set<AcademicReviewCategory>>(
+    () => new Set(groups.filter((group) => !group.passed).map((group) => group.category)),
+  );
+  const [passedOpen, setPassedOpen] = useState(false);
 
-export function IssuesPanel({ issues, summary, loading, error, onClose, onJumpTo }: Props): JSX.Element {
-  const { t } = useLang();
+  useEffect(() => {
+    const categories = groups
+      .filter((group) => !group.passed)
+      .map((group) => group.category);
+    if (categories.length === 0) return;
+    setExpanded((current) => new Set([...current, ...categories]));
+  }, [groups]);
+
+  const toggle = (category: AcademicReviewCategory): void => {
+    setExpanded((previous) => {
+      const next = new Set(previous);
+      if (next.has(category)) next.delete(category);
+      else next.add(category);
+      return next;
+    });
+  };
+
   return (
-    <div className="card flex flex-col h-full">
+    <div className="card flex flex-col h-full bg-white">
       <div className="flex items-center justify-between border-b border-border px-3 py-2">
         <div>
-          <h3 className="font-semibold text-primary text-sm">🔍 {t('ai_issues_title')}</h3>
-          {!loading && !error && (
-            <p className="text-xs text-muted">
-              {t('ai_issues_count').replace('{count}', String(issues.length))} {summary ? '·' : ''}
-            </p>
-          )}
+          <h3 className="font-semibold text-primary text-sm">
+            {tr ? 'Akademik İnceleme' : 'Academic Review'}
+          </h3>
+          <p className="text-xs text-muted">
+            {loading && progress
+              ? `${tr ? 'İnceleniyor' : 'Reviewing'} ${progress.completed}/${progress.total}`
+              : `${openCount} ${tr ? 'açık öneri' : 'open suggestions'}`}
+          </p>
         </div>
-        <button onClick={onClose} className="text-muted hover:text-primary text-lg leading-none">
-          ×
-        </button>
+        <div className="flex items-center gap-2">
+          {onClear && issues.length > 0 && (
+            <button onClick={onClear} className="text-[10px] text-muted hover:text-red">
+              {tr ? 'Temizle' : 'Clear'}
+            </button>
+          )}
+          <button onClick={onClose} className="text-muted hover:text-primary text-lg leading-none">×</button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-auto p-3 space-y-2 text-sm">
-        {loading && <p className="text-muted text-xs italic">{t('ai_issues_loading')}</p>}
-        {error && <p className="text-red text-xs">{error}</p>}
-        {!loading && !error && summary && (
-          <div className="bg-teal-bg border border-teal/30 rounded-lg px-3 py-2 text-xs text-secondary leading-relaxed">
-            <span className="tool-label">{t('ai_issues_overall')}</span>
-            <p className="mt-0.5">{summary}</p>
+        {loading && (
+          <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
+            <div
+              className="h-full bg-teal transition-all"
+              style={{
+                width: progress && progress.total > 0
+                  ? `${Math.round((progress.completed / progress.total) * 100)}%`
+                  : '8%',
+              }}
+            />
           </div>
         )}
-        {!loading && !error && issues.length === 0 && (
-          <p className="text-muted text-xs italic">{t('ai_issues_empty')}</p>
+        {error && <p className="text-red text-xs">{error}</p>}
+        {summary && (
+          <div className="bg-teal-bg border border-teal/30 rounded-lg px-3 py-2 text-xs text-secondary leading-relaxed">
+            <div className="font-semibold text-primary mb-0.5">{tr ? 'Genel değerlendirme' : 'Overall assessment'}</div>
+            {summary}
+          </div>
         )}
-        {issues.map((issue, i) => (
-          <div
-            key={i}
-            className="border border-border rounded-lg p-2 text-xs hover:border-teal hover:bg-teal-bg/30 cursor-pointer transition"
-            onClick={() => onJumpTo?.(issue)}
-          >
-            <div className="flex items-center gap-2 mb-1">
-              <span
-                className={`px-1.5 py-0.5 rounded text-[10px] font-semibold border ${
-                  SEVERITY_STYLES[issue.severity] ?? SEVERITY_STYLES.low
-                }`}
+
+        {groups.filter((group) => !group.passed).map((group) => {
+          const label = LABELS[group.category];
+          const isOpen = expanded.has(group.category);
+          return (
+            <section key={group.category} className="border border-blue-400 rounded-xl overflow-hidden">
+              <button
+                onClick={() => toggle(group.category)}
+                className="w-full text-left px-3 py-2.5 flex gap-2 items-start bg-blue-50/40 hover:bg-blue-50"
               >
-                {SEVERITY_KEY[issue.severity] ? t(SEVERITY_KEY[issue.severity] as Parameters<typeof t>[0]) : issue.severity}
+                <span className="text-base leading-5">{isOpen ? '⌄' : '›'}</span>
+                <span className="flex-1">
+                  <span className="block font-semibold text-primary">
+                    {group.issues.length} {tr ? label.tr : label.en}
+                  </span>
+                  <span className="block text-[11px] text-secondary mt-0.5">
+                    {tr ? label.description.tr : label.description.en}
+                  </span>
+                </span>
+              </button>
+              {isOpen && (
+                <div className="border-t border-blue-200 divide-y divide-border/70">
+                  {group.issues.map((issue) => (
+                    <div key={issue.id} className="p-3 text-xs">
+                      <button className="block w-full text-left" onClick={() => onJumpTo?.(issue)}>
+                        <span className={`inline-block px-1.5 py-0.5 rounded border text-[9px] font-semibold ${SEVERITY_STYLE[issue.severity]}`}>
+                          {issue.severity === 'high'
+                            ? tr ? 'Yüksek' : 'High'
+                            : issue.severity === 'med'
+                              ? tr ? 'Orta' : 'Medium'
+                              : tr ? 'Düşük' : 'Low'}
+                        </span>
+                        <p className="text-muted italic my-1.5 leading-snug">&ldquo;{issue.quote}&rdquo;</p>
+                        <p className="text-primary leading-snug">{issue.explanation}</p>
+                      </button>
+                      {issue.replacement && (
+                        <div className="mt-2 rounded-md bg-teal-bg/50 border border-teal/20 p-2 text-teal leading-snug">
+                          {issue.replacement}
+                        </div>
+                      )}
+                      <div className="flex justify-end gap-2 mt-2">
+                        <button onClick={() => onDismiss?.(issue)} className="px-2 py-1 text-muted hover:text-red">
+                          {tr ? 'Reddet' : 'Dismiss'}
+                        </button>
+                        {issue.replacement && issue.from != null && issue.to != null && (
+                          <button onClick={() => onApply?.(issue)} className="btn-primary px-2.5 py-1 text-[11px]">
+                            {tr ? 'Uygula' : 'Apply'}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          );
+        })}
+
+        {!loading && passed.length > 0 && (
+          <section className="border border-border rounded-xl overflow-hidden">
+            <button
+              onClick={() => setPassedOpen((value) => !value)}
+              className="w-full text-left px-3 py-2.5 flex gap-2 items-center bg-slate-50"
+            >
+              <span className="text-base">{passedOpen ? '⌄' : '›'}</span>
+              <span className="font-medium text-primary">
+                {passed.length} {tr ? 'kontrol geçti' : 'checks passed'}
               </span>
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-secondary">
-                {CATEGORY_KEY[issue.category] ? t(CATEGORY_KEY[issue.category] as Parameters<typeof t>[0]) : issue.category}
-              </span>
-            </div>
-            {issue.quote && (
-              <p className="text-muted italic mb-1 leading-snug">&ldquo;{issue.quote}&rdquo;</p>
-            )}
-            <p className="text-primary leading-snug">{issue.comment}</p>
-            {issue.suggestion && (
-              <div className="mt-1.5 pt-1.5 border-t border-border">
-                <span className="tool-label">{t('ai_issues_suggestion')}</span>
-                <p className="text-teal mt-0.5 leading-snug">{issue.suggestion}</p>
+            </button>
+            {passedOpen && (
+              <div className="border-t border-border px-3 py-2 space-y-1">
+                {passed.map((group) => (
+                  <div key={group.category} className="text-xs text-secondary">
+                    {tr ? LABELS[group.category].tr : LABELS[group.category].en}
+                  </div>
+                ))}
               </div>
             )}
-          </div>
-        ))}
+          </section>
+        )}
       </div>
     </div>
   );

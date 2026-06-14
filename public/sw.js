@@ -8,6 +8,7 @@ self.addEventListener('install', (e) => {
       cache.addAll([
         '/',
         '/edit',
+        '/reader',
       ]).catch(() => {})
     )
   );
