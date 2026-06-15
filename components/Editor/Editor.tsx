@@ -241,6 +241,19 @@ export function ArticleEditor({
   return (
     <div className="card flex flex-col h-full">
       <div className="flex items-center gap-1 border-b border-border p-2 flex-wrap text-sm">
+        <ToolbarButton
+          onClick={() => editor.chain().focus().undo().run()}
+          title={t('ed_undo')}
+        >
+          ↶
+        </ToolbarButton>
+        <ToolbarButton
+          onClick={() => editor.chain().focus().redo().run()}
+          title={t('ed_redo')}
+        >
+          ↷
+        </ToolbarButton>
+        <Sep />
         <ToolbarButton onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive('bold')}>
           B
         </ToolbarButton>
@@ -307,6 +320,13 @@ export function ArticleEditor({
         >
           <span>X<sub>2</sub></span>
         </ToolbarButton>
+        <ToolbarButton
+          onClick={() => editor.chain().focus().toggleStrike().run()}
+          active={editor.isActive('strike')}
+          title={t('ed_strike')}
+        >
+          <span className="line-through">S</span>
+        </ToolbarButton>
         <Sep />
         <ColorPicker editor={editor} t={t} />
         <HighlightPicker editor={editor} t={t} />
@@ -337,6 +357,29 @@ export function ArticleEditor({
           title={t('ed_align_right')}
         >
           ≡R
+        </ToolbarButton>
+        <ToolbarButton
+          onClick={() => editor.chain().focus().setTextAlign('justify').run()}
+          active={editor.isActive({ textAlign: 'justify' })}
+          title={t('ed_align_justify')}
+        >
+          ≡J
+        </ToolbarButton>
+        <ToolbarButton
+          onClick={() => editor.chain().focus().setHorizontalRule().run()}
+          title={t('ed_hr')}
+        >
+          ─
+        </ToolbarButton>
+        <Sep />
+        <LinkButton editor={editor} t={t} />
+        <ImageUrlButton editor={editor} t={t} />
+        <ToolbarButton
+          onClick={() => editor.chain().focus().toggleCodeBlock().run()}
+          active={editor.isActive('codeBlock')}
+          title={t('ed_code_block')}
+        >
+          {'</>'}
         </ToolbarButton>
         <Sep />
         <TableMenu editor={editor} t={t} onInsertRequest={onTableInsertRequest} />
@@ -659,6 +702,50 @@ function ToolbarButton({
     >
       {children}
     </button>
+  );
+}
+
+function LinkButton({ editor, t }: { editor: any; t: (k: string) => string }): JSX.Element {
+  const active = editor.isActive('link');
+  return (
+    <ToolbarButton
+      active={active}
+      title={active ? t('ed_link_remove') : t('ed_link')}
+      onClick={() => {
+        if (active) {
+          editor.chain().focus().unsetLink().run();
+          return;
+        }
+        const prev = editor.getAttributes('link')?.href ?? '';
+        const url = window.prompt(t('ed_link_url'), prev);
+        if (url === null) return;
+        const trimmed = url.trim();
+        if (!trimmed) {
+          editor.chain().focus().unsetLink().run();
+          return;
+        }
+        editor.chain().focus().extendMarkRange('link').setLink({ href: trimmed }).run();
+      }}
+    >
+      🔗
+    </ToolbarButton>
+  );
+}
+
+function ImageUrlButton({ editor, t }: { editor: any; t: (k: string) => string }): JSX.Element {
+  return (
+    <ToolbarButton
+      title={t('ed_image_from_url')}
+      onClick={() => {
+        const url = window.prompt(t('ed_image_url'), '');
+        if (url === null) return;
+        const trimmed = url.trim();
+        if (!trimmed) return;
+        editor.chain().focus().setImage({ src: trimmed }).run();
+      }}
+    >
+      🖼
+    </ToolbarButton>
   );
 }
 
