@@ -40,41 +40,35 @@ export function LocalFolderCard() {
   }, []);
 
   return (
-    <section className="card p-5 mb-6">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <h2 className="text-lg font-bold text-primary flex items-center gap-2">
-            📁 Yerel Klasör
-            {name && <span className="text-emerald-500 text-sm">✓</span>}
-          </h2>
-          <p className="text-xs text-muted mt-0.5">
-            PDF okuyucuda kaydettiğin PDF&apos;ler, notlar ve çizimler bu klasöre yazılır
-            (her proje için ayrı alt klasör: <code>&lt;klasör&gt;/&lt;proje&gt;/sources/</code>).
-          </p>
-          {name && (
-            <p className="text-xs text-secondary mt-1 font-semibold">Seçili klasör: {name}/</p>
-          )}
-          {!supported && (
-            <p className="text-xs text-rose-500 mt-1">
-              Bu tarayıcı yerel klasör seçimini desteklemiyor (Chrome/Edge gerekir).
-            </p>
-          )}
-          {error && <p className="text-xs text-rose-500 mt-1">{error}</p>}
-        </div>
-
-        {supported && (
-          <div className="flex items-center gap-3 flex-wrap">
-            <button onClick={choose} className="btn-primary text-xs px-4 py-2">
-              {name ? 'Klasörü değiştir' : 'Klasör seç'}
-            </button>
-            {name && (
-              <button onClick={clear} className="btn-secondary text-xs px-4 py-2">
-                Kaldır
-              </button>
-            )}
-          </div>
-        )}
+    <section className="card p-3 flex flex-col gap-2">
+      <div className="min-w-0">
+        <h2 className="text-sm font-bold text-primary flex items-center gap-1.5">
+          📁 Yerel Klasör
+          {name && <span className="text-emerald-500 text-xs">✓</span>}
+        </h2>
+        <p className="text-[11px] text-muted mt-0.5 truncate" title="<klasör>/<proje>/sources/">
+          {error
+            ? error
+            : !supported
+              ? 'Bu tarayıcı desteklemiyor (Chrome/Edge gerekir)'
+              : name
+                ? `Seçili: ${name}/`
+                : 'PDF, not ve çizimleri diske yazar'}
+        </p>
       </div>
+
+      {supported && (
+        <div className="mt-auto flex items-center gap-2 flex-wrap">
+          <button onClick={choose} className="btn-primary text-xs px-3 py-1.5">
+            {name ? 'Değiştir' : 'Klasör seç'}
+          </button>
+          {name && (
+            <button onClick={clear} className="btn-secondary text-xs px-3 py-1.5">
+              Kaldır
+            </button>
+          )}
+        </div>
+      )}
     </section>
   );
 }

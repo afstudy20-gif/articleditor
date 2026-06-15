@@ -229,97 +229,78 @@ function EditPageInner() {
       <div className="min-h-screen">
         <Header />
         <main className="max-w-5xl mx-auto px-6 py-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
           {/* Google Drive Sync Section */}
           {syncState && (
-            <section className="card p-5 mb-6">
-              <div className="flex items-center justify-between gap-4 flex-wrap">
-                <div>
-                  <h2 className="text-lg font-bold text-primary flex items-center gap-2">
+            <section className="card p-3 flex flex-col gap-2">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <h2 className="text-sm font-bold text-primary flex items-center gap-1.5">
                     ☁️ {t('gdrive_sync_title')}
                     {syncState.status === 'syncing' && (
-                      <span className="animate-spin text-teal text-sm">🔄</span>
+                      <span className="animate-spin text-teal text-xs">🔄</span>
                     )}
                     {syncState.status === 'ok' && (
-                      <span className="text-emerald-500 text-sm">✓</span>
+                      <span className="text-emerald-500 text-xs">✓</span>
                     )}
                     {syncState.status === 'error' && (
-                      <span className="text-rose-500 text-sm" title={syncState.message}>⚠️</span>
+                      <span className="text-rose-500 text-xs" title={syncState.message}>⚠️</span>
                     )}
                   </h2>
-                  <p className="text-xs text-muted mt-0.5">
-                    {t('gdrive_sync_desc')}
+                  <p className="text-[11px] text-muted mt-0.5 truncate">
+                    {syncState.signedIn && syncState.user
+                      ? `${syncState.user.email || syncState.user.name || ''}${
+                          syncState.lastSync
+                            ? ' · ' + new Date(syncState.lastSync).toLocaleString(lang === 'tr' ? 'tr-TR' : 'en-US')
+                            : ''
+                        }`
+                      : t('gdrive_sync_desc')}
                   </p>
-                  {syncState.lastSync && (
-                    <p className="text-xs text-secondary mt-1 font-semibold">
-                      {t('gdrive_last_sync')}: {new Date(syncState.lastSync).toLocaleString(lang === 'tr' ? 'tr-TR' : 'en-US')}
-                    </p>
-                  )}
                 </div>
+                <button
+                  onClick={() => setShowSyncSettings(!showSyncSettings)}
+                  title={t('gdrive_advanced_settings')}
+                  className="shrink-0 text-muted hover:text-primary text-sm leading-none"
+                >
+                  ⚙️
+                </button>
+              </div>
 
-                <div className="flex items-center gap-3 flex-wrap">
-                  {syncState.signedIn && syncState.user ? (
-                    <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-border">
-                      {syncState.user.picture ? (
-                        <img
-                          src={syncState.user.picture}
-                          alt="Avatar"
-                          className="w-8 h-8 rounded-full border border-border"
-                          referrerPolicy="no-referrer"
-                        />
-                      ) : (
-                        <span className="w-8 h-8 rounded-full bg-teal text-white flex items-center justify-center font-bold text-xs">
-                          U
-                        </span>
-                      )}
-                      <div className="text-left">
-                        <p className="text-xs font-bold text-primary leading-tight">{syncState.user.name || 'Google User'}</p>
-                        <p className="text-[10px] text-muted leading-tight">{syncState.user.email || ''}</p>
-                      </div>
-                      <button
-                        onClick={() => gdrive.signOut()}
-                        className="text-xs text-rose-600 hover:underline ml-2 font-medium"
-                      >
-                        {t('gdrive_disconnect')}
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => gdrive.signIn()}
-                      className="btn-primary text-xs flex items-center gap-2 px-4 py-2"
-                    >
-                      <svg width="16" height="16" viewBox="0 0 48 48" className="shrink-0">
-                        <path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.2l6.7-6.7C35.7 2.5 30.2 0 24 0 14.7 0 6.7 5.5 2.8 13.5l7.8 6C12.5 13.2 17.8 9.5 24 9.5z"/>
-                        <path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4 6.9-10 6.9-17z"/>
-                        <path fill="#FBBC05" d="M10.6 28.5c-.5-1.5-.8-3.1-.8-4.8s.3-3.3.8-4.8l-7.8-6C1 16.2 0 20 0 24s1 7.8 2.8 11.1l7.8-6.6z"/>
-                        <path fill="#34A853" d="M24 48c6.2 0 11.4-2 15.2-5.5l-7.5-5.8c-2 1.4-4.6 2.2-7.7 2.2-6.2 0-11.5-3.7-13.4-9l-7.8 6C6.7 42.5 14.7 48 24 48z"/>
-                      </svg>
-                      {t('gdrive_connect')}
-                    </button>
-                  )}
-                  
-                  {syncState.signedIn && (
+              <div className="mt-auto flex items-center gap-2 flex-wrap">
+                {syncState.signedIn ? (
+                  <>
                     <button
                       onClick={() => gdrive.syncNow()}
                       disabled={syncState.status === 'syncing'}
-                      className="btn-secondary text-xs px-4 py-2"
+                      className="btn-secondary text-xs px-3 py-1.5"
                     >
                       {syncState.status === 'syncing' ? t('gdrive_syncing') : t('gdrive_sync_now')}
                     </button>
-                  )}
-                </div>
+                    <button
+                      onClick={() => gdrive.signOut()}
+                      className="text-xs text-rose-600 hover:underline font-medium"
+                    >
+                      {t('gdrive_disconnect')}
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => gdrive.signIn()}
+                    className="btn-primary text-xs flex items-center gap-2 px-3 py-1.5"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 48 48" className="shrink-0">
+                      <path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.2l6.7-6.7C35.7 2.5 30.2 0 24 0 14.7 0 6.7 5.5 2.8 13.5l7.8 6C12.5 13.2 17.8 9.5 24 9.5z"/>
+                      <path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4 6.9-10 6.9-17z"/>
+                      <path fill="#FBBC05" d="M10.6 28.5c-.5-1.5-.8-3.1-.8-4.8s.3-3.3.8-4.8l-7.8-6C1 16.2 0 20 0 24s1 7.8 2.8 11.1l7.8-6.6z"/>
+                      <path fill="#34A853" d="M24 48c6.2 0 11.4-2 15.2-5.5l-7.5-5.8c-2 1.4-4.6 2.2-7.7 2.2-6.2 0-11.5-3.7-13.4-9l-7.8 6C6.7 42.5 14.7 48 24 48z"/>
+                    </svg>
+                    {t('gdrive_connect')}
+                  </button>
+                )}
               </div>
 
-              {/* Advanced Settings Toggle & Form */}
-              <div className="mt-4 pt-3 border-t border-border">
-                <button
-                  onClick={() => setShowSyncSettings(!showSyncSettings)}
-                  className="text-xs text-muted hover:text-primary flex items-center gap-1 font-semibold"
-                >
-                  ⚙️ {t('gdrive_advanced_settings')} {showSyncSettings ? '▼' : '▶'}
-                </button>
-
-                {showSyncSettings && (
-                  <div className="mt-3 bg-slate-50 p-3 rounded-lg border border-border text-xs flex flex-col gap-2">
+              {showSyncSettings && (
+                <div className="bg-slate-50 p-3 rounded-lg border border-border text-xs flex flex-col gap-2">
                     <label className="font-bold text-primary block">
                       {t('gdrive_client_id_label')}
                     </label>
@@ -356,12 +337,12 @@ function EditPageInner() {
                     </div>
                   </div>
                 )}
-              </div>
             </section>
           )}
 
           {/* Local workspace folder */}
           <LocalFolderCard />
+          </div>
 
           {/* Convert + create flow card */}
           <section className="card p-5 mb-6">
