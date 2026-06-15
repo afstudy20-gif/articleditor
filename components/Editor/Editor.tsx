@@ -24,6 +24,8 @@ import { AcademicReviewDecorations } from './extensions/academic-review-plugin';
 import type { Ref } from '@/store/types';
 import { useLang } from '@/lib/i18n/hooks';
 import { getNextNumbering, isNumberingPrefix } from '@/lib/editor/numbering';
+import { computeWritingStats } from '@/lib/stats/writing-stats';
+import type { WritingStats } from '@/lib/stats/types';
 
 type Props = {
   initialContent?: unknown;
@@ -105,6 +107,7 @@ export function ArticleEditor({
     return m;
   }, [refs]);
   const [, setTick] = useState(0);
+  const [liveStats, setLiveStats] = useState<WritingStats | null>(null);
 
   const editor = useEditor({
     extensions: [
@@ -199,6 +202,7 @@ export function ArticleEditor({
       order.forEach((id, i) => map.set(id, i + 1));
       window.__enrRefOrder = map;
       window.__enrRefs = refsById;
+      setLiveStats(computeWritingStats(json));
       setTick((t) => t + 1);
     },
   });
@@ -211,6 +215,7 @@ export function ArticleEditor({
     order.forEach((id, i) => map.set(id, i + 1));
     window.__enrRefOrder = map;
     window.__enrRefs = refsById;
+    setLiveStats(computeWritingStats(json));
     setTick((t) => t + 1);
   }, [editor, refs, refsById]);
 
@@ -442,6 +447,34 @@ export function ArticleEditor({
           className="prose max-w-none p-2 min-h-full focus-within:outline-none [&_p]:my-2 [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:mt-4 [&_h2]:text-xl [&_h2]:font-bold [&_h3]:text-lg [&_h3]:font-semibold [&_.ProseMirror]:min-h-[50vh]"
         />
       </div>
+      {liveStats && <EditorStatusBar stats={liveStats} t={t} />}
+    </div>
+  );
+}
+
+function EditorStatusBar({
+  stats,
+  t,
+}: {
+  stats: WritingStats;
+  t: (k: string) => string;
+}): JSX.Element {
+  const items: Array<{ label: string; value: string }> = [
+    { label: t('stats_words'), value: stats.words.toLocaleString() },
+    { label: t('stats_chars'), value: stats.characters.toLocaleString() },
+    { label: t('ed_status_chars_no_space'), value: stats.charactersNoSpaces.toLocaleString() },
+    { label: t('stats_sentences'), value: stats.sentences.toLocaleString() },
+    { label: t('stats_paragraphs'), value: stats.paragraphs.toLocaleString() },
+    { label: t('stats_citations'), value: stats.citations.toLocaleString() },
+  ];
+  return (
+    <div className="border-t border-border px-3 py-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-secondary bg-slate-50 dark:bg-slate-900/40">
+      {items.map((item) => (
+        <span key={item.label} className="whitespace-nowrap">
+          <span className="text-muted">{item.label}:</span>{' '}
+          <span className="font-semibold text-primary">{item.value}</span>
+        </span>
+      ))}
     </div>
   );
 }
