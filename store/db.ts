@@ -203,6 +203,41 @@ export async function addNoteToProject(
   return full;
 }
 
+/**
+ * Free browser storage for a mature project without losing it: delete its undo
+ * snapshots and drop cached ref embeddings (regenerated on demand). The project,
+ * refs, and notes stay intact and usable.
+ */
+export async function shrinkProject(
+  projectId: string,
+): Promise<{ snapshots: number; embeddingsCleared: number }> {
+  const db = getDb();
+  const snapKeys = await db.snapshots.where('projectId').equals(projectId).primaryKeys();
+  await db.snapshots.bulkDelete(snapKeys);
+
+  let embeddingsCleared = 0;
+  const project = await db.projects.get(projectId);
+  if (project) {
+    const refs = project.refs.map((ref) => {
+      if (ref.embedding === undefined && ref.embeddingSource === undefined) return ref;
+      embeddingsCleared += 1;
+      const copy = { ...ref };
+      delete copy.embedding;
+      delete copy.embeddingSource;
+      return copy;
+    });
+    await db.projects.put({ ...project, refs, updatedAt: Date.now() });
+  }
+  return { snapshots: snapKeys.length, embeddingsCleared };
+}
+
+/** Best-effort estimate of bytes used by the origin (IndexedDB + caches). */
+export async function estimateStorageBytes(): Promise<number | null> {
+  if (typeof navigator === 'undefined' || !navigator.storage?.estimate) return null;
+  const { usage } = await navigator.storage.estimate();
+  return usage ?? null;
+}
+
 export async function deleteNoteFromProject(projectId: string, noteId: string): Promise<void> {
   const db = getDb();
   const project = await db.projects.get(projectId);

@@ -8,6 +8,7 @@ import { CitationPanel } from '@/components/PdfReader/CitationPanel';
 import { ProjectPicker } from '@/components/PdfReader/ProjectPicker';
 import { NotesPanel } from '@/components/PdfReader/NotesPanel';
 import { WorkspaceSaver } from '@/components/PdfReader/WorkspaceSaver';
+import { StorageBar } from '@/components/PdfReader/StorageBar';
 import {
   getWorkspaceRoot,
   hasWritePermission,
@@ -251,6 +252,7 @@ export function ReaderClient() {
               <NotesPanel notes={notes} hasProject={!!projectId} onDelete={handleDeleteNote} />
             )}
           </div>
+          <StorageBar projectId={projectId} onToast={flashToast} />
         </aside>
       </main>
 
