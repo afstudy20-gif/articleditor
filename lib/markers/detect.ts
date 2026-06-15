@@ -14,7 +14,17 @@ const SUPERSCRIPT_DIGITS: Record<string, string> = {
 };
 
 export function normalizeSuperscripts(s: string): string {
-  return s.replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹]+/g, (m) => `[${[...m].map((c) => SUPERSCRIPT_DIGITS[c] ?? c).join('')}]`);
+  return s.replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹]+/g, (m, offset: number) => {
+    const before = s[offset - 1] ?? '';
+    const digits = [...m].map((c) => SUPERSCRIPT_DIGITS[c] ?? c).join('');
+    // Exponent / scientific notation (e.g. 10⁹/L, 2³) — preceded by a digit.
+    if (/\d/.test(before)) return m;
+    // Unit (e.g. m², cm³, mm²) — a lone ²/³ stuck directly to a unit letter.
+    if (m.length === 1 && /[a-zA-Z]/.test(before) && (digits === '2' || digits === '3')) {
+      return m;
+    }
+    return `[${digits}]`;
+  });
 }
 
 const RANGE_RE =

@@ -421,8 +421,107 @@ function extractListInfo(pNode: OOXMLValue): { numId: string; ilvl: number } | n
   return numId !== null ? { numId, ilvl } : null;
 }
 
+/** A superscript run that is purely a numeric citation (e.g. "1", "6,7",
+ *  "9–11") — Word formats Vancouver citations this way instead of using literal
+ *  superscript characters. */
+const SUPERSCRIPT_CITATION_SHAPE = /^\s*\d+(?:\s*[,;–—-]\s*\d+)*\s*$/;
+
+type RunContent = {
+  text: string;
+  bold: boolean;
+  italic: boolean;
+  underline: boolean;
+  superscript: boolean;
+};
+
+/** Read a single w:r node: its concatenated text plus bold/italic/underline and
+ *  whether it carries superscript vertical alignment. */
+function readRunContent(rNode: OOXMLValue): RunContent {
+  let text = '';
+  let bold = false;
+  let italic = false;
+  let underline = false;
+  let superscript = false;
+
+  const walkRun = (rn: OOXMLValue) => {
+    if (Array.isArray(rn)) {
+      for (const item of rn) walkRun(item);
+      return;
+    }
+    if (!isOOXMLNode(rn)) return;
+
+    for (const key of Object.keys(rn)) {
+      if (key === 'w:rPr') {
+        const checkPr = (pr: OOXMLValue) => {
+          if (Array.isArray(pr)) {
+            for (const item of pr) checkPr(item);
+            return;
+          }
+          if (!isOOXMLNode(pr)) return;
+          if ('w:b' in pr) bold = true;
+          if ('w:i' in pr) italic = true;
+          if ('w:u' in pr) underline = true;
+          if ('w:vertAlign' in pr) {
+            const attrs = isOOXMLNode(pr[':@']) ? (pr[':@'] as OOXMLNode) : undefined;
+            if (String(attrs?.['@_w:val'] ?? '') === 'superscript') superscript = true;
+          }
+        };
+        checkPr(rn[key]);
+      } else if (key === 'w:t') {
+        const t = rn[key];
+        if (Array.isArray(t)) {
+          for (const inner of t) {
+            if (isOOXMLNode(inner) && '#text' in inner) text += String(inner['#text']);
+          }
+        } else if (isOOXMLNode(t) && '#text' in t) {
+          text += String(t['#text']);
+        } else if (typeof t === 'string') {
+          text += t;
+        }
+      } else if (key === 'w:tab') {
+        text += '\t';
+      } else if (key === 'w:br') {
+        text += '\n';
+      } else if (key !== ':@') {
+        walkRun(rn[key]);
+      }
+    }
+  };
+
+  walkRun(rNode);
+  return { text, bold, italic, underline, superscript };
+}
+
+/** Last non-space character of `s`, used to tell citations from units. */
+function lastMeaningfulChar(s: string): string {
+  const trimmed = s.replace(/\s+$/, '');
+  return trimmed.slice(-1);
+}
+
+/** Wrap superscript-formatted numeric citations in brackets so the marker
+ *  detector recognizes them (Word stores these as superscript runs, not literal
+ *  ¹² characters, which would otherwise be lost as plain digits on import).
+ *  `prevChar` is the character preceding this run, used to skip exponents
+ *  (10⁹) and units (m², R²) that are not citations. */
+function citationText(run: RunContent, prevChar: string): string {
+  if (!run.superscript || !SUPERSCRIPT_CITATION_SHAPE.test(run.text)) return run.text;
+  const trimmed = run.text.trim();
+  // Exponent / scientific notation, e.g. 10⁹ — preceded by a digit.
+  if (/\d/.test(prevChar)) return run.text;
+  // Unit or statistic, e.g. m², R² — a lone 2/3 stuck to a letter.
+  if (/^[23]$/.test(trimmed) && /[a-zA-Z]/.test(prevChar)) return run.text;
+  return `[${trimmed}]`;
+}
+
 function extractParagraphText(pNode: OOXMLValue): string {
   const parts: string[] = [];
+  let prevChar = '';
+  const push = (s: string) => {
+    if (!s) return;
+    parts.push(s);
+    const c = lastMeaningfulChar(s);
+    if (c) prevChar = c;
+  };
   const recurse = (n: OOXMLValue) => {
     if (Array.isArray(n)) {
       for (const item of n) recurse(item);
@@ -430,21 +529,24 @@ function extractParagraphText(pNode: OOXMLValue): string {
     }
     if (!isOOXMLNode(n)) return;
     for (const k of Object.keys(n)) {
-      if (k === 'w:t') {
+      if (k === 'w:r') {
+        push(citationText(readRunContent(n[k]), prevChar));
+      } else if (k === 'w:t') {
+        // Stray text not wrapped in a run (rare).
         const t = n[k];
         if (Array.isArray(t)) {
           for (const inner of t) {
-            if (isOOXMLNode(inner) && '#text' in inner) parts.push(String(inner['#text']));
+            if (isOOXMLNode(inner) && '#text' in inner) push(String(inner['#text']));
           }
         } else if (isOOXMLNode(t) && '#text' in t) {
-          parts.push(String(t['#text']));
+          push(String(t['#text']));
         } else if (typeof t === 'string') {
-          parts.push(t);
+          push(t);
         }
       } else if (k === 'w:tab') {
-        parts.push('\t');
+        push('\t');
       } else if (k === 'w:br') {
-        parts.push('\n');
+        push('\n');
       } else if (k !== ':@') {
         recurse(n[k]);
       }
@@ -456,6 +558,7 @@ function extractParagraphText(pNode: OOXMLValue): string {
 
 function extractParagraphRuns(pNode: OOXMLValue): ImportRun[] {
   const runs: ImportRun[] = [];
+  let prevChar = '';
 
   const recurse = (n: OOXMLValue) => {
     if (Array.isArray(n)) {
@@ -466,74 +569,24 @@ function extractParagraphRuns(pNode: OOXMLValue): ImportRun[] {
 
     for (const k of Object.keys(n)) {
       if (k === 'w:r') {
-        const rNode = n[k];
-        let runText = '';
-        let bold = false;
-        let italic = false;
-        let underline = false;
-
-        const findPropsAndText = (rn: OOXMLValue) => {
-          if (Array.isArray(rn)) {
-            for (const item of rn) findPropsAndText(item);
-            return;
-          }
-          if (!isOOXMLNode(rn)) return;
-
-          for (const key of Object.keys(rn)) {
-            if (key === 'w:rPr') {
-              const rPr = rn[key];
-              const checkPr = (pr: OOXMLValue) => {
-                if (Array.isArray(pr)) {
-                  for (const item of pr) checkPr(item);
-                  return;
-                }
-                if (!isOOXMLNode(pr)) return;
-                if ('w:b' in pr) bold = true;
-                if ('w:i' in pr) italic = true;
-                if ('w:u' in pr) underline = true;
-                for (const subKey of Object.keys(pr)) {
-                  if (subKey === 'w:b' || subKey === 'w:i' || subKey === 'w:u') {
-                    if (subKey === 'w:b') bold = true;
-                    if (subKey === 'w:i') italic = true;
-                    if (subKey === 'w:u') underline = true;
-                  }
-                }
-              };
-              checkPr(rPr);
-            } else if (key === 'w:t') {
-              const t = rn[key];
-              if (Array.isArray(t)) {
-                for (const inner of t) {
-                  if (isOOXMLNode(inner) && '#text' in inner) runText += String(inner['#text']);
-                }
-              } else if (isOOXMLNode(t) && '#text' in t) {
-                runText += String(t['#text']);
-              } else if (typeof t === 'string') {
-                runText += t;
-              }
-            } else if (key === 'w:tab') {
-              runText += '\t';
-            } else if (key === 'w:br') {
-              runText += '\n';
-            } else if (key !== ':@') {
-              findPropsAndText(rn[key]);
-            }
-          }
-        };
-
-        findPropsAndText(rNode);
-        if (runText.length > 0) {
+        const content = readRunContent(n[k]);
+        const text = citationText(content, prevChar);
+        if (text.length > 0) {
           runs.push({
-            text: runText,
-            bold: bold || undefined,
-            italic: italic || undefined,
-            underline: underline || undefined,
+            text,
+            bold: content.bold || undefined,
+            italic: content.italic || undefined,
+            underline: content.underline || undefined,
           });
+          const c = lastMeaningfulChar(text);
+          if (c) prevChar = c;
         }
       } else if (k === 'w:tab') {
         runs.push({ text: '\t' });
+        prevChar = '\t';
       } else if (k === 'w:br') {
         runs.push({ text: '\n' });
+        prevChar = '\n';
       } else if (k !== ':@') {
         recurse(n[k]);
       }
