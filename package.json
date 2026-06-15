@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test \"lib/**/*.test.ts\""
+    "test": "node --import tsx --test \"lib/**/*.test.ts\"",
+    "tauri": "tauri"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
@@ -47,6 +48,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@tauri-apps/cli": "^2.11.2",
     "@types/katex": "0.16.7",
     "@types/node": "22.10.1",
     "@types/react": "^19.2.17",
