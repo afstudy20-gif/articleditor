@@ -37,6 +37,7 @@ const EditorClient = dynamic(() => import('./EditorClient').then((m) => m.Editor
 });
 
 import { ProjectWorkspace } from '@/components/Workspace/ProjectWorkspace';
+import { LocalFolderCard } from '@/components/Workspace/LocalFolderCard';
 import { SiteHeader } from '@/components/SiteChrome';
 
 function EditPageInner() {
@@ -358,6 +359,9 @@ function EditPageInner() {
               </div>
             </section>
           )}
+
+          {/* Local workspace folder */}
+          <LocalFolderCard />
 
           {/* Convert + create flow card */}
           <section className="card p-5 mb-6">
