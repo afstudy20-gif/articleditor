@@ -69,6 +69,7 @@ export function RefsPanel({
 }: Props) {
   const { t } = useLang();
   const [tab, setTab] = useState<'list' | 'add' | 'history'>('list');
+  const [libMenu, setLibMenu] = useState<{ x: number; y: number } | null>(null);
   const [internalSelectedIds, setInternalSelectedIds] = useState<Set<string>>(new Set());
   const selectedIds = extSelectedIds ?? internalSelectedIds;
   const setSelectedIds = (next: Set<string>): void => {
@@ -84,6 +85,18 @@ export function RefsPanel({
   }
   function clearSelection(): void {
     setSelectedIds(new Set());
+  }
+  function toggleAll(): void {
+    if (selectedIds.size === refs.length) setSelectedIds(new Set());
+    else setSelectedIds(new Set(refs.map((r) => r.id)));
+  }
+  function clearLibrary(): void {
+    setLibMenu(null);
+    if (refs.length === 0) return;
+    const msg = `${refs.length} ${t('rp_bulk_delete_confirm')}`;
+    if (!confirm(msg)) return;
+    if (onBulkDelete) onBulkDelete(refs.map((r) => r.id));
+    clearSelection();
   }
   function bulkDelete(): void {
     if (selectedIds.size === 0) return;
@@ -101,6 +114,12 @@ export function RefsPanel({
             tab === 'list' ? 'bg-teal-bg text-teal border-b-2 border-teal' : 'text-muted'
           }`}
           onClick={() => setTab('list')}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            setTab('list');
+            setLibMenu({ x: e.clientX, y: e.clientY });
+          }}
+          title={t('rp_clear_library_hint')}
         >
           {t('rp_tab_library')} ({refs.length})
         </button>
@@ -146,6 +165,30 @@ export function RefsPanel({
         </div>
       )}
 
+      {tab === 'list' && refs.length > 0 && (
+        <div className="px-3 py-1.5 border-b border-border flex items-center justify-between gap-2 text-xs">
+          <label className="flex items-center gap-1.5 cursor-pointer text-muted hover:text-primary">
+            <input
+              type="checkbox"
+              checked={selectedIds.size === refs.length}
+              ref={(el) => {
+                if (el) el.indeterminate = selectedIds.size > 0 && selectedIds.size < refs.length;
+              }}
+              onChange={toggleAll}
+            />
+            {t('rp_select_all')}
+          </label>
+          {selectedIds.size > 0 && (
+            <button
+              onClick={bulkDelete}
+              className="font-medium text-rose-600 hover:underline"
+            >
+              {t('rp_delete_selected').replace('{n}', String(selectedIds.size))}
+            </button>
+          )}
+        </div>
+      )}
+
       <div className="flex-1 overflow-auto p-3">
         {tab === 'list' ? (
           <RefList
@@ -175,6 +218,24 @@ export function RefsPanel({
           />
         )}
       </div>
+
+      {libMenu && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setLibMenu(null)} onContextMenu={(e) => { e.preventDefault(); setLibMenu(null); }} />
+          <div
+            className="fixed z-50 min-w-[160px] rounded-lg border border-border bg-white py-1 shadow-xl"
+            style={{ left: libMenu.x, top: libMenu.y }}
+          >
+            <button
+              onClick={clearLibrary}
+              disabled={refs.length === 0}
+              className="block w-full px-3 py-1.5 text-left text-xs font-medium text-rose-600 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              🗑 {t('rp_clear_library')} ({refs.length})
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
