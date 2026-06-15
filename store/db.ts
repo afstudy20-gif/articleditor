@@ -2,12 +2,17 @@
 
 import Dexie, { type EntityTable } from 'dexie';
 import { newId } from '@/lib/id';
-import type { PhraseCategory, Project, Snapshot, Ref, UserPhrasebank } from './types';
+import type { PhraseCategory, Project, ProjectNote, Snapshot, Ref, UserPhrasebank } from './types';
+
+/** Generic local key/value row. Never synced — used for browser-bound objects
+ *  like File System Access directory handles. */
+export type KvRow = { key: string; value: unknown };
 
 export interface AppDB extends Dexie {
   projects: EntityTable<Project, 'id'>;
   snapshots: EntityTable<Snapshot, 'id'>;
   phrasebanks: EntityTable<UserPhrasebank, 'id'>;
+  kv: EntityTable<KvRow, 'key'>;
 }
 
 let _db: AppDB | null = null;
@@ -32,8 +37,28 @@ export function getDb(): AppDB {
     snapshots: 'id, projectId, createdAt',
     phrasebanks: 'id, updatedAt',
   });
+  // v4 adds a local-only key/value store (e.g. the workspace folder handle).
+  db.version(4).stores({
+    projects: 'id, updatedAt',
+    snapshots: 'id, projectId, createdAt',
+    phrasebanks: 'id, updatedAt',
+    kv: 'key',
+  });
   _db = db;
   return db;
+}
+
+export async function kvGet<T>(key: string): Promise<T | undefined> {
+  const row = await getDb().kv.get(key);
+  return row?.value as T | undefined;
+}
+
+export async function kvSet(key: string, value: unknown): Promise<void> {
+  await getDb().kv.put({ key, value });
+}
+
+export async function kvDelete(key: string): Promise<void> {
+  await getDb().kv.delete(key);
 }
 
 const MAX_SNAPSHOTS_PER_PROJECT = 30;
@@ -157,6 +182,36 @@ export async function emptyTrash(): Promise<void> {
 export async function getProject(id: string): Promise<Project | undefined> {
   const db = getDb();
   return db.projects.get(id);
+}
+
+export async function addNoteToProject(
+  projectId: string,
+  note: Omit<ProjectNote, 'id' | 'createdAt'>,
+): Promise<ProjectNote> {
+  const db = getDb();
+  const project = await db.projects.get(projectId);
+  if (!project) {
+    throw new Error('Project not found');
+  }
+  const full: ProjectNote = { ...note, id: newId('note'), createdAt: Date.now() };
+  const next: Project = {
+    ...project,
+    notes: [...(project.notes ?? []), full],
+    updatedAt: Date.now(),
+  };
+  await db.projects.put(next);
+  return full;
+}
+
+export async function deleteNoteFromProject(projectId: string, noteId: string): Promise<void> {
+  const db = getDb();
+  const project = await db.projects.get(projectId);
+  if (!project?.notes) return;
+  await db.projects.put({
+    ...project,
+    notes: project.notes.filter((n) => n.id !== noteId),
+    updatedAt: Date.now(),
+  });
 }
 
 export async function deleteProject(id: string): Promise<void> {

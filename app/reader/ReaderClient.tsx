@@ -3,11 +3,23 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
-import { PdfViewer } from '@/components/PdfReader/Viewer';
+import { PdfViewer, type CapturedNote } from '@/components/PdfReader/Viewer';
 import { CitationPanel } from '@/components/PdfReader/CitationPanel';
 import { ProjectPicker } from '@/components/PdfReader/ProjectPicker';
-import { getProject, saveProject } from '@/store/db';
-import type { Ref } from '@/store/types';
+import { NotesPanel } from '@/components/PdfReader/NotesPanel';
+import { WorkspaceSaver } from '@/components/PdfReader/WorkspaceSaver';
+import {
+  getWorkspaceRoot,
+  hasWritePermission,
+  writeProjectJson,
+} from '@/lib/fs/workspace';
+import {
+  addNoteToProject,
+  deleteNoteFromProject,
+  getProject,
+  saveProject,
+} from '@/store/db';
+import type { ProjectNote, Ref } from '@/store/types';
 
 type LaunchParams = { files?: FileSystemHandle[] };
 type LaunchQueue = { setConsumer: (cb: (params: LaunchParams) => void) => void };
@@ -23,6 +35,67 @@ export function ReaderClient() {
   const [doc, setDoc] = useState<PDFDocumentProxy | null>(null);
   const [projectId, setProjectId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [notes, setNotes] = useState<ProjectNote[]>([]);
+  const [tab, setTab] = useState<'citations' | 'notes'>('citations');
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!projectId) {
+      setNotes([]);
+      return;
+    }
+    getProject(projectId).then((p) => {
+      if (!cancelled) setNotes(p?.notes ?? []);
+    });
+    return () => { cancelled = true; };
+  }, [projectId]);
+
+  const flashToast = useCallback((message: string) => {
+    setToast(message);
+    window.setTimeout(() => setToast(null), 2500);
+  }, []);
+
+  // Best-effort: keep the on-disk project.json fresh after changes, but only
+  // when a workspace is set and write access is already granted (no prompt).
+  const mirrorProjectToFolder = useCallback(async (id: string) => {
+    try {
+      const root = await getWorkspaceRoot();
+      if (!root || !(await hasWritePermission(root.handle))) return;
+      const project = await getProject(id);
+      if (project) await writeProjectJson(root.handle, project);
+    } catch {
+      /* mirroring is optional — ignore failures */
+    }
+  }, []);
+
+  const handleAddNote = useCallback(
+    async (note: CapturedNote) => {
+      if (!projectId) {
+        flashToast('Önce bir proje seçin');
+        return;
+      }
+      try {
+        const saved = await addNoteToProject(projectId, note);
+        setNotes((prev) => [...prev, saved]);
+        setTab('notes');
+        flashToast('Not eklendi');
+        void mirrorProjectToFolder(projectId);
+      } catch {
+        flashToast('Not eklenemedi');
+      }
+    },
+    [projectId, flashToast, mirrorProjectToFolder],
+  );
+
+  const handleDeleteNote = useCallback(
+    async (noteId: string) => {
+      if (!projectId) return;
+      await deleteNoteFromProject(projectId, noteId);
+      setNotes((prev) => prev.filter((n) => n.id !== noteId));
+      void mirrorProjectToFolder(projectId);
+    },
+    [projectId, mirrorProjectToFolder],
+  );
 
   useEffect(() => {
     if (!window.launchQueue) return;
@@ -85,10 +158,9 @@ export function ReaderClient() {
         return;
       }
       await saveProject({ ...p, refs: [...p.refs, ref], updatedAt: Date.now() });
-      setToast(`Added: ${ref.title?.slice(0, 60) ?? ref.doi ?? 'reference'}`);
-      window.setTimeout(() => setToast(null), 2500);
+      flashToast(`Added: ${ref.title?.slice(0, 60) ?? ref.doi ?? 'reference'}`);
     },
-    [projectId],
+    [projectId, flashToast],
   );
 
   return (
@@ -135,13 +207,19 @@ export function ReaderClient() {
           <div className="w-56">
             <ProjectPicker value={projectId} onChange={setProjectId} />
           </div>
+          <WorkspaceSaver source={source} projectId={projectId} onToast={flashToast} />
         </div>
       </header>
 
       <main className="grid flex-1 grid-cols-[1fr_360px] overflow-hidden">
         <section className="overflow-hidden">
           {source ? (
-            <PdfViewer file={source} onDocLoaded={setDoc} />
+            <PdfViewer
+              file={source}
+              onDocLoaded={setDoc}
+              canAddNote={!!projectId}
+              onAddNote={handleAddNote}
+            />
           ) : (
             <div className="flex h-full items-center justify-center p-10 text-center text-gray-400">
               <div>
@@ -151,8 +229,28 @@ export function ReaderClient() {
             </div>
           )}
         </section>
-        <aside className="border-l border-gray-200">
-          <CitationPanel doc={doc} onAddRef={handleAddRef} />
+        <aside className="flex flex-col overflow-hidden border-l border-gray-200">
+          <div className="flex border-b border-gray-200 text-xs font-medium">
+            <button
+              onClick={() => setTab('citations')}
+              className={`flex-1 px-3 py-2 ${tab === 'citations' ? 'border-b-2 border-teal-700 text-teal-700' : 'text-gray-500 hover:bg-gray-50'}`}
+            >
+              Atıflar
+            </button>
+            <button
+              onClick={() => setTab('notes')}
+              className={`flex-1 px-3 py-2 ${tab === 'notes' ? 'border-b-2 border-teal-700 text-teal-700' : 'text-gray-500 hover:bg-gray-50'}`}
+            >
+              Notlar{notes.length > 0 ? ` (${notes.length})` : ''}
+            </button>
+          </div>
+          <div className="flex-1 overflow-auto">
+            {tab === 'citations' ? (
+              <CitationPanel doc={doc} onAddRef={handleAddRef} />
+            ) : (
+              <NotesPanel notes={notes} hasProject={!!projectId} onDelete={handleDeleteNote} />
+            )}
+          </div>
         </aside>
       </main>
 

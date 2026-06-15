@@ -59,6 +59,21 @@ export type Citation = {
   refIds: string[];
 };
 
+/**
+ * A passage captured from the PDF reader to reuse while writing. Stored on the
+ * owning project so notes follow the article through sync/snapshots.
+ */
+export type ProjectNote = {
+  id: string;
+  text: string;
+  translation?: string;
+  sourceTitle?: string;
+  sourceUrl?: string;
+  page?: number;
+  color?: string;
+  createdAt: number;
+};
+
 export type ProjectDocument = {
   id: string;
   type: 'cover' | 'title-page' | 'response' | 'contrib' | 'coi' | 'copyright' | 'custom';
@@ -85,6 +100,8 @@ export type Project = {
   deleted?: number | null;
   documents?: ProjectDocument[];
   supplementary?: string;
+  /** Passages captured from the PDF reader for use while writing. */
+  notes?: ProjectNote[];
 };
 
 

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Script from 'next/script';
 import { ExtensionBridge } from '@/components/ExtensionBridge';
+import { StoragePersist } from '@/components/StoragePersist';
 import { LangProvider } from '@/lib/i18n/hooks';
 import './globals.css';
 
@@ -39,6 +40,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="min-h-screen font-sans">
         <LangProvider>
+          <StoragePersist />
           <ExtensionBridge />
           {children}
         </LangProvider>

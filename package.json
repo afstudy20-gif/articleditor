@@ -34,6 +34,7 @@
     "dexie": "4.0.10",
     "dexie-react-hooks": "1.1.7",
     "diff": "^9.0.0",
+    "fabric": "^6.9.1",
     "fast-xml-parser": "^5.8.0",
     "jszip": "3.10.1",
     "katex": "^0.16.47",
