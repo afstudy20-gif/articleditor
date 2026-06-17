@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { PDFDocumentProxy, PDFPageProxy, PageViewport } from 'pdfjs-dist';
+import { fetchPdfBytes, resolvePdfUrl } from '@/lib/pdf/client-source';
 import { loadPdfjs } from '@/lib/pdf/worker';
 import { AnnotationCanvas, type AnnotationTool } from './AnnotationCanvas';
 import { TextSelectionLayer } from './TextSelectionLayer';
@@ -79,12 +80,14 @@ export function PdfViewer({ file, onDocLoaded, canAddNote = false, onAddNote }: 
       setError(null);
       try {
         if (typeof file === 'string') {
+          const resolved = await resolvePdfUrl(file);
           try {
-            const task = pdfjsLib.getDocument({ url: file });
+            const task = pdfjsLib.getDocument({ url: resolved });
             pdfDoc = await task.promise;
           } catch (e: unknown) {
             console.warn('Direct PDF fetch failed, falling back to proxy:', e);
-            const task = pdfjsLib.getDocument({ url: `/api/pdf-proxy?url=${encodeURIComponent(file)}` });
+            const bytes = await fetchPdfBytes(resolved);
+            const task = pdfjsLib.getDocument({ data: bytes });
             pdfDoc = await task.promise;
           }
         } else {

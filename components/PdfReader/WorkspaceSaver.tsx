@@ -12,6 +12,7 @@ import {
   writeAnnotationsJson,
   writeProjectJson,
 } from '@/lib/fs/workspace';
+import { fetchPdfBytes } from '@/lib/pdf/client-source';
 import { docKeyForSource, loadAnnotations } from '@/lib/pdf/annotations';
 
 type Props = {
@@ -24,11 +25,7 @@ async function getPdfBytes(source: File | string): Promise<Uint8Array> {
   if (typeof source !== 'string') {
     return new Uint8Array(await source.arrayBuffer());
   }
-  const response = await fetch(`/api/pdf-proxy?url=${encodeURIComponent(source)}`);
-  if (!response.ok) {
-    throw new Error(`PDF alınamadı (HTTP ${response.status})`);
-  }
-  return new Uint8Array(await response.arrayBuffer());
+  return fetchPdfBytes(source);
 }
 
 function downloadFallback(bytes: Uint8Array, filename: string) {
