@@ -72,10 +72,22 @@ export function splitBodyAndBiblio(fullText: string): BibSplit {
     return { bodyText: fullText, refLines: [] };
   }
   const body = lines.slice(0, headingIdx).join('\n').trimEnd();
-  const refsRawAll = lines
-    .slice(headingIdx + 1)
-    .map((l) => l.replace(/\s+$/g, ''))
-    .filter((l) => l.trim().length > 0);
+  
+  const refsRawAll: string[] = [];
+  const stopPatterns = [
+    /^\s*(?:Table|Tablo|Figure|Fig|Şekil|Resim)\s+\d+/i,
+    /^\s*(?:Author Contributions|Conflict of Interest|Funding|Acknowledgments|Acknowledgements|Appendix)\b/i,
+  ];
+
+  for (let i = headingIdx + 1; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+    if (trimmed.length === 0) continue;
+    const shouldStop = stopPatterns.some((pattern) => pattern.test(trimmed));
+    if (shouldStop) break;
+    refsRawAll.push(line.replace(/\s+$/g, ''));
+  }
+
   // Cap the number of raw reference lines before grouping so that hostile or
   // accidental megabyte-sized input cannot drive the heuristics indefinitely.
   const truncated = refsRawAll.length > MAX_BIBLIO_LINES;
@@ -155,6 +167,7 @@ function groupRefLines(lines: string[]): string[] {
 // Heuristic: a new reference line usually starts with a capital letter and the
 // previous line ended with punctuation typical of a citation end (period, year, page range).
 function looksLikeRefStart(line: string, prev: string): boolean {
+  if (REF_START_RE.test(line)) return true;
   const startsCapital = /^[A-ZÇĞİÖŞÜ]/.test(line);
   if (!startsCapital) return false;
   const prevEnd = prev.replace(/\s+$/, '').slice(-40);

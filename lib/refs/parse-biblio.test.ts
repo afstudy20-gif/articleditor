@@ -186,4 +186,23 @@ describe('splitBodyAndBiblio', () => {
     assert.ok(elapsed < 2000);
     assert.ok(parsed.refs.length > 0);
   });
+
+  it('stops bibliography extraction when meeting a table stop pattern', () => {
+    const text = [
+      'Body text.',
+      'References',
+      '1. Smith JA. Title. Nature. 2019;1:1-2.',
+      '2. Lee CD. Title. Science. 2020;2:3-4.',
+      '',
+      'Table 1',
+      'Variable Group A\tVariable Group B',
+      'Value 1\tValue 2',
+    ].join('\n');
+
+    const split = splitBodyAndBiblio(text);
+    assert.equal(split.refLines.length, 2);
+    assert.ok(split.refLines[0].includes('Smith JA'));
+    assert.ok(split.refLines[1].includes('Lee CD'));
+    assert.ok(!split.refLines.some(l => l.includes('Variable Group')));
+  });
 });
