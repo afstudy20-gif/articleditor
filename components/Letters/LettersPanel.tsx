@@ -8,12 +8,13 @@ import {
   buildConflictOfInterest,
   buildCopyrightTransfer,
   parseReviewerComments,
+  buildTitlePage,
   type CopyrightVariant,
   type LetterLang,
 } from '@/lib/letters/templates';
 import { aiHeaders } from '@/lib/ai/user-keys';
 
-type LetterType = 'cover' | 'response' | 'contrib' | 'coi' | 'copyright';
+type LetterType = 'cover' | 'title-page' | 'response' | 'contrib' | 'coi' | 'copyright';
 
 interface LettersPanelProps {
   defaultTitle: string;
@@ -50,6 +51,17 @@ export function LettersPanel({ defaultTitle, lang, aiEnabled, onClose, t }: Lett
   const [output, setOutput] = useState('');
   const [aiBusy, setAiBusy] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+  const [runningTitle, setRunningTitle] = useState('');
+  const [correspondingEmail, setCorrespondingEmail] = useState('');
+  const [correspondingAddress, setCorrespondingAddress] = useState('');
+  const [orcid, setOrcid] = useState('');
+  const [abstractWordCount, setAbstractWordCount] = useState('');
+  const [manuscriptWordCount, setManuscriptWordCount] = useState('');
+  const [figuresCount, setFiguresCount] = useState('');
+  const [tablesCount, setTablesCount] = useState('');
+  const [conflictDesc, setConflictDesc] = useState('');
+  const [funding, setFunding] = useState('');
+  const [acknowledgements, setAcknowledgements] = useState('');
 
   const generate = (): void => {
     setAiError(null);
@@ -78,6 +90,26 @@ export function LettersPanel({ defaultTitle, lang, aiEnabled, onClose, t }: Lett
       setOutput(buildAuthorContributions({ authors: splitAuthors(authorsStr), lang }));
     } else if (type === 'coi') {
       setOutput(buildConflictOfInterest({ authors: splitAuthors(authorsStr), hasConflict, lang }));
+    } else if (type === 'title-page') {
+      setOutput(
+        buildTitlePage({
+          manuscriptTitle: title,
+          runningTitle,
+          authorsStr,
+          correspondingAuthor: corresponding,
+          correspondingEmail,
+          correspondingAddress,
+          orcid,
+          abstractWordCount,
+          manuscriptWordCount,
+          figuresCount,
+          tablesCount,
+          conflictOfInterest: conflictDesc,
+          funding,
+          acknowledgements,
+          lang,
+        }),
+      );
     } else {
       const authors = splitAuthors(authorsStr);
       if (corresponding.trim() && !authors.some((author) => author.toLowerCase() === corresponding.trim().toLowerCase())) {
@@ -134,6 +166,7 @@ export function LettersPanel({ defaultTitle, lang, aiEnabled, onClose, t }: Lett
 
   const TABS: Array<{ id: LetterType; label: string }> = [
     { id: 'cover', label: t('letters_cover') },
+    { id: 'title-page', label: t('letters_title_page') || 'Title Page' },
     { id: 'response', label: t('letters_response') },
     { id: 'contrib', label: t('letters_contrib') },
     { id: 'coi', label: t('letters_coi') },
@@ -173,10 +206,10 @@ export function LettersPanel({ defaultTitle, lang, aiEnabled, onClose, t }: Lett
         <div className="grid md:grid-cols-2 gap-3 p-4 overflow-auto flex-1">
           <div className="space-y-2">
             {(type === 'cover' || type === 'response' || type === 'copyright') && (
-              <>
-                <input className={inputCls} placeholder={t('letters_journal')} value={journalName} onChange={(e) => setJournalName(e.target.value)} />
-                <input className={inputCls} placeholder={t('letters_ms_title')} value={title} onChange={(e) => setTitle(e.target.value)} />
-              </>
+              <input className={inputCls} placeholder={t('letters_journal')} value={journalName} onChange={(e) => setJournalName(e.target.value)} />
+            )}
+            {(type === 'cover' || type === 'response' || type === 'copyright' || type === 'title-page') && (
+              <input className={inputCls} placeholder={t('letters_ms_title')} value={title} onChange={(e) => setTitle(e.target.value)} />
             )}
             {type === 'cover' && (
               <>
@@ -184,6 +217,25 @@ export function LettersPanel({ defaultTitle, lang, aiEnabled, onClose, t }: Lett
                 <input className={inputCls} placeholder={t('letters_authors')} value={authorsStr} onChange={(e) => setAuthorsStr(e.target.value)} />
                 <input className={inputCls} placeholder={t('letters_ms_type')} value={manuscriptType} onChange={(e) => setManuscriptType(e.target.value)} />
                 <textarea className={`${inputCls} h-20 resize-none`} placeholder={t('letters_key_finding')} value={keyFinding} onChange={(e) => setKeyFinding(e.target.value)} />
+              </>
+            )}
+            {type === 'title-page' && (
+              <>
+                <input className={inputCls} placeholder={t('letters_running_title')} value={runningTitle} onChange={(e) => setRunningTitle(e.target.value)} />
+                <textarea className={`${inputCls} h-16 resize-none`} placeholder={t('letters_authors_list')} value={authorsStr} onChange={(e) => setAuthorsStr(e.target.value)} />
+                <input className={inputCls} placeholder={t('letters_corresponding')} value={corresponding} onChange={(e) => setCorresponding(e.target.value)} />
+                <input className={inputCls} placeholder={t('letters_corresponding_email')} value={correspondingEmail} onChange={(e) => setCorrespondingEmail(e.target.value)} />
+                <input className={inputCls} placeholder={t('letters_corresponding_address')} value={correspondingAddress} onChange={(e) => setCorrespondingAddress(e.target.value)} />
+                <input className={inputCls} placeholder={t('letters_orcid')} value={orcid} onChange={(e) => setOrcid(e.target.value)} />
+                <div className="grid grid-cols-2 gap-2">
+                  <input className={inputCls} placeholder={t('letters_abs_wc')} value={abstractWordCount} onChange={(e) => setAbstractWordCount(e.target.value)} />
+                  <input className={inputCls} placeholder={t('letters_ms_wc')} value={manuscriptWordCount} onChange={(e) => setManuscriptWordCount(e.target.value)} />
+                  <input className={inputCls} placeholder={t('letters_figs')} value={figuresCount} onChange={(e) => setFiguresCount(e.target.value)} />
+                  <input className={inputCls} placeholder={t('letters_tbls')} value={tablesCount} onChange={(e) => setTablesCount(e.target.value)} />
+                </div>
+                <input className={inputCls} placeholder={t('letters_coi')} value={conflictDesc} onChange={(e) => setConflictDesc(e.target.value)} />
+                <input className={inputCls} placeholder={t('letters_funding')} value={funding} onChange={(e) => setFunding(e.target.value)} />
+                <input className={inputCls} placeholder={t('letters_ack')} value={acknowledgements} onChange={(e) => setAcknowledgements(e.target.value)} />
               </>
             )}
             {type === 'response' && (
