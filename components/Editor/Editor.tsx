@@ -45,6 +45,8 @@ type Props = {
   onAIManuscriptTool?: (mode: 'abstract' | 'titles' | 'discussion' | 'conclusion') => void;
   onIntegrityCheck?: () => void;
   aiDisabled?: boolean;
+  fontFamily?: string;
+  onFontFamilyChange?: (font: string) => void;
 };
 
 const SECTION_PRESETS: Array<{ label: string; level: 1 | 2 | 3 }> = [
@@ -99,6 +101,8 @@ export function ArticleEditor({
   onAIManuscriptTool,
   onIntegrityCheck,
   aiDisabled,
+  fontFamily = 'Times New Roman',
+  onFontFamilyChange,
 }: Props) {
   const { t, lang } = useLang();
   const refsById = useMemo(() => {
@@ -249,7 +253,10 @@ export function ArticleEditor({
   if (!editor) return <div className="card p-6 text-muted">{t('ed_loading')}</div>;
 
   return (
-    <div className="card flex flex-col h-full">
+    <div
+      className="card flex flex-col h-full"
+      style={{ '--editor-font-family': fontFamily } as React.CSSProperties}
+    >
       <div className="flex items-center gap-1 border-b border-border p-2 flex-wrap text-sm">
         <ToolbarButton
           onClick={() => editor.chain().focus().undo().run()}
@@ -263,6 +270,20 @@ export function ArticleEditor({
         >
           ↷
         </ToolbarButton>
+        <Sep />
+        <select
+          value={fontFamily}
+          onChange={(e) => onFontFamilyChange?.(e.target.value)}
+          className="border border-border rounded px-1.5 py-0.5 text-xs bg-white text-primary font-medium hover:border-teal focus:outline-none cursor-pointer"
+          style={{ width: '130px' }}
+          title={lang === 'tr' ? 'Yazı Tipi' : 'Font Family'}
+        >
+          <option value="Times New Roman">Times New Roman</option>
+          <option value="Arial">Arial</option>
+          <option value="Georgia">Georgia</option>
+          <option value="Calibri">Calibri</option>
+          <option value="Cambria">Cambria</option>
+        </select>
         <Sep />
         <ToolbarButton onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive('bold')}>
           B
@@ -474,31 +495,16 @@ function EditorStatusBar({
   lines: number;
   t: (k: string) => string;
 }): JSX.Element {
-  const row1: Array<{ label: string; value: string }> = [
+  const items: Array<{ label: string; value: string }> = [
     { label: t('stats_words'), value: stats.words.toLocaleString() },
     { label: t('stats_chars'), value: stats.characters.toLocaleString() },
     { label: t('ed_status_chars_no_space'), value: stats.charactersNoSpaces.toLocaleString() },
-  ];
-  const row2: Array<{ label: string; value: string }> = [
     { label: t('stats_sentences'), value: stats.sentences.toLocaleString() },
     { label: t('stats_paragraphs'), value: stats.paragraphs.toLocaleString() },
     { label: t('ed_status_lines'), value: lines.toLocaleString() },
   ];
   return (
-    <div className="border-t border-border px-3 py-1.5 flex flex-col gap-0.5 text-[11px] text-secondary bg-slate-50 dark:bg-slate-900/40">
-      <StatusRow items={row1} />
-      <StatusRow items={row2} />
-    </div>
-  );
-}
-
-function StatusRow({
-  items,
-}: {
-  items: Array<{ label: string; value: string }>;
-}): JSX.Element {
-  return (
-    <div className="flex flex-wrap items-center gap-x-4">
+    <div className="border-t border-border px-3 py-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-secondary bg-slate-50 dark:bg-slate-900/40">
       {items.map((item, i) => (
         <span key={item.label} className="whitespace-nowrap flex items-center gap-2">
           <span>

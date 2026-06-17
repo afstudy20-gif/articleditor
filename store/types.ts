@@ -96,6 +96,7 @@ export type Project = {
     style?: string;
     aiProvider?: 'anthropic' | 'openai';
     figureCaptionPlacement?: 'inline' | 'after-bibliography';
+    fontFamily?: string;
   };
   deleted?: number | null;
   documents?: ProjectDocument[];

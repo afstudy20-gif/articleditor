@@ -62,6 +62,8 @@ export type RichBuildInput = {
   styleMap?: DocxStyleMap;
   /** Media part name prefix; templates may already contain imageN.* parts. */
   imageNamePrefix?: string;
+  /** Selected font family. Defaults to 'Times New Roman'. */
+  fontFamily?: string;
 };
 
 const WORD_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
@@ -83,7 +85,10 @@ export async function buildRichDocx(input: RichBuildInput): Promise<Blob> {
   zip.folder('_rels')!.file('.rels', ROOT_RELS_XML);
   const word = zip.folder('word')!;
   word.file('document.xml', bodyXml);
-  word.file('styles.xml', RICH_STYLES_XML);
+  
+  const font = input.fontFamily || 'Times New Roman';
+  const stylesXml = RICH_STYLES_XML.replaceAll('Times New Roman', font);
+  word.file('styles.xml', stylesXml);
   word.file('settings.xml', SETTINGS_XML);
 
   const titleText = input.title ?? 'Manuscript';
@@ -94,8 +99,8 @@ export async function buildRichDocx(input: RichBuildInput): Promise<Blob> {
     hour: '2-digit',
     minute: '2-digit'
   });
-  word.file('header1.xml', headerXml(titleText));
-  word.file('footer1.xml', footerXml(exportDateText));
+  word.file('header1.xml', headerXml(titleText, font));
+  word.file('footer1.xml', footerXml(exportDateText, font));
 
   if (ctx.usesNumbering) word.file('numbering.xml', NUMBERING_XML);
   word.folder('_rels')!.file('document.xml.rels', ctx.relsXml());
@@ -717,7 +722,7 @@ const RICH_STYLES_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:style w:type="paragraph" w:styleId="Title"><w:name w:val="Title"/><w:basedOn w:val="Normal"/><w:pPr><w:jc w:val="center"/><w:spacing w:after="240"/></w:pPr><w:rPr><w:b/><w:sz w:val="24"/></w:rPr></w:style>
 </w:styles>`;
 
-function headerXml(title: string): string {
+function headerXml(title: string, fontFamily = 'Times New Roman'): string {
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
        xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
@@ -730,7 +735,7 @@ function headerXml(title: string): string {
     </w:pPr>
     <w:r>
       <w:rPr>
-        <w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:cs="Times New Roman" w:eastAsia="Times New Roman"/>
+        <w:rFonts w:ascii="${fontFamily}" w:hAnsi="${fontFamily}" w:cs="${fontFamily}" w:eastAsia="${fontFamily}"/>
         <w:sz w:val="18"/>
         <w:i/>
         <w:color w:val="808080"/>
@@ -741,7 +746,7 @@ function headerXml(title: string): string {
 </w:hdr>`;
 }
 
-function footerXml(exportDate: string): string {
+function footerXml(exportDate: string, fontFamily = 'Times New Roman'): string {
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
        xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
@@ -757,7 +762,7 @@ function footerXml(exportDate: string): string {
     </w:pPr>
     <w:r>
       <w:rPr>
-        <w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:cs="Times New Roman" w:eastAsia="Times New Roman"/>
+        <w:rFonts w:ascii="${fontFamily}" w:hAnsi="${fontFamily}" w:cs="${fontFamily}" w:eastAsia="${fontFamily}"/>
         <w:sz w:val="18"/>
         <w:color w:val="808080"/>
       </w:rPr>
@@ -765,7 +770,7 @@ function footerXml(exportDate: string): string {
     </w:r>
     <w:r>
       <w:rPr>
-        <w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:cs="Times New Roman" w:eastAsia="Times New Roman"/>
+        <w:rFonts w:ascii="${fontFamily}" w:hAnsi="${fontFamily}" w:cs="${fontFamily}" w:eastAsia="${fontFamily}"/>
         <w:sz w:val="18"/>
         <w:color w:val="808080"/>
       </w:rPr>
@@ -775,7 +780,7 @@ function footerXml(exportDate: string): string {
     <w:fldSimple w:instr="PAGE">
       <w:r>
         <w:rPr>
-          <w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:cs="Times New Roman" w:eastAsia="Times New Roman"/>
+          <w:rFonts w:ascii="${fontFamily}" w:hAnsi="${fontFamily}" w:cs="${fontFamily}" w:eastAsia="${fontFamily}"/>
           <w:sz w:val="18"/>
           <w:color w:val="808080"/>
         </w:rPr>
@@ -784,7 +789,7 @@ function footerXml(exportDate: string): string {
     </w:fldSimple>
     <w:r>
       <w:rPr>
-        <w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:cs="Times New Roman" w:eastAsia="Times New Roman"/>
+        <w:rFonts w:ascii="${fontFamily}" w:hAnsi="${fontFamily}" w:cs="${fontFamily}" w:eastAsia="${fontFamily}"/>
         <w:sz w:val="18"/>
         <w:color w:val="808080"/>
       </w:rPr>
@@ -793,7 +798,7 @@ function footerXml(exportDate: string): string {
     <w:fldSimple w:instr="NUMPAGES">
       <w:r>
         <w:rPr>
-          <w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:cs="Times New Roman" w:eastAsia="Times New Roman"/>
+          <w:rFonts w:ascii="${fontFamily}" w:hAnsi="${fontFamily}" w:cs="${fontFamily}" w:eastAsia="${fontFamily}"/>
           <w:sz w:val="18"/>
           <w:color w:val="808080"/>
         </w:rPr>

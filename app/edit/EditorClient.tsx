@@ -177,6 +177,9 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
   const [figureCaptionPlacement, setFigureCaptionPlacement] = useState<FigureCaptionPlacement>(
     project.settings?.figureCaptionPlacement ?? 'inline',
   );
+  const [fontFamily, setFontFamily] = useState<string>(
+    project.settings?.fontFamily ?? 'Times New Roman',
+  );
   const [importPreview, setImportPreview] = useState<ImportPreview>(null);
   const [importPasteText, setImportPasteText] = useState('');
   const [pastedHtmlParagraphs, setPastedHtmlParagraphs] = useState<ImportParagraph[] | null>(null);
@@ -616,7 +619,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
         refs,
         doc,
         supplementary,
-        settings: { ...(project.settings ?? {}), style, figureCaptionPlacement },
+        settings: { ...(project.settings ?? {}), style, figureCaptionPlacement, fontFamily },
       });
       setSavedAt(Date.now());
       setSavingState('saved');
@@ -632,6 +635,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
     style,
     supplementary,
     figureCaptionPlacement,
+    fontFamily,
     project,
     onSaved,
     notifyTabSaved,
@@ -1930,6 +1934,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
       lineNumbers: exportLineNumbers,
       bibHeading: 'References',
       figureCaptionPlacement,
+      fontFamily,
     });
     download(blob, `${slugify(title)}-${style}-${mode}.docx`);
   }
@@ -2630,6 +2635,8 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
               onAIManuscriptTool={runAIManuscriptTool}
               onIntegrityCheck={() => setIntegrityOpen(true)}
               aiDisabled={aiConfigured === false}
+              fontFamily={fontFamily}
+              onFontFamilyChange={setFontFamily}
             />
           </div>
         </div>
@@ -2744,16 +2751,18 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
             setFiguresOpen(false);
           }}
           onAIReview={runAIReview}
-              onAIScore={runAIScore}
-              onAIEnhance={runAIEnhance}
-              onAISuggestCitation={runAISuggestCitation}
-              onAIDetectGaps={runAIDetectGaps}
-              onAICompare={runAICompare}
-              onAIDeepResearch={runAIDeepResearch}
-              onAIStructureCheck={runAIStructureCheck}
-              onAIManuscriptTool={runAIManuscriptTool}
-              onIntegrityCheck={() => setIntegrityOpen(true)}
-              aiDisabled={aiConfigured === false}
+          onAIScore={runAIScore}
+          onAIEnhance={runAIEnhance}
+          onAISuggestCitation={runAISuggestCitation}
+          onAIDetectGaps={runAIDetectGaps}
+          onAICompare={runAICompare}
+          onAIDeepResearch={runAIDeepResearch}
+          onAIStructureCheck={runAIStructureCheck}
+          onAIManuscriptTool={runAIManuscriptTool}
+          onIntegrityCheck={() => setIntegrityOpen(true)}
+          aiDisabled={aiConfigured === false}
+          fontFamily={fontFamily}
+          onFontFamilyChange={setFontFamily}
         />
         <RefsPanel
           refs={refs}

@@ -458,9 +458,27 @@ function readRunContent(rNode: OOXMLValue): RunContent {
             return;
           }
           if (!isOOXMLNode(pr)) return;
-          if ('w:b' in pr) bold = true;
-          if ('w:i' in pr) italic = true;
-          if ('w:u' in pr) underline = true;
+          if ('w:b' in pr) {
+            const attrs = isOOXMLNode(pr[':@']) ? (pr[':@'] as OOXMLNode) : undefined;
+            const val = attrs?.['@_w:val'];
+            if (val === undefined || (val !== 'false' && val !== '0' && val !== 'off')) {
+              bold = true;
+            }
+          }
+          if ('w:i' in pr) {
+            const attrs = isOOXMLNode(pr[':@']) ? (pr[':@'] as OOXMLNode) : undefined;
+            const val = attrs?.['@_w:val'];
+            if (val === undefined || (val !== 'false' && val !== '0' && val !== 'off')) {
+              italic = true;
+            }
+          }
+          if ('w:u' in pr) {
+            const attrs = isOOXMLNode(pr[':@']) ? (pr[':@'] as OOXMLNode) : undefined;
+            const val = attrs?.['@_w:val'];
+            if (val === undefined || val !== 'none') {
+              underline = true;
+            }
+          }
           if ('w:vertAlign' in pr) {
             const attrs = isOOXMLNode(pr[':@']) ? (pr[':@'] as OOXMLNode) : undefined;
             if (String(attrs?.['@_w:val'] ?? '') === 'superscript') superscript = true;
