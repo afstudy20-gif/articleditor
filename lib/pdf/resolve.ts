@@ -1,6 +1,12 @@
 import { extractPmcid, pickCrossrefPdfUrl, sanitizePdfUrl } from './proxy';
 
-export async function resolvePmcPdfUrl(pmcid: string): Promise<URL | null> {
+/** Europe PMC serves PMC PDFs with CORS * and works from our production server (SciELO often does not). */
+export function europePmcPdfUrl(pmcid: string): URL | null {
+  const id = pmcid.toUpperCase().startsWith('PMC') ? pmcid.toUpperCase() : `PMC${pmcid}`;
+  return sanitizePdfUrl(`https://europepmc.org/api/getPdf?pmcid=${encodeURIComponent(id)}`);
+}
+
+async function resolvePmcViaCrossref(pmcid: string): Promise<URL | null> {
   const ids = new URL('https://pmc.ncbi.nlm.nih.gov/tools/idconv/api/v1/articles/');
   ids.searchParams.set('ids', pmcid);
   ids.searchParams.set('format', 'json');
@@ -22,6 +28,10 @@ export async function resolvePmcPdfUrl(pmcid: string): Promise<URL | null> {
     message?: { link?: Array<{ URL?: string; 'content-type'?: string }> };
   };
   return pickCrossrefPdfUrl(data.message?.link);
+}
+
+export async function resolvePmcPdfUrl(pmcid: string): Promise<URL | null> {
+  return europePmcPdfUrl(pmcid) ?? resolvePmcViaCrossref(pmcid);
 }
 
 /** Resolve publisher HTML links (e.g. PMC /pdf/ paths) to a direct HTTPS PDF URL when possible. */
