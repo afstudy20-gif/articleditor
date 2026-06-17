@@ -45,7 +45,7 @@ export function StickyNote(): JSX.Element {
   if (!isMounted) return <div className="w-8 h-8" />; // Placeholder to avoid hydration mismatch
 
   return (
-    <div className="relative" ref={containerRef}>
+    <div className="relative z-[60]" ref={containerRef}>
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}

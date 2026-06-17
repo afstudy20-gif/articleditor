@@ -2278,7 +2278,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
 
   return (
     <div className="min-h-screen flex flex-col">
-      <header className={`border-b border-border bg-surface sticky top-0 z-50 ${focusMode ? 'hidden' : ''}`}>
+      <header className={`border-b border-border bg-surface sticky top-0 z-[60] ${focusMode ? 'hidden' : ''}`}>
         <div className="w-full px-4 sm:px-6 py-3 flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-3 flex-1 min-w-0">
             <div className="flex flex-col gap-1 items-start shrink-0 mr-2">
@@ -2324,8 +2324,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
                     setFiguresOpen(false);
                     setSuppOpen(false);
                     setAbbrOpen(false);
-                    if (onGoToDocuments) onGoToDocuments();
-                    else setLettersOpen(true);
+                    setLettersOpen(true);
                   }}
                   className={`px-1.5 py-0.5 rounded text-[11px] font-semibold transition flex items-center gap-1 shrink-0 ${
                     lettersOpen

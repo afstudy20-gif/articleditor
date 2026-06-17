@@ -1251,7 +1251,7 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
   return (
     <div className="min-h-screen bg-slate-50/50 flex flex-col">
       {/* Top Bar / Header */}
-      <header className="border-b border-border bg-white sticky top-0 z-40 px-4 sm:px-6 py-3 sm:py-4 shadow-sm flex items-center justify-between">
+      <header className="border-b border-border bg-white sticky top-0 z-[60] px-4 sm:px-6 py-3 sm:py-4 shadow-sm flex items-center justify-between">
         <div className="flex items-center gap-3">
           <button
             onClick={onExit}
