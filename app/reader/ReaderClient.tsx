@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import { PdfViewer, type CapturedNote } from '@/components/PdfReader/Viewer';
@@ -10,10 +10,12 @@ import { NotesPanel } from '@/components/PdfReader/NotesPanel';
 import { WorkspaceSaver } from '@/components/PdfReader/WorkspaceSaver';
 import { StorageBar } from '@/components/PdfReader/StorageBar';
 import {
+  derivePdfFilename,
   getWorkspaceRoot,
   hasWritePermission,
   writeProjectJson,
 } from '@/lib/fs/workspace';
+import { fetchPdfBytes, resolvePdfUrl } from '@/lib/pdf/client-source';
 import {
   addNoteToProject,
   deleteNoteFromProject,
@@ -38,6 +40,7 @@ export function ReaderClient() {
   const [toast, setToast] = useState<string | null>(null);
   const [notes, setNotes] = useState<ProjectNote[]>([]);
   const [tab, setTab] = useState<'citations' | 'notes'>('citations');
+  const printFrameRef = useRef<HTMLIFrameElement | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -164,6 +167,59 @@ export function ReaderClient() {
     [projectId, flashToast],
   );
 
+  const handleDownload = useCallback(async () => {
+    if (!source) {
+      flashToast('Önce bir PDF açın');
+      return;
+    }
+    try {
+      const filename = derivePdfFilename(source);
+      const bytes =
+        typeof source === 'string'
+          ? await fetchPdfBytes(source)
+          : new Uint8Array(await source.arrayBuffer());
+      const blob = new Blob([bytes], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+      flashToast(`İndirildi: ${filename}`);
+    } catch (e) {
+      flashToast(e instanceof Error ? e.message : 'İndirilemedi');
+    }
+  }, [source, flashToast]);
+
+  const handlePrint = useCallback(async () => {
+    if (!source) {
+      flashToast('Önce bir PDF açın');
+      return;
+    }
+    try {
+      const url =
+        typeof source === 'string'
+          ? await resolvePdfUrl(source)
+          : URL.createObjectURL(source);
+      const frame = printFrameRef.current;
+      if (!frame) return;
+      frame.onload = () => {
+        try {
+          frame.contentWindow?.print();
+        } catch {
+          flashToast('Yazdırma penceresi açılamadı');
+        } finally {
+          if (typeof source !== 'string') {
+            URL.revokeObjectURL(url);
+          }
+        }
+      };
+      frame.src = url;
+    } catch (e) {
+      flashToast(e instanceof Error ? e.message : 'Yazdırılamadı');
+    }
+  }, [source, flashToast]);
+
   return (
     <div className="flex h-screen flex-col bg-gray-50">
       <header className="flex items-center gap-3 border-b border-gray-200 bg-white px-4 py-2">
@@ -209,6 +265,24 @@ export function ReaderClient() {
             <ProjectPicker value={projectId} onChange={setProjectId} />
           </div>
           <WorkspaceSaver source={source} projectId={projectId} onToast={flashToast} />
+          <button
+            type="button"
+            onClick={handleDownload}
+            disabled={!source}
+            title="PDF’i indir"
+            className="rounded border border-gray-300 bg-white px-3 py-1 text-xs text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            İndir
+          </button>
+          <button
+            type="button"
+            onClick={handlePrint}
+            disabled={!source}
+            title="PDF’i yazdır"
+            className="rounded border border-gray-300 bg-white px-3 py-1 text-xs text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Yazdır
+          </button>
         </div>
       </header>
 
@@ -261,6 +335,12 @@ export function ReaderClient() {
           {toast}
         </div>
       )}
+      <iframe
+        ref={printFrameRef}
+        title="Print PDF"
+        className="pointer-events-none absolute h-0 w-0 opacity-0"
+        aria-hidden="true"
+      />
     </div>
   );
 }

@@ -587,10 +587,18 @@ function splitByBlankLines(text: string): string[] {
 // Title Page Template
 // ---------------------------------------------------------------------------
 
+export interface TitlePageAuthor {
+  name: string;
+  email?: string;
+  orcid?: string;
+  institution?: string;
+}
+
 export interface TitlePageInput {
   manuscriptTitle: string;
   runningTitle?: string;
   authorsStr?: string;
+  authors?: TitlePageAuthor[];
   correspondingAuthor?: string;
   correspondingEmail?: string;
   correspondingAddress?: string;
@@ -611,10 +619,41 @@ export function buildTitlePage(input: TitlePageInput): string {
     : buildTitlePageEn(input);
 }
 
+function formatTitlePageAuthors(
+  authors: TitlePageAuthor[] | undefined,
+  lang: LetterLang,
+): string {
+  const list = (authors ?? []).filter((a) => a.name.trim().length > 0);
+  if (list.length === 0) return '';
+
+  const namesLine = list.map((a, idx) => `${a.name}${idx + 1}`).join(', ');
+
+  const affiliations = list
+    .map((a, idx) => {
+      const parts = [
+        a.institution?.trim(),
+        a.email?.trim()
+          ? lang === 'tr'
+            ? `E-posta: ${a.email.trim()}`
+            : `Email: ${a.email.trim()}`
+          : '',
+        a.orcid?.trim() ? `ORCID: ${a.orcid.trim()}` : '',
+      ].filter(Boolean);
+      const body = parts.length > 0 ? parts.join(', ') : (lang === 'tr' ? '[Kurum]' : '[Institution]');
+      return `${idx + 1} ${body}`;
+    })
+    .join('\n');
+
+  return `${namesLine}\n\n${affiliations}`;
+}
+
 function buildTitlePageEn(input: TitlePageInput): string {
   const title = orPlaceholder(input.manuscriptTitle, '[Manuscript Title]');
   const running = orPlaceholder(input.runningTitle, '[Running Title]');
-  const authors = orPlaceholder(input.authorsStr, '[Author Names and Affiliations]');
+  const authors =
+    input.authors && input.authors.some((a) => a.name.trim())
+      ? formatTitlePageAuthors(input.authors, 'en')
+      : orPlaceholder(input.authorsStr, '[Author Names and Affiliations]');
   const corrAuthor = orPlaceholder(input.correspondingAuthor, '[Corresponding Author Name]');
   const corrEmail = orPlaceholder(input.correspondingEmail, '[Email Address]');
   const corrAddress = orPlaceholder(input.correspondingAddress, '[Full Mailing Address]');
@@ -647,7 +686,10 @@ function buildTitlePageEn(input: TitlePageInput): string {
 function buildTitlePageTr(input: TitlePageInput): string {
   const title = orPlaceholder(input.manuscriptTitle, '[Makale Başlığı]');
   const running = orPlaceholder(input.runningTitle, '[Kısa Başlık]');
-  const authors = orPlaceholder(input.authorsStr, '[Yazar İsimleri ve Kurumları]');
+  const authors =
+    input.authors && input.authors.some((a) => a.name.trim())
+      ? formatTitlePageAuthors(input.authors, 'tr')
+      : orPlaceholder(input.authorsStr, '[Yazar İsimleri ve Kurumları]');
   const corrAuthor = orPlaceholder(input.correspondingAuthor, '[Sorumlu Yazar Adı]');
   const corrEmail = orPlaceholder(input.correspondingEmail, '[E-posta Adresi]');
   const corrAddress = orPlaceholder(input.correspondingAddress, '[Açık Posta Adresi]');

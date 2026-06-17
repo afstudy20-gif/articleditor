@@ -45,7 +45,7 @@ export function StickyNote(): JSX.Element {
   if (!isMounted) return <div className="w-8 h-8" />; // Placeholder to avoid hydration mismatch
 
   return (
-    <div className="relative z-[60]" ref={containerRef}>
+    <div className="relative z-[80]" ref={containerRef}>
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
@@ -58,7 +58,7 @@ export function StickyNote(): JSX.Element {
       </button>
 
       {isOpen && (
-        <div className="absolute top-full left-0 mt-1.5 w-72 sm:w-96 h-80 bg-surface border border-border shadow-xl rounded-lg flex flex-col z-[100] animate-in fade-in slide-in-from-top-2">
+        <div className="absolute top-full left-0 mt-1.5 w-80 sm:w-96 h-80 bg-surface border border-border shadow-xl rounded-lg flex flex-col z-[100] animate-in fade-in slide-in-from-top-2 resize overflow-auto min-w-[220px] min-h-[160px] max-w-[90vw] max-h-[80vh]">
           <div className="flex justify-between items-center px-3 py-2 border-b border-border bg-slate-50/50 rounded-t-lg">
             <span className="text-xs font-bold text-primary">{t('note_sticky')}</span>
             <button
