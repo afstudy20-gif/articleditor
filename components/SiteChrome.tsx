@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useLang, useTheme } from '@/lib/i18n/hooks';
 import { APP_NAME, APP_AUTHOR, APP_YEAR } from '@/lib/i18n';
+import { StickyNote } from './StickyNote';
 
 export function SiteHeader({
   showNav = true,
@@ -87,6 +88,7 @@ export function SiteHeader({
               {t('ext_update')}
             </button>
             <span className="w-px h-5 bg-border mx-1" />
+            <StickyNote />
             <select
               value={lang}
               onChange={(e) => setLang(e.target.value as 'tr' | 'en')}

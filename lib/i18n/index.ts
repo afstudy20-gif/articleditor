@@ -789,6 +789,8 @@ const tr: Dict = {
   theme_light: 'Aydınlık',
   theme_dark: 'Karanlık',
   lang_label: 'Dil',
+  note_sticky: '📝 Notlar',
+  note_placeholder: 'Buraya kopyalamak istediğiniz bölümleri yapıştırabilirsiniz. Notlarınız tarayıcıda saklanır...',
 };
 
 const en: Dict = {
@@ -1566,6 +1568,8 @@ const en: Dict = {
   theme_light: 'Light',
   theme_dark: 'Dark',
   lang_label: 'Language',
+  note_sticky: '📝 Notes',
+  note_placeholder: 'You can paste parts you want to copy here. Your notes are saved in the browser...',
 };
 
 const dicts: Record<Lang, Dict> = { tr, en };
