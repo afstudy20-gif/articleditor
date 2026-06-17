@@ -24,7 +24,8 @@ export async function enrichRef(ref: Ref, opts: EnrichOptions = {}): Promise<Ref
     enriched.doi = cleanDoi(enriched.doi);
   }
 
-  const MATCH_THRESHOLD = 0.45;
+  const MATCH_THRESHOLD = 0.65;
+  const CONSERVATIVE_THRESHOLD = 0.45;
 
   if (enriched.doi) {
     const fresh = await getCrossRefByDoi(enriched.doi, { mailto: opts.mailto }).catch(() => null);
@@ -59,6 +60,11 @@ export async function enrichRef(ref: Ref, opts: EnrichOptions = {}): Promise<Ref
       const best = pickBestMatch(ref, candidates);
       if (best && best.score >= MATCH_THRESHOLD) {
         enriched = mergeRef(enriched, best.candidate);
+      } else if (best && best.score >= CONSERVATIVE_THRESHOLD) {
+        // Low-confidence match: keep the original title/authors/year and only
+        // fill missing identifiers and metadata to avoid swapping the reference
+        // for an unrelated paper.
+        enriched = mergeRefConservative(enriched, best.candidate);
       } else {
         const pmids = await searchPubmed(query, {
           apiKey: opts.ncbiKey,
@@ -248,6 +254,26 @@ function mergeRef(original: Ref, fresh: Ref): Ref {
     pmid: fresh.pmid || original.pmid,
     url: fresh.url || original.url,
     abstract: fresh.abstract || original.abstract,
+    confidence: Math.max(original.confidence ?? 0, fresh.confidence ?? 0),
+  };
+}
+
+/** Merge only missing identifiers and secondary metadata.
+ *  Keeps the original title, authors, and year so a low-confidence match does
+ *  not replace the reference with an unrelated paper.
+ */
+function mergeRefConservative(original: Ref, fresh: Ref): Ref {
+  return {
+    ...original,
+    doi: original.doi || fresh.doi,
+    pmid: original.pmid || fresh.pmid,
+    url: original.url || fresh.url,
+    abstract: original.abstract || fresh.abstract,
+    containerTitle: original.containerTitle || fresh.containerTitle,
+    volume: original.volume || fresh.volume,
+    issue: original.issue || fresh.issue,
+    pages: original.pages || fresh.pages,
+    publisher: original.publisher || fresh.publisher,
     confidence: Math.max(original.confidence ?? 0, fresh.confidence ?? 0),
   };
 }
