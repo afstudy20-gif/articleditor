@@ -19,7 +19,7 @@ export async function GET(request: NextRequest): Promise<Response> {
       signal: AbortSignal.timeout(30_000),
       headers: {
         Accept: 'application/pdf',
-        'User-Agent': 'ArticleEditor/1.0 (+https://articleditor.drtr.uk)',
+        'User-Agent': 'ARTED/1.0 (+https://arted.drtr.uk)',
       },
     });
     if (!response.ok) {
@@ -65,7 +65,7 @@ async function resolvePmcPdf(pmcid: string): Promise<URL | null> {
   const ids = new URL('https://pmc.ncbi.nlm.nih.gov/tools/idconv/api/v1/articles/');
   ids.searchParams.set('ids', pmcid);
   ids.searchParams.set('format', 'json');
-  ids.searchParams.set('tool', 'article-editor');
+  ids.searchParams.set('tool', 'arted');
   ids.searchParams.set('email', 'adycovs@gmail.com');
   const idResponse = await fetch(ids, { signal: AbortSignal.timeout(10_000) });
   if (!idResponse.ok) return null;

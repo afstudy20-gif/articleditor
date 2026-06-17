@@ -42,12 +42,12 @@ function cleanDoi(doi: string): string {
 export async function getOpenAlexByDoi(doi: string, opts: OpenAlexOptions = {}): Promise<Partial<Ref> | null> {
   const cleaned = cleanDoi(doi);
   const params = new URLSearchParams();
-  const mailto = opts.mailto || 'polite@article-editor.com';
+  const mailto = opts.mailto || 'polite@arted.com';
   params.set('mailto', mailto);
   const url = `${OPENALEX_BASE}/works/doi:${encodeURIComponent(cleaned)}${params.toString() ? `?${params}` : ''}`;
   try {
     const res = await fetchWithTimeout(url, 10000, {
-      headers: { Accept: 'application/json', 'User-Agent': 'ArticleEditor/0.1' },
+      headers: { Accept: 'application/json', 'User-Agent': 'ARTED/0.1' },
     });
     if (!res.ok) return null;
     const work = (await res.json()) as OpenAlexWork;
@@ -64,7 +64,7 @@ export async function searchOpenAlex(query: string, opts: OpenAlexOptions = {}):
     search: query,
     per_page: '5',
   });
-  const mailto = opts.mailto || 'polite@article-editor.com';
+  const mailto = opts.mailto || 'polite@arted.com';
   params.set('mailto', mailto);
   const filters: string[] = [];
   if (opts.fromYear && opts.toYear) {

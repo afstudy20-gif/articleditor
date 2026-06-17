@@ -1987,7 +1987,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
     zip.file(
       'README.txt',
       [
-        `Article Editor LaTeX bundle`,
+        `ARTED LaTeX bundle`,
         `Style: ${style}`,
         `Engine: LuaLaTeX`,
         ``,

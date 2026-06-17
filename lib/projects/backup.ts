@@ -42,9 +42,9 @@ export function projectFilename(project: Project): string {
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '')
       .slice(0, 60) || 'proje';
-  return `article-editor-${slug}-${new Date().toISOString().slice(0, 10)}.json`;
+  return `arted-${slug}-${new Date().toISOString().slice(0, 10)}.json`;
 }
 
 export function backupFilename(): string {
-  return `article-editor-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  return `arted-backup-${new Date().toISOString().slice(0, 10)}.json`;
 }

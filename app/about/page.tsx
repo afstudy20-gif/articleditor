@@ -44,12 +44,12 @@ export default function AboutPage(): JSX.Element {
               <dt className="tool-label">Source</dt>
               <dd className="text-secondary mt-0.5">
                 <a
-                  href="https://github.com/afstudy20-gif/articleditor"
+                  href="https://github.com/afstudy20-gif/arted"
                   target="_blank"
                   rel="noopener"
                   className="text-teal hover:underline"
                 >
-                  github.com/afstudy20-gif/articleditor ↗
+                  github.com/afstudy20-gif/arted ↗
                 </a>
               </dd>
             </div>

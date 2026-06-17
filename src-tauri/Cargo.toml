@@ -1,15 +1,15 @@
 [package]
-name = "articleditor"
+name = "arted"
 version = "0.1.0"
-description = "Article Editor desktop shell"
+description = "ARTED desktop shell"
 authors = ["DrTR Tools"]
 license = ""
-repository = "https://github.com/afstudy20-gif/articleditor"
+repository = "https://github.com/afstudy20-gif/arted"
 edition = "2021"
 rust-version = "1.77.2"
 
 [lib]
-name = "articleditor_lib"
+name = "arted_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

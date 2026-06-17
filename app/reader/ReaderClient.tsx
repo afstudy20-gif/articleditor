@@ -168,7 +168,7 @@ export function ReaderClient() {
     <div className="flex h-screen flex-col bg-gray-50">
       <header className="flex items-center gap-3 border-b border-gray-200 bg-white px-4 py-2">
         <Link href="/" className="text-sm font-semibold text-teal-700 hover:underline">
-          ← Article Editor
+          ← ARTED
         </Link>
         <span className="text-sm font-medium text-gray-700">PDF Reader</span>
         <div className="ml-auto flex items-center gap-2">

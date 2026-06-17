@@ -21,7 +21,7 @@ export function isFsAccessSupported(): boolean {
 
 export async function pickWorkspaceRoot(): Promise<StoredRoot | null> {
   if (!isFsAccessSupported()) return null;
-  const handle = await window.showDirectoryPicker({ id: 'articleditor-workspace', mode: 'readwrite' });
+  const handle = await window.showDirectoryPicker({ id: 'arted-workspace', mode: 'readwrite' });
   const stored: StoredRoot = { handle, name: handle.name };
   await kvSet(ROOT_KEY, stored);
   return stored;
@@ -140,7 +140,7 @@ export function projectToDiskJson(project: Project): string {
   });
   const payload = {
     _schema: 1,
-    _exportedFrom: 'articleditor',
+    _exportedFrom: 'arted',
     ...project,
     refs,
   };

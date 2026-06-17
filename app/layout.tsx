@@ -6,7 +6,7 @@ import { LangProvider } from '@/lib/i18n/hooks';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Article Editor — Online Academic Writing & EndNote Converter',
+  title: 'ARTED — Online Academic Writing & EndNote Converter',
   description:
     'Online academic article editor. Convert plain text citations to active EndNote field codes, DOI/PubMed lookup, Vancouver/APA/AMA/IEEE styles, LaTeX export.',
   robots: 'index, follow',
@@ -22,7 +22,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Script id="theme-init" strategy="beforeInteractive">{`
           (function(){
             try {
-              var t = localStorage.getItem('article-editor-theme');
+              var t = localStorage.getItem('arted-theme');
               if (!t) {
                 t = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
               }

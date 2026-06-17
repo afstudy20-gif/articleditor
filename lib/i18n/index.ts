@@ -1,6 +1,6 @@
 export type Lang = 'tr' | 'en';
 
-export const APP_NAME = 'Article Editor';
+export const APP_NAME = 'ARTED';
 export const APP_VERSION = '1.0.0';
 export const APP_YEAR = '2026';
 export const APP_AUTHOR = 'Dr. Yusuf Hoşoğlu';
@@ -50,7 +50,7 @@ const tr: Dict = {
   // Privacy
   privacy_title: 'Gizlilik',
   privacy_intro:
-    'Article Editor tarayıcıda çalışan tek-kullanıcı bir uygulamadır. Verileriniz cihazınızdadır.',
+    'ARTED tarayıcıda çalışan tek-kullanıcı bir uygulamadır. Verileriniz cihazınızdadır.',
   privacy_local_title: 'Tüm veriler yerel',
   privacy_local_desc:
     'Projeler, makale metinleri ve kaynakça kütüphaneniz tarayıcınızın IndexedDB veritabanında saklanır. Yalnızca açıkça başlattığınız çevrim içi AI, AI-yazım veya benzerlik denetimlerinde ilgili metin sağlayıcıya gönderilir.',
@@ -829,7 +829,7 @@ const en: Dict = {
 
   privacy_title: 'Privacy',
   privacy_intro:
-    'Article Editor is a single-user browser application. Your data stays on your device.',
+    'ARTED is a single-user browser application. Your data stays on your device.',
   privacy_local_title: 'All data local',
   privacy_local_desc:
     'Projects, article text and your reference library are stored in your browser’s IndexedDB. Text is sent to a provider only when you explicitly start an online AI, AI-writing, or similarity check.',
@@ -1572,7 +1572,7 @@ const dicts: Record<Lang, Dict> = { tr, en };
 
 export function detectLang(): Lang {
   if (typeof window === 'undefined') return 'tr';
-  const stored = localStorage.getItem('article-editor-lang');
+  const stored = localStorage.getItem('arted-lang');
   if (stored === 'tr' || stored === 'en') return stored;
   const nav = (navigator.language || 'en').toLowerCase();
   return nav.startsWith('tr') ? 'tr' : 'en';
@@ -1580,7 +1580,7 @@ export function detectLang(): Lang {
 
 export function setLang(lang: Lang): void {
   if (typeof window === 'undefined') return;
-  localStorage.setItem('article-editor-lang', lang);
+  localStorage.setItem('arted-lang', lang);
 }
 
 export function t(key: keyof typeof tr, lang: Lang = 'tr'): string {

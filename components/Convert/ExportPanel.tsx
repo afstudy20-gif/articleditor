@@ -27,7 +27,7 @@ export function ExportPanel({ bodyText, refs, markers }: Props) {
       const blob = await buildDocx({ bodyText, refs, markers, mode, style, lineNumbers });
       triggerDownload(
         blob,
-        `article-editor-${style}-${mode === 'active' ? 'aktif' : 'placeholder'}.docx`,
+        `arted-${style}-${mode === 'active' ? 'aktif' : 'placeholder'}.docx`,
       );
     } finally {
       setBusy(false);
@@ -37,7 +37,7 @@ export function ExportPanel({ bodyText, refs, markers }: Props) {
   function downloadRis() {
     const text = refsToRis(refs);
     const blob = new Blob([text], { type: 'application/x-research-info-systems' });
-    triggerDownload(blob, 'article-editor.ris');
+    triggerDownload(blob, 'arted.ris');
   }
 
   return (

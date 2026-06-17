@@ -1,6 +1,6 @@
 {
-  "name": "Article Editor",
-  "short_name": "ArticleEditor",
+  "name": "ARTED",
+  "short_name": "ARTED",
   "description": "Online academic writing, PDF reader & EndNote converter",
   "start_url": "/",
   "display": "standalone",

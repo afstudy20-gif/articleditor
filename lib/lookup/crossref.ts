@@ -52,7 +52,7 @@ export async function searchCrossRef(
   if (filters.length > 0) params.set('filter', filters.join(','));
   const url = `${CROSSREF_BASE}/works?${params.toString()}`;
   const res = await fetchWithTimeout(url, 12000, {
-    headers: { Accept: 'application/json', 'User-Agent': 'ArticleEditor/0.1 (mailto:' + (opts.mailto ?? 'noreply@article-editor') + ')' },
+    headers: { Accept: 'application/json', 'User-Agent': 'ARTED/0.1 (mailto:' + (opts.mailto ?? 'noreply@arted') + ')' },
   });
   if (!res.ok) throw new Error(`CrossRef search failed: ${res.status}`);
   const json = (await res.json()) as { message?: { items?: CrossRefWork[] } };

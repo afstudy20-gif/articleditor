@@ -1,11 +1,11 @@
-# Article Editor
+# ARTED
 
 Online academic writing & EndNote converter — by Dr. Yusuf Hoşoğlu, 2026.
 
 Browser-based editor that converts plain-text numbered citations (`[1]`, `[2]`…) in Word documents into **active EndNote field codes** (`ADDIN EN.CITE`). Open the output `.docx` in Word + EndNote CWYW and citations are live — insert a new ref and numbers re-number automatically.
 
-🌐 Live: [articleditor.drtr.uk](https://articleditor.drtr.uk/) (planned)
-📦 Repo: [github.com/afstudy20-gif/articleditor](https://github.com/afstudy20-gif/articleditor)
+🌐 Live: [arted.drtr.uk](https://arted.drtr.uk/) (planned)
+📦 Repo: [github.com/afstudy20-gif/arted](https://github.com/afstudy20-gif/arted)
 
 ## Features
 
@@ -39,14 +39,14 @@ npm run build
 ## Docker
 
 ```bash
-docker build -t article-editor .
-docker run -p 3000:3000 article-editor
+docker build -t arted .
+docker run -p 3000:3000 arted
 ```
 
 ## Coolify deployment
 
 1. **Coolify panel** → New Resource → **Public Repository**
-2. Repository: `https://github.com/afstudy20-gif/articleditor`
+2. Repository: `https://github.com/afstudy20-gif/arted`
 3. Branch: `main`
 4. Build pack: **Dockerfile** (auto-detected)
 5. Port: `3000`
@@ -64,10 +64,10 @@ docker run -p 3000:3000 article-editor
    | `COPYLEAKS_EMAIL` | Copyleaks account email for AI-writing and similarity checks |
    | `COPYLEAKS_API_KEY` | Copyleaks server API key |
    | `COPYLEAKS_WEBHOOK_SECRET` | Long random secret used to authenticate plagiarism callbacks |
-   | `COPYLEAKS_WEBHOOK_BASE_URL` | Public HTTPS app origin, e.g. `https://articleditor.drtr.uk` |
+   | `COPYLEAKS_WEBHOOK_BASE_URL` | Public HTTPS app origin, e.g. `https://arted.drtr.uk` |
    | `COPYLEAKS_SANDBOX` | Set to `true` while testing with Copyleaks mock results |
 
-8. **Domain** — point your subdomain (e.g. `articleditor.drtr.uk`) at Coolify
+8. **Domain** — point your subdomain (e.g. `arted.drtr.uk`) at Coolify
 9. **Persistent volume** — none required (all data is client-side IndexedDB)
 10. Deploy. The container exposes `:3000`, healthcheck `/api/health` returns 200 JSON.
 
@@ -75,7 +75,7 @@ docker run -p 3000:3000 article-editor
 
 ```yaml
 services:
-  article-editor:
+  arted:
     build: .
     ports:
       - "3000:3000"
@@ -99,7 +99,7 @@ See `/privacy` in the running app for full details.
 ## Project structure
 
 ```
-articleditor/
+arted/
 ├── app/                        # Next.js App Router (UI + API routes)
 │   ├── page.tsx                # Landing
 │   ├── about/, privacy/, tutorial/

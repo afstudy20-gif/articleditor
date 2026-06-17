@@ -58,8 +58,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: v__VERSION__
-          releaseName: 'Article Editor v__VERSION__'
-          releaseBody: 'Cross-platform desktop builds of Article Editor. Download the installer for your OS below.'
+          releaseName: 'ARTED v__VERSION__'
+          releaseBody: 'Cross-platform desktop builds of ARTED. Download the installer for your OS below.'
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}

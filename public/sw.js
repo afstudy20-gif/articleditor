@@ -1,6 +1,6 @@
-// Article Editor Service Worker — app shell offline support.
+// ARTED Service Worker — app shell offline support.
 const VERSION = 'v2';
-const CACHE = `article-editor-${VERSION}`;
+const CACHE = `arted-${VERSION}`;
 
 self.addEventListener('install', (e) => {
   e.waitUntil(

@@ -78,7 +78,7 @@ export type Theme = 'light' | 'dark';
 
 export function detectTheme(): Theme {
   if (typeof window === 'undefined') return 'light';
-  const stored = localStorage.getItem('article-editor-theme');
+  const stored = localStorage.getItem('arted-theme');
   if (stored === 'light' || stored === 'dark') return stored;
   if (window.matchMedia?.('(prefers-color-scheme: dark)').matches) return 'dark';
   return 'light';
@@ -86,7 +86,7 @@ export function detectTheme(): Theme {
 
 export function setTheme(theme: Theme): void {
   if (typeof window === 'undefined') return;
-  localStorage.setItem('article-editor-theme', theme);
+  localStorage.setItem('arted-theme', theme);
   document.documentElement.setAttribute('data-theme', theme);
 }
 

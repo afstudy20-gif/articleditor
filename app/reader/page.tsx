@@ -1,7 +1,7 @@
 import { ReaderClient } from './ReaderClient';
 
 export const metadata = {
-  title: 'PDF Reader · Article Editor',
+  title: 'PDF Reader · ARTED',
 };
 
 export default function ReaderPage() {

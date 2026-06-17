@@ -128,7 +128,7 @@ export function SiteFooter(): JSX.Element {
             {t('nav_tutorial')}
           </Link>
           <span>·</span>
-          <a href="https://github.com/afstudy20-gif/articleditor" target="_blank" rel="noopener" className="hover:text-teal">
+          <a href="https://github.com/afstudy20-gif/arted" target="_blank" rel="noopener" className="hover:text-teal">
             GitHub
           </a>
         </div>
