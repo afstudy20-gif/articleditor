@@ -49,8 +49,8 @@ export function StickyNote(): JSX.Element {
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className={`text-xs border border-border rounded px-2 py-1 transition-colors ${
-          isOpen ? 'bg-teal-bg text-teal font-semibold' : 'bg-surface text-primary hover:bg-slate-100'
+        className={`text-[10px] border border-border/85 rounded px-1.5 py-0.5 transition-colors font-medium ${
+          isOpen ? 'bg-teal-bg text-teal font-semibold border-teal/30' : 'bg-white text-secondary hover:text-primary hover:bg-slate-50'
         }`}
         title={t('note_sticky')}
       >
@@ -58,7 +58,7 @@ export function StickyNote(): JSX.Element {
       </button>
 
       {isOpen && (
-        <div className="absolute top-full right-0 mt-2 w-72 sm:w-96 h-80 bg-surface border border-border shadow-xl rounded-lg flex flex-col z-[100] animate-in fade-in slide-in-from-top-2">
+        <div className="absolute top-full left-0 mt-1.5 w-72 sm:w-96 h-80 bg-surface border border-border shadow-xl rounded-lg flex flex-col z-[100] animate-in fade-in slide-in-from-top-2">
           <div className="flex justify-between items-center px-3 py-2 border-b border-border bg-slate-50/50 rounded-t-lg">
             <span className="text-xs font-bold text-primary">{t('note_sticky')}</span>
             <button

@@ -75,6 +75,7 @@ import { LettersPanel } from '@/components/Letters/LettersPanel';
 import { PhrasebankPanel } from '@/components/Phrasebank/PhrasebankPanel';
 import { SupplementaryPanel } from '@/components/Supplementary/SupplementaryPanel';
 import { AbbreviationsPanel } from '@/components/Abbreviations/AbbreviationsPanel';
+import { StickyNote } from '@/components/StickyNote';
 import { useTabSync } from '@/lib/hooks/useTabSync';
 import { useIsDesktop } from '@/lib/hooks/useIsDesktop';
 import { computeWritingStats } from '@/lib/stats/writing-stats';
@@ -2280,22 +2281,25 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
       <header className={`border-b border-border bg-surface sticky top-0 z-50 ${focusMode ? 'hidden' : ''}`}>
         <div className="w-full px-4 sm:px-6 py-3 flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-3 flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap shrink-0 text-xs mr-2 border border-border px-2 py-1 rounded-lg bg-white shadow-xs">
-              <button
-                onClick={onExitToProjects || onExit}
-                className="text-secondary hover:text-primary font-bold flex items-center gap-1 transition"
-                title="Ana Proje Listesi"
-              >
-                🏠 {lang === 'tr' ? 'Projelerim' : 'Projects'}
-              </button>
-              <span className="text-muted/30">|</span>
-              <button
-                onClick={onExit}
-                className="text-secondary hover:text-primary font-bold flex items-center gap-1 transition"
-                title={lang === 'tr' ? 'Proje Çalışma Alanı' : 'Project Workspace'}
-              >
-                📁 {t('ws_title') || (lang === 'tr' ? 'Çalışma Alanı' : 'Workspace')}
-              </button>
+            <div className="flex flex-col gap-1 items-start shrink-0 mr-2">
+              <div className="flex items-center gap-2 flex-wrap text-xs border border-border px-2 py-1 rounded-lg bg-white shadow-xs">
+                <button
+                  onClick={onExitToProjects || onExit}
+                  className="text-secondary hover:text-primary font-bold flex items-center gap-1 transition"
+                  title="Ana Proje Listesi"
+                >
+                  🏠 {lang === 'tr' ? 'Projelerim' : 'Projects'}
+                </button>
+                <span className="text-muted/30">|</span>
+                <button
+                  onClick={onExit}
+                  className="text-secondary hover:text-primary font-bold flex items-center gap-1 transition"
+                  title={lang === 'tr' ? 'Proje Çalışma Alanı' : 'Project Workspace'}
+                >
+                  📁 {t('ws_title') || (lang === 'tr' ? 'Çalışma Alanı' : 'Workspace')}
+                </button>
+              </div>
+              <StickyNote />
             </div>
             <input
               value={title}
