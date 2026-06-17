@@ -921,6 +921,9 @@ function ImageUrlButton({ editor, t }: { editor: any; t: (k: string) => string }
 }
 
 const TEXT_COLORS: Array<{ name: string; value: string }> = [
+  { name: 'Black', value: '#000000' },
+  { name: 'Charcoal', value: '#334155' },
+  { name: 'Gray', value: '#6b7280' },
   { name: 'Red', value: '#dc2626' },
   { name: 'Orange', value: '#ea580c' },
   { name: 'Amber', value: '#d97706' },
@@ -930,7 +933,6 @@ const TEXT_COLORS: Array<{ name: string; value: string }> = [
   { name: 'Indigo', value: '#4f46e5' },
   { name: 'Purple', value: '#7c3aed' },
   { name: 'Pink', value: '#db2777' },
-  { name: 'Gray', value: '#6b7280' },
 ];
 
 const HIGHLIGHT_COLORS: Array<{ name: string; value: string }> = [
@@ -960,8 +962,8 @@ function ColorPicker({ editor, t }: { editor: any; t: (k: string) => string }): 
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute top-full left-0 mt-1 z-20 bg-white border border-border rounded-lg shadow-lg p-2 w-44">
-            <div className="grid grid-cols-5 gap-1.5">
+          <div className="absolute top-full left-0 mt-1 z-20 bg-white border border-border rounded-lg shadow-lg p-2 w-48">
+            <div className="grid grid-cols-6 gap-1.5">
               {TEXT_COLORS.map((c) => (
                 <button
                   key={c.value}

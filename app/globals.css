@@ -255,6 +255,7 @@ body {
   font-size: 12pt !important;
   line-height: 1.5 !important;
   text-align: justify !important;
+  color: #000000;
 }
 
 .ProseMirror h1,
