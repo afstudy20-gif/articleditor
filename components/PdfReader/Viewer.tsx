@@ -78,12 +78,20 @@ export function PdfViewer({ file, onDocLoaded, canAddNote = false, onAddNote }: 
       setLoading(true);
       setError(null);
       try {
-        const source =
-          typeof file === 'string'
-            ? { url: `/api/pdf-proxy?url=${encodeURIComponent(file)}` }
-            : { data: file instanceof File ? await file.arrayBuffer() : file };
-        const task = pdfjsLib.getDocument(source);
-        pdfDoc = await task.promise;
+        if (typeof file === 'string') {
+          try {
+            const task = pdfjsLib.getDocument({ url: file });
+            pdfDoc = await task.promise;
+          } catch (e: unknown) {
+            console.warn('Direct PDF fetch failed, falling back to proxy:', e);
+            const task = pdfjsLib.getDocument({ url: `/api/pdf-proxy?url=${encodeURIComponent(file)}` });
+            pdfDoc = await task.promise;
+          }
+        } else {
+          const task = pdfjsLib.getDocument({ data: file instanceof File ? await file.arrayBuffer() : file });
+          pdfDoc = await task.promise;
+        }
+        
         if (cancelled) return;
         setDoc(pdfDoc);
         setPageCount(pdfDoc.numPages);

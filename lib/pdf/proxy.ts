@@ -28,3 +28,45 @@ export function extractPmcid(url: URL): string | null {
   if (url.hostname.toLowerCase() !== 'pmc.ncbi.nlm.nih.gov') return null;
   return url.pathname.match(/\/articles\/(PMC\d+)(?:\/|$)/i)?.[1]?.toUpperCase() ?? null;
 }
+
+const HTTP_UPGRADE_HOSTS = new Set(['www.scielo.br', 'scielo.br']);
+
+export function looksLikePdfLink(raw: string): boolean {
+  return (
+    /\.pdf(?:$|[?#])/i.test(raw) ||
+    /sci_pdf|format=pdf|pdfdirect|\/pdf(?:\/|$|[?#])/i.test(raw)
+  );
+}
+
+/** Accept HTTPS directly, or upgrade known HTTP-only publisher links. */
+export function coercePdfUrl(raw: string | null | undefined): URL | null {
+  const direct = sanitizePdfUrl(raw);
+  if (direct) return direct;
+  if (!raw) return null;
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== 'http:') return null;
+    if (!HTTP_UPGRADE_HOSTS.has(url.hostname.toLowerCase())) return null;
+    url.protocol = 'https:';
+    return sanitizePdfUrl(url.href);
+  } catch {
+    return null;
+  }
+}
+
+export function pickCrossrefPdfUrl(
+  links: Array<{ URL?: string; 'content-type'?: string }> | undefined,
+): URL | null {
+  if (!links?.length) return null;
+  for (const link of links) {
+    const raw = link.URL?.trim();
+    if (!raw || !looksLikePdfLink(raw)) continue;
+    const contentType = (link['content-type'] || '').toLowerCase();
+    if (contentType && contentType !== 'application/pdf' && contentType !== 'unspecified') {
+      continue;
+    }
+    const coerced = coercePdfUrl(raw);
+    if (coerced) return coerced;
+  }
+  return null;
+}

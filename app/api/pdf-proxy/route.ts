@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { extractPmcid, sanitizePdfUrl } from '@/lib/pdf/proxy';
+import { extractPmcid, pickCrossrefPdfUrl, sanitizePdfUrl } from '@/lib/pdf/proxy';
 
 const MAX_PDF_BYTES = 50 * 1024 * 1024;
 
@@ -18,8 +18,8 @@ export async function GET(request: NextRequest): Promise<Response> {
       redirect: 'follow',
       signal: AbortSignal.timeout(30_000),
       headers: {
-        Accept: 'application/pdf',
-        'User-Agent': 'ARTED/1.0 (+https://arted.drtr.uk)',
+        Accept: 'application/pdf,application/octet-stream;q=0.9,*/*;q=0.1',
+        'User-Agent': 'Mozilla/5.0 (compatible; ARTED/1.0; +https://arted.drtr.uk)',
       },
     });
     if (!response.ok) {
@@ -81,7 +81,6 @@ async function resolvePmcPdf(pmcid: string): Promise<URL | null> {
   const data = await crossref.json() as {
     message?: { link?: Array<{ URL?: string; 'content-type'?: string }> };
   };
-  const pdf = data.message?.link?.find((link) => link['content-type'] === 'application/pdf')?.URL;
-  return sanitizePdfUrl(pdf);
+  return pickCrossrefPdfUrl(data.message?.link);
 }
 
