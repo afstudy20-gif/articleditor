@@ -1553,13 +1553,12 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
               </button>
             </div>
 
-            {/* Template Selectors */}
             <div className="flex gap-1 px-4 py-2 bg-slate-50 border-b border-border overflow-x-auto scrollbar-none whitespace-nowrap">
               {(['cover', 'title-page', 'response', 'contrib', 'coi', 'copyright', 'custom', 'author-pool', 'custom-templates'] as WizardTab[]).map((type) => (
                 <button
                   key={type}
                   onClick={() => resetWizardFields(type)}
-                  className={`px-3 py-1.5 text-xs rounded-lg font-semibold shrink-0 transition ${
+                  className={`px-3 py-1.5 text-xs rounded-lg font-semibold shrink-0 whitespace-nowrap transition ${
                     wizardType === type ? 'bg-violet-600 text-white shadow-sm' : 'text-secondary hover:bg-slate-100'
                   }`}
                 >
@@ -1643,46 +1642,7 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
               {wizardType === 'cover' && (
                 <div className="space-y-4 pt-2 border-t border-slate-100">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="flex flex-col gap-1">
-                      <div className="flex justify-between items-center w-full">
-                        <label className={labelCls}>{tLocal('letters_corresponding')}</label>
-                        <div className="flex items-center gap-2">
-                          {justSavedAuthor ? (
-                            <span className="text-[10px] text-emerald-600 font-semibold animate-pulse flex items-center gap-0.5">
-                              ✅ {tLocal('letters_saved_success')}
-                            </span>
-                          ) : (
-                            correspondingAuthor.trim() && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  saveAuthorToPool({
-                                    name: correspondingAuthor,
-                                    email: correspondingEmail,
-                                    orcid: orcid,
-                                    address: correspondingAddress,
-                                  });
-                                  setJustSavedAuthor(true);
-                                  setTimeout(() => setJustSavedAuthor(false), 2000);
-                                }}
-                                className="text-[10px] text-emerald-600 hover:text-emerald-700 font-semibold flex items-center gap-0.5 transition"
-                                title={tLocal('letters_save_pool')}
-                              >
-                                💾 {tLocal('letters_save_pool')}
-                              </button>
-                            )
-                          )}
-                          {renderAuthorPoolSelector()}
-                        </div>
-                      </div>
-                      <input
-                        className={inputCls}
-                        placeholder={lang === 'tr' ? 'Dr. Ahmet Yılmaz' : 'Dr. Jane Smith'}
-                        value={correspondingAuthor}
-                        onChange={(e) => setCorrespondingAuthor(e.target.value)}
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1">
+                    <div className="flex flex-col gap-1 sm:col-span-2">
                       <label className={labelCls}>{tLocal('letters_ms_type')}</label>
                       <input
                         className={inputCls}
@@ -1709,79 +1669,13 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
               {wizardType === 'title-page' && (
                 <div className="space-y-4 pt-2 border-t border-slate-100">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="flex flex-col gap-1">
+                    <div className="flex flex-col gap-1 sm:col-span-2">
                       <label className={labelCls}>{tLocal('letters_running_title')}</label>
                       <input
                         className={inputCls}
                         placeholder="e.g. Deep Learning in Healthcare"
                         value={runningTitle}
                         onChange={(e) => setRunningTitle(e.target.value)}
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <div className="flex justify-between items-center w-full">
-                        <label className={labelCls}>{tLocal('letters_corresponding')}</label>
-                        <div className="flex items-center gap-2">
-                          {justSavedAuthor ? (
-                            <span className="text-[10px] text-emerald-600 font-semibold animate-pulse flex items-center gap-0.5">
-                              ✅ {tLocal('letters_saved_success')}
-                            </span>
-                          ) : (
-                            correspondingAuthor.trim() && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  saveAuthorToPool({
-                                    name: correspondingAuthor,
-                                    email: correspondingEmail,
-                                    orcid: orcid,
-                                    address: correspondingAddress,
-                                  });
-                                  setJustSavedAuthor(true);
-                                  setTimeout(() => setJustSavedAuthor(false), 2000);
-                                }}
-                                className="text-[10px] text-emerald-600 hover:text-emerald-700 font-semibold flex items-center gap-0.5 transition"
-                                title={tLocal('letters_save_pool')}
-                              >
-                                💾 {tLocal('letters_save_pool')}
-                              </button>
-                            )
-                          )}
-                          {renderAuthorPoolSelector()}
-                        </div>
-                      </div>
-                      <input
-                        className={inputCls}
-                        placeholder={lang === 'tr' ? 'Dr. Ahmet Yılmaz' : 'Dr. Jane Smith'}
-                        value={correspondingAuthor}
-                        onChange={(e) => setCorrespondingAuthor(e.target.value)}
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label className={labelCls}>{tLocal('letters_corresponding_email')}</label>
-                      <input
-                        className={inputCls}
-                        placeholder="ahmet@university.edu"
-                        value={correspondingEmail}
-                        onChange={(e) => setCorrespondingEmail(e.target.value)}
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label className={labelCls}>{tLocal('letters_orcid')}</label>
-                      <input
-                        className={inputCls}
-                        placeholder="0000-0002-XXXX-XXXX"
-                        value={orcid}
-                        onChange={(e) => setOrcid(e.target.value)}
-                      />
-                    </div>
-                    <div className="sm:col-span-2 flex flex-col gap-1">
-                      <label className={labelCls}>{tLocal('letters_corresponding_address')}</label>
-                      <input
-                        className={inputCls}
-                        placeholder="Department of Computer Science, University of X, City, Country"
-                        value={correspondingAddress}
-                        onChange={(e) => setCorrespondingAddress(e.target.value)}
                       />
                     </div>
                     {renderAuthorsManager()}
@@ -1864,18 +1758,7 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
                   {wizardType === 'copyright' && (
                     <>
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <div className="flex flex-col gap-1">
-                          <label className={labelCls}>
-                            {wizardLang === 'tr' ? 'Sorumlu Yazar' : 'Corresponding Author'}
-                          </label>
-                          <input
-                            className={inputCls}
-                            value={correspondingAuthor}
-                            onChange={(e) => setCorrespondingAuthor(e.target.value)}
-                            placeholder={wizardLang === 'tr' ? 'Ad Soyad' : 'Full name'}
-                          />
-                        </div>
-                        <div className="flex flex-col gap-1">
+                        <div className="flex flex-col gap-1 sm:col-span-2">
                           <label className={labelCls}>{wizardLang === 'tr' ? 'Tarih' : 'Date'}</label>
                           <input
                             type="date"
