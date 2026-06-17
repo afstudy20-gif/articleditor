@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import { PdfViewer, type CapturedNote } from '@/components/PdfReader/Viewer';
+import { BuiltInPdfViewer } from '@/components/PdfReader/BuiltInPdfViewer';
 import { CitationPanel } from '@/components/PdfReader/CitationPanel';
 import { ProjectPicker } from '@/components/PdfReader/ProjectPicker';
 import { NotesPanel } from '@/components/PdfReader/NotesPanel';
@@ -40,6 +41,7 @@ export function ReaderClient() {
   const [toast, setToast] = useState<string | null>(null);
   const [notes, setNotes] = useState<ProjectNote[]>([]);
   const [tab, setTab] = useState<'citations' | 'notes'>('citations');
+  const [useArtedViewer, setUseArtedViewer] = useState(false);
   const printFrameRef = useRef<HTMLIFrameElement | null>(null);
 
   useEffect(() => {
@@ -112,7 +114,9 @@ export function ReaderClient() {
   }, []);
 
   useEffect(() => {
-    const url = new URL(window.location.href).searchParams.get('url');
+    const params = new URL(window.location.href).searchParams;
+    const url = params.get('url');
+    setUseArtedViewer(params.get('viewer') === 'arted');
     if (!url) return;
     try {
       const parsed = new URL(url);
@@ -134,11 +138,16 @@ export function ReaderClient() {
       setSource(parsed.href);
       const next = new URL(window.location.href);
       next.searchParams.set('url', parsed.href);
+      if (useArtedViewer) {
+        next.searchParams.set('viewer', 'arted');
+      } else {
+        next.searchParams.delete('viewer');
+      }
       window.history.replaceState(null, '', next);
     } catch {
       setToast('Enter a valid http(s) PDF URL');
     }
-  }, [urlInput]);
+  }, [urlInput, useArtedViewer]);
 
   const handleAddRef = useCallback(
     async (ref: Ref) => {
@@ -286,15 +295,19 @@ export function ReaderClient() {
         </div>
       </header>
 
-      <main className="grid flex-1 grid-cols-[1fr_360px] overflow-hidden">
+      <main className={`grid flex-1 overflow-hidden ${useArtedViewer ? 'grid-cols-[1fr_360px]' : 'grid-cols-1'}`}>
         <section className="overflow-hidden">
           {source ? (
-            <PdfViewer
-              file={source}
-              onDocLoaded={setDoc}
-              canAddNote={!!projectId}
-              onAddNote={handleAddNote}
-            />
+            useArtedViewer ? (
+              <PdfViewer
+                file={source}
+                onDocLoaded={setDoc}
+                canAddNote={!!projectId}
+                onAddNote={handleAddNote}
+              />
+            ) : (
+              <BuiltInPdfViewer source={source} />
+            )
           ) : (
             <div className="flex h-full items-center justify-center p-10 text-center text-gray-400">
               <div>
@@ -304,30 +317,32 @@ export function ReaderClient() {
             </div>
           )}
         </section>
-        <aside className="flex flex-col overflow-hidden border-l border-gray-200">
-          <div className="flex border-b border-gray-200 text-xs font-medium">
-            <button
-              onClick={() => setTab('citations')}
-              className={`flex-1 px-3 py-2 ${tab === 'citations' ? 'border-b-2 border-teal-700 text-teal-700' : 'text-gray-500 hover:bg-gray-50'}`}
-            >
-              Atıflar
-            </button>
-            <button
-              onClick={() => setTab('notes')}
-              className={`flex-1 px-3 py-2 ${tab === 'notes' ? 'border-b-2 border-teal-700 text-teal-700' : 'text-gray-500 hover:bg-gray-50'}`}
-            >
-              Notlar{notes.length > 0 ? ` (${notes.length})` : ''}
-            </button>
-          </div>
-          <div className="flex-1 overflow-auto">
-            {tab === 'citations' ? (
-              <CitationPanel doc={doc} onAddRef={handleAddRef} />
-            ) : (
-              <NotesPanel notes={notes} hasProject={!!projectId} onDelete={handleDeleteNote} />
-            )}
-          </div>
-          <StorageBar projectId={projectId} onToast={flashToast} />
-        </aside>
+        {useArtedViewer && (
+          <aside className="flex flex-col overflow-hidden border-l border-gray-200">
+            <div className="flex border-b border-gray-200 text-xs font-medium">
+              <button
+                onClick={() => setTab('citations')}
+                className={`flex-1 px-3 py-2 ${tab === 'citations' ? 'border-b-2 border-teal-700 text-teal-700' : 'text-gray-500 hover:bg-gray-50'}`}
+              >
+                Atıflar
+              </button>
+              <button
+                onClick={() => setTab('notes')}
+                className={`flex-1 px-3 py-2 ${tab === 'notes' ? 'border-b-2 border-teal-700 text-teal-700' : 'text-gray-500 hover:bg-gray-50'}`}
+              >
+                Notlar{notes.length > 0 ? ` (${notes.length})` : ''}
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto">
+              {tab === 'citations' ? (
+                <CitationPanel doc={doc} onAddRef={handleAddRef} />
+              ) : (
+                <NotesPanel notes={notes} hasProject={!!projectId} onDelete={handleDeleteNote} />
+              )}
+            </div>
+            <StorageBar projectId={projectId} onToast={flashToast} />
+          </aside>
+        )}
       </main>
 
       {toast && (
