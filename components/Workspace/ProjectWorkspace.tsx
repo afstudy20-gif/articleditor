@@ -5,6 +5,7 @@ import type { Project, ProjectDocument, Ref } from '@/store/types';
 import { saveProject } from '@/store/db';
 import { newId } from '@/lib/id';
 import { useLang } from '@/lib/i18n/hooks';
+import { StickyNote } from '@/components/StickyNote';
 import { aiHeaders } from '@/lib/ai/user-keys';
 import { buildRichDocx } from '@/lib/docx/build-rich';
 import { docxFilename, plainTextToTiptapDoc } from '@/lib/docx/plain-text';
@@ -1268,9 +1269,12 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
             </p>
           </div>
         </div>
-        <span className="text-[10px] tracking-wider uppercase font-bold text-teal bg-teal-bg/60 px-2.5 py-1 rounded-full">
-          {t('ws_title')}
-        </span>
+        <div className="flex items-center gap-3">
+          <StickyNote />
+          <span className="text-[10px] tracking-wider uppercase font-bold text-teal bg-teal-bg/60 px-2.5 py-1 rounded-full">
+            {t('ws_title')}
+          </span>
+        </div>
       </header>
 
       {view === 'dashboard' ? (
