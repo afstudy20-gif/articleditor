@@ -521,7 +521,7 @@ export function ArticleEditor({
                     type="button"
                     onClick={onStyleEdit}
                     className="p-1 text-xs border border-border/70 rounded hover:bg-slate-100 hover:text-primary text-secondary transition-colors leading-none"
-                    title={t('style_edit') || 'Stili Düzenle'}
+                    title={t('style_edit') || (lang === 'tr' ? 'Atıf Stili Editörü' : 'Citation Style Editor')}
                   >
                     🎨
                   </button>

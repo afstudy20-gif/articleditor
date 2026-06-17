@@ -731,7 +731,7 @@ const tr: Dict = {
   hdr_settings: 'Ayar',
   // Custom citation styles
   style_new: 'Yeni özel stil',
-  style_edit: 'Stili düzenle',
+  style_edit: 'Atıf Stili Editörü',
   style_title: 'Atıf Stili Düzenleyici',
   style_name: 'Stil adı',
   style_preset: 'Hazır şablon',
@@ -1511,7 +1511,7 @@ const en: Dict = {
   hdr_settings: 'Settings',
   // Custom citation styles
   style_new: 'New custom style',
-  style_edit: 'Edit style',
+  style_edit: 'Citation Style Editor',
   style_title: 'Citation Style Editor',
   style_name: 'Style name',
   style_preset: 'Preset',
