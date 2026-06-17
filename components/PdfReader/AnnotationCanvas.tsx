@@ -107,6 +107,15 @@ export function AnnotationCanvas({
       }) as FabricCanvas;
       fcRef.current = fc;
 
+      // Fabric v6 no longer auto-creates the free-drawing brush (it was created
+      // lazily in v5). Without this the pen / highlight tools silently draw
+      // nothing — isDrawingMode is on but there is no brush. Seed one here and
+      // apply the current tool settings.
+      const brush = new fabric.PencilBrush(fc);
+      brush.color = colorRef.current;
+      brush.width = widthRef.current;
+      fc.freeDrawingBrush = brush;
+
       const img = await fabric.FabricImage.fromURL(backgroundUrl, { crossOrigin: 'anonymous' });
       (fc as unknown as { backgroundImage: unknown }).backgroundImage = img;
       fc.renderAll();
