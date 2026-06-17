@@ -23,6 +23,7 @@ import { ManuscriptTable, ManuscriptTableView } from './extensions/manuscript-ta
 import { AcademicReviewDecorations } from './extensions/academic-review-plugin';
 import type { Ref } from '@/store/types';
 import { useLang } from '@/lib/i18n/hooks';
+import { isNumericStyle } from '@/lib/refs/styles';
 import { getNextNumbering, isNumberingPrefix } from '@/lib/editor/numbering';
 import { computeWritingStats } from '@/lib/stats/writing-stats';
 import type { WritingStats } from '@/lib/stats/types';
@@ -47,6 +48,12 @@ type Props = {
   aiDisabled?: boolean;
   fontFamily?: string;
   onFontFamilyChange?: (font: string) => void;
+  styleId?: string;
+  styleOptions?: Array<{ id: string; label: string; custom: boolean }>;
+  onStyleChange?: (styleId: string) => void;
+  onStyleEdit?: () => void;
+  onFindReplace?: () => void;
+  onRenumberCitations?: () => void;
 };
 
 const SECTION_PRESETS: Array<{ label: string; level: 1 | 2 | 3 }> = [
@@ -83,6 +90,36 @@ function computeRefOrder(json: any, refIds: string[]): string[] {
   return seen;
 }
 
+function getStyleHint(styleId: string, lang: string): string {
+  const isTr = lang === 'tr';
+  switch (styleId) {
+    case 'vancouver':
+      return isTr ? '[1, 2] (Sayısal)' : '[1, 2] (Numeric)';
+    case 'sage-vancouver':
+      return isTr ? "¹'² (Süper skript)" : "¹'² (Superscript)";
+    case 'apa':
+      return isTr ? '(Smith, 2020) (Yazar-Yıl)' : '(Smith, 2020) (Author-Year)';
+    case 'ama':
+      return isTr ? "¹'² (Süper skript)" : "¹'² (Superscript)";
+    case 'ieee':
+      return isTr ? '[1] (Köşeli Sayısal)' : '[1] (Bracketed Numeric)';
+    case 'mdpi-acs':
+      return isTr ? '¹ (Süper skript ACS)' : '¹ (Superscript ACS)';
+    case 'mdpi-chicago':
+      return isTr ? '(Smith 2020) (Yazar-Yıl)' : '(Smith 2020) (Author-Year)';
+    case 'mdpi-apa':
+      return isTr ? '(Smith, 2020) (Yazar-Yıl)' : '(Smith, 2020) (Author-Year)';
+    default: {
+      const isNum = isNumericStyle(styleId);
+      if (isNum) {
+        return isTr ? '[1] (Sayısal)' : '[1] (Numeric)';
+      } else {
+        return isTr ? '(Smith, 2020) (Yazar-Yıl)' : '(Smith, 2020) (Author-Year)';
+      }
+    }
+  }
+}
+
 export function ArticleEditor({
   initialContent,
   refs,
@@ -103,6 +140,12 @@ export function ArticleEditor({
   aiDisabled,
   fontFamily = 'Times New Roman',
   onFontFamilyChange,
+  styleId,
+  styleOptions,
+  onStyleChange,
+  onStyleEdit,
+  onFindReplace,
+  onRenumberCitations,
 }: Props) {
   const { t, lang } = useLang();
   const refsById = useMemo(() => {
@@ -449,10 +492,66 @@ export function ArticleEditor({
         {onIntegrityCheck && (
           <button
             onClick={onIntegrityCheck}
-            className="px-2.5 py-1 rounded-md border border-violet-300 text-violet-700 text-xs font-semibold hover:bg-violet-50"
+            className="px-2.5 py-1 rounded-md border border-violet-300 text-violet-700 text-xs font-semibold hover:bg-violet-50 shrink-0"
           >
             {lang === 'tr' ? 'Özgünlük' : 'Integrity'}
           </button>
+        )}
+        {styleId && styleOptions && onStyleChange && (
+          <>
+            <Sep />
+            <div className="flex flex-col gap-0.5 items-start shrink-0">
+              <div className="flex items-center gap-1">
+                <select
+                  value={styleId}
+                  onChange={(e) => onStyleChange(e.target.value)}
+                  className="border border-border/80 rounded px-1.5 py-0.5 text-[11px] font-medium bg-white focus:outline-none focus:border-teal min-w-[80px]"
+                  title={lang === 'tr' ? 'Atıf ve kaynakça stili' : 'Citation & bibliography style'}
+                >
+                  {styleOptions.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.custom ? `★ ${s.label}` : s.label}
+                    </option>
+                  ))}
+                  <option value="__new__">＋ {t('style_new') || (lang === 'tr' ? 'Yeni Stil' : 'New Style')}…</option>
+                </select>
+                
+                {onStyleEdit && (
+                  <button
+                    type="button"
+                    onClick={onStyleEdit}
+                    className="p-1 text-xs border border-border/70 rounded hover:bg-slate-100 hover:text-primary text-secondary transition-colors leading-none"
+                    title={t('style_edit') || 'Stili Düzenle'}
+                  >
+                    🎨
+                  </button>
+                )}
+                {onFindReplace && (
+                  <button
+                    type="button"
+                    onClick={onFindReplace}
+                    className="p-1 text-xs border border-border/70 rounded hover:bg-slate-100 hover:text-primary text-secondary transition-colors leading-none"
+                    title={lang === 'tr' ? 'Bul ve Değiştir' : 'Find & Replace'}
+                  >
+                    🔍
+                  </button>
+                )}
+                {onRenumberCitations && (
+                  <button
+                    type="button"
+                    onClick={onRenumberCitations}
+                    className="p-1 text-xs border border-border/70 rounded hover:bg-slate-100 hover:text-primary text-secondary transition-colors leading-none"
+                    title={lang === 'tr' ? 'Atıfları Yeniden Numaralandır' : 'Renumber Citations'}
+                  >
+                    ↻
+                  </button>
+                )}
+              </div>
+              <span className="text-[9px] text-muted/70 px-0.5 select-none font-medium leading-none">
+                {getStyleHint(styleId, lang)}
+              </span>
+            </div>
+          </>
         )}
       </div>
       <div

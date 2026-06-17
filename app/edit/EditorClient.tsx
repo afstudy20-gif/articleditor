@@ -2299,7 +2299,108 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
                   📁 {t('ws_title') || (lang === 'tr' ? 'Çalışma Alanı' : 'Workspace')}
                 </button>
               </div>
-              <StickyNote />
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <StickyNote />
+                <span className="text-muted/30 self-center">|</span>
+                <button
+                  onClick={() => {
+                    setTablesOpen(false);
+                    setFiguresOpen(false);
+                    setSuppOpen(false);
+                    setLettersOpen(false);
+                    setAbbrOpen(false);
+                  }}
+                  className={`px-1.5 py-0.5 rounded text-[11px] font-semibold transition flex items-center gap-1 shrink-0 ${
+                    (!tablesOpen && !figuresOpen && !suppOpen && !lettersOpen && !abbrOpen)
+                      ? 'bg-teal text-white shadow-sm'
+                      : 'text-secondary hover:text-primary hover:bg-slate-100'
+                  }`}
+                >
+                  📝 {lang === 'tr' ? 'Ana Yazı' : 'Main Text'}
+                </button>
+                <button
+                  onClick={() => {
+                    setTablesOpen(false);
+                    setFiguresOpen(false);
+                    setSuppOpen(false);
+                    setAbbrOpen(false);
+                    if (onGoToDocuments) onGoToDocuments();
+                    else setLettersOpen(true);
+                  }}
+                  className={`px-1.5 py-0.5 rounded text-[11px] font-semibold transition flex items-center gap-1 shrink-0 ${
+                    lettersOpen
+                      ? 'bg-teal text-white shadow-sm'
+                      : 'text-secondary hover:text-primary hover:bg-slate-100'
+                  }`}
+                >
+                  ✉️ {lang === 'tr' ? 'Diğer Yazılar' : 'Letters'}
+                </button>
+                <button
+                  onClick={() => {
+                    setFiguresOpen(true);
+                    setTablesOpen(false);
+                    setSuppOpen(false);
+                    setLettersOpen(false);
+                    setAbbrOpen(false);
+                  }}
+                  className={`px-1.5 py-0.5 rounded text-[11px] font-semibold transition flex items-center gap-1 shrink-0 ${
+                    figuresOpen
+                      ? 'bg-teal text-white shadow-sm'
+                      : 'text-secondary hover:text-primary hover:bg-slate-100'
+                  }`}
+                >
+                  🖼️ Figure Legends
+                </button>
+                <button
+                  onClick={() => {
+                    setTablePanelView('list');
+                    setTablesOpen(true);
+                    setFiguresOpen(false);
+                    setSuppOpen(false);
+                    setLettersOpen(false);
+                    setAbbrOpen(false);
+                  }}
+                  className={`px-1.5 py-0.5 rounded text-[11px] font-semibold transition flex items-center gap-1 shrink-0 ${
+                    tablesOpen
+                      ? 'bg-teal text-white shadow-sm'
+                      : 'text-secondary hover:text-primary hover:bg-slate-100'
+                  }`}
+                >
+                  ⊞ {lang === 'tr' ? 'Tablolar' : 'Tables'}
+                </button>
+                <button
+                  onClick={() => {
+                    setSuppOpen(true);
+                    setTablesOpen(false);
+                    setFiguresOpen(false);
+                    setLettersOpen(false);
+                    setAbbrOpen(false);
+                  }}
+                  className={`px-1.5 py-0.5 rounded text-[11px] font-semibold transition flex items-center gap-1 shrink-0 ${
+                    suppOpen
+                      ? 'bg-teal text-white shadow-sm'
+                      : 'text-secondary hover:text-primary hover:bg-slate-100'
+                  }`}
+                >
+                  📎 {lang === 'tr' ? 'Ek Materyaller' : 'Supplementary'}
+                </button>
+                <button
+                  onClick={() => {
+                    setAbbrOpen(true);
+                    setSuppOpen(false);
+                    setTablesOpen(false);
+                    setFiguresOpen(false);
+                    setLettersOpen(false);
+                  }}
+                  className={`px-1.5 py-0.5 rounded text-[11px] font-semibold transition flex items-center gap-1 shrink-0 ${
+                    abbrOpen
+                      ? 'bg-teal text-white shadow-sm'
+                      : 'text-secondary hover:text-primary hover:bg-slate-100'
+                  }`}
+                >
+                  🔤 {lang === 'tr' ? 'Kısaltmalar' : 'Abbreviations'}
+                </button>
+              </div>
             </div>
             <input
               value={title}
@@ -2313,48 +2414,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
             </span>
           </div>
           <div className="flex gap-1 items-center text-xs">
-            <select
-              value={style}
-              onChange={(e) => {
-                const v = e.target.value;
-                if (v === '__new__') {
-                  setStyleSeed(null);
-                  setStyleEditorOpen(true);
-                  return;
-                }
-                setStyle(v as StyleId);
-              }}
-              className="border border-border rounded px-1.5 py-0.5 text-xs bg-white focus:outline-none focus:border-teal"
-              title={lang === 'tr' ? 'Atıf ve kaynakça stili' : 'Citation & bibliography style'}
-            >
-              {styleOptions.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.custom ? `★ ${s.label}` : s.label}
-                </option>
-              ))}
-              <option value="__new__">＋ {t('style_new')}…</option>
-            </select>
-            <HeaderIcon
-              onClick={() => {
-                setStyleSeed(null);
-                setStyleEditorOpen(true);
-              }}
-              title={t('style_edit')}
-              label="🎨"
-              caption={t('hdr_style')}
-            />
-            <HeaderIcon
-              onClick={() => setShowFind(true)}
-              title={lang === 'tr' ? 'Bul ve Değiştir (Ctrl+F / Ctrl+H)' : 'Find & Replace (Ctrl+F / Ctrl+H)'}
-              label="🔍"
-              caption={t('hdr_find')}
-            />
-            <HeaderIcon
-              onClick={updateAllCitations}
-              title={lang === 'tr' ? "Atıfları yeniden numaralandır + orphan'ları temizle" : 'Renumber citations + clean orphans'}
-              label="↻"
-              caption={t('hdr_renumber')}
-            />
+
             <HeaderDropdown label={`📥 ${t('ed_import')} ▾`}>
               <DropItem
                 onClick={() => {
@@ -2420,107 +2480,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
             />
           </div>
         </div>
-        <div className="w-full border-t border-border bg-slate-50 px-4 sm:px-6 py-1.5 flex items-center gap-2 overflow-x-auto scrollbar-none text-xs">
-          <span className="text-muted/60 font-semibold mr-1 shrink-0 uppercase tracking-wider text-[9px]">{lang === 'tr' ? 'Bölümler:' : 'Sub-groups:'}</span>
-          <button
-            onClick={() => {
-              setTablesOpen(false);
-              setFiguresOpen(false);
-              setSuppOpen(false);
-              setLettersOpen(false);
-              setAbbrOpen(false);
-            }}
-            className={`px-3 py-1 rounded-md text-xs font-bold transition flex items-center gap-1 shrink-0 ${
-              (!tablesOpen && !figuresOpen && !suppOpen && !lettersOpen && !abbrOpen)
-                ? 'bg-teal text-white shadow-sm'
-                : 'text-secondary hover:text-primary hover:bg-slate-100'
-            }`}
-          >
-            📝 {lang === 'tr' ? 'Ana Yazı' : 'Main Text'}
-          </button>
-          <button
-            onClick={() => {
-              setTablesOpen(false);
-              setFiguresOpen(false);
-              setSuppOpen(false);
-              setAbbrOpen(false);
-              if (onGoToDocuments) onGoToDocuments();
-              else setLettersOpen(true);
-            }}
-            className={`px-3 py-1 rounded-md text-xs font-bold transition flex items-center gap-1 shrink-0 ${
-              lettersOpen
-                ? 'bg-teal text-white shadow-sm'
-                : 'text-secondary hover:text-primary hover:bg-slate-100'
-            }`}
-          >
-            ✉️ {lang === 'tr' ? 'Diğer Yazılar' : 'Letters'}
-          </button>
-          <button
-            onClick={() => {
-              setFiguresOpen(true);
-              setTablesOpen(false);
-              setSuppOpen(false);
-              setLettersOpen(false);
-              setAbbrOpen(false);
-            }}
-            className={`px-3 py-1 rounded-md text-xs font-bold transition flex items-center gap-1 shrink-0 ${
-              figuresOpen
-                ? 'bg-teal text-white shadow-sm'
-                : 'text-secondary hover:text-primary hover:bg-slate-100'
-            }`}
-          >
-            🖼️ Figure Legends
-          </button>
-          <button
-            onClick={() => {
-              setTablePanelView('list');
-              setTablesOpen(true);
-              setFiguresOpen(false);
-              setSuppOpen(false);
-              setLettersOpen(false);
-              setAbbrOpen(false);
-            }}
-            className={`px-3 py-1 rounded-md text-xs font-bold transition flex items-center gap-1 shrink-0 ${
-              tablesOpen
-                ? 'bg-teal text-white shadow-sm'
-                : 'text-secondary hover:text-primary hover:bg-slate-100'
-            }`}
-          >
-            ⊞ {lang === 'tr' ? 'Tablolar' : 'Tables'}
-          </button>
-          <button
-            onClick={() => {
-              setSuppOpen(true);
-              setTablesOpen(false);
-              setFiguresOpen(false);
-              setLettersOpen(false);
-              setAbbrOpen(false);
-            }}
-            className={`px-3 py-1 rounded-md text-xs font-bold transition flex items-center gap-1 shrink-0 ${
-              suppOpen
-                ? 'bg-teal text-white shadow-sm'
-                : 'text-secondary hover:text-primary hover:bg-slate-100'
-            }`}
-          >
-            📎 {lang === 'tr' ? 'Ek Materyaller' : 'Supplementary'}
-          </button>
-          <button
-            onClick={() => {
-              setAbbrOpen(true);
-              setSuppOpen(false);
-              setTablesOpen(false);
-              setFiguresOpen(false);
-              setLettersOpen(false);
-            }}
-            className={`px-3 py-1 rounded-md text-xs font-bold transition flex items-center gap-1 shrink-0 ${
-              abbrOpen
-                ? 'bg-teal text-white shadow-sm'
-                : 'text-secondary hover:text-primary hover:bg-slate-100'
-            }`}
-          >
-            🔤 {lang === 'tr' ? 'Kısaltmalar' : 'Abbreviations'}
-          </button>
-        </div>
+
       </header>
 
       {importError && (
@@ -2641,6 +2601,22 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
               aiDisabled={aiConfigured === false}
               fontFamily={fontFamily}
               onFontFamilyChange={setFontFamily}
+              styleId={style}
+              styleOptions={styleOptions}
+              onStyleChange={(v) => {
+                if (v === '__new__') {
+                  setStyleSeed(null);
+                  setStyleEditorOpen(true);
+                  return;
+                }
+                setStyle(v as StyleId);
+              }}
+              onStyleEdit={() => {
+                setStyleSeed(null);
+                setStyleEditorOpen(true);
+              }}
+              onFindReplace={() => setShowFind(true)}
+              onRenumberCitations={updateAllCitations}
             />
           </div>
         </div>
@@ -2767,6 +2743,22 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
           aiDisabled={aiConfigured === false}
           fontFamily={fontFamily}
           onFontFamilyChange={setFontFamily}
+          styleId={style}
+          styleOptions={styleOptions}
+          onStyleChange={(v) => {
+            if (v === '__new__') {
+              setStyleSeed(null);
+              setStyleEditorOpen(true);
+              return;
+            }
+            setStyle(v as StyleId);
+          }}
+          onStyleEdit={() => {
+            setStyleSeed(null);
+            setStyleEditorOpen(true);
+          }}
+          onFindReplace={() => setShowFind(true)}
+          onRenumberCitations={updateAllCitations}
         />
         <RefsPanel
           refs={refs}
