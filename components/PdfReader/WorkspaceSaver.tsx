@@ -135,7 +135,7 @@ export function WorkspaceSaver({ source, projectId, onToast }: Props) {
         title={supported ? 'PDF’i projenin sources klasörüne kaydet' : 'PDF’i indir'}
         className="rounded bg-teal-700 px-3 py-1 text-xs font-medium text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-40"
       >
-        {saving ? 'Kaydediliyor…' : supported ? 'Kaynaklara kaydet' : 'PDF indir'}
+        {saving ? 'Kaydediliyor…' : supported ? 'Projeye kaydet' : 'PDF indir'}
       </button>
     </div>
   );

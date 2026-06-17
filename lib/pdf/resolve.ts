@@ -43,6 +43,7 @@ export async function resolvePdfSource(raw: string | null | undefined): Promise<
   if (pmcid) {
     return (await resolvePmcPdfUrl(pmcid)) ?? initial;
   }
+
   return initial;
 }
 

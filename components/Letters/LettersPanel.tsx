@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   buildCoverLetter,
   buildResponseToReviewers,
@@ -11,8 +11,10 @@ import {
   buildTitlePage,
   type CopyrightVariant,
   type LetterLang,
+  type TitlePageAuthor,
 } from '@/lib/letters/templates';
 import { aiHeaders } from '@/lib/ai/user-keys';
+import { newId } from '@/lib/id';
 
 type LetterType = 'cover' | 'title-page' | 'response' | 'contrib' | 'coi' | 'copyright';
 
@@ -22,6 +24,14 @@ interface LettersPanelProps {
   aiEnabled: boolean;
   onClose: () => void;
   t: (k: string) => string;
+}
+
+interface SavedAuthor {
+  id: string;
+  name: string;
+  email?: string;
+  orcid?: string;
+  institution?: string;
 }
 
 function splitAuthors(s: string): string[] {
@@ -52,13 +62,27 @@ export function LettersPanel({ defaultTitle, lang, aiEnabled, onClose, t }: Lett
   const [aiBusy, setAiBusy] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const [runningTitle, setRunningTitle] = useState('');
-  const [correspondingEmail, setCorrespondingEmail] = useState('');
-  const [correspondingAddress, setCorrespondingAddress] = useState('');
-  const [orcid, setOrcid] = useState('');
+  const [titlePageAuthors, setTitlePageAuthors] = useState<TitlePageAuthor[]>([
+    { name: '', email: '', orcid: '', institution: '' },
+  ]);
+  const [savedAuthors, setSavedAuthors] = useState<SavedAuthor[]>([]);
+  const [justSavedIdx, setJustSavedIdx] = useState<number | null>(null);
   const [abstractWordCount, setAbstractWordCount] = useState('');
   const [manuscriptWordCount, setManuscriptWordCount] = useState('');
   const [figuresCount, setFiguresCount] = useState('');
   const [tablesCount, setTablesCount] = useState('');
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const raw = localStorage.getItem('endnotere-author-pool');
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw) as SavedAuthor[];
+      setSavedAuthors(parsed);
+    } catch (e) {
+      console.error('Failed to parse author pool', e);
+    }
+  }, []);
   const [conflictDesc, setConflictDesc] = useState('');
   const [funding, setFunding] = useState('');
   const [acknowledgements, setAcknowledgements] = useState('');
@@ -91,15 +115,18 @@ export function LettersPanel({ defaultTitle, lang, aiEnabled, onClose, t }: Lett
     } else if (type === 'coi') {
       setOutput(buildConflictOfInterest({ authors: splitAuthors(authorsStr), hasConflict, lang }));
     } else if (type === 'title-page') {
+      const correspondingAuthor = titlePageAuthors.find(
+        (a) => a.name.trim().toLowerCase() === corresponding.trim().toLowerCase()
+      );
       setOutput(
         buildTitlePage({
           manuscriptTitle: title,
           runningTitle,
-          authorsStr,
+          authors: titlePageAuthors,
           correspondingAuthor: corresponding,
-          correspondingEmail,
-          correspondingAddress,
-          orcid,
+          correspondingEmail: correspondingAuthor?.email || '',
+          correspondingAddress: correspondingAuthor?.institution || '',
+          orcid: correspondingAuthor?.orcid || '',
           abstractWordCount,
           manuscriptWordCount,
           figuresCount,
@@ -164,6 +191,61 @@ export function LettersPanel({ defaultTitle, lang, aiEnabled, onClose, t }: Lett
     setTimeout(() => URL.revokeObjectURL(url), 5000);
   };
 
+  const saveAuthorToPool = (author: TitlePageAuthor) => {
+    const trimmed: TitlePageAuthor = {
+      name: author.name.trim(),
+      email: author.email?.trim() || '',
+      orcid: author.orcid?.trim() || '',
+      institution: author.institution?.trim() || '',
+    };
+    if (!trimmed.name) return;
+    setSavedAuthors((prev) => {
+      const existing = prev.find(
+        (a) =>
+          a.name.trim().toLowerCase() === trimmed.name.toLowerCase() ||
+          (trimmed.email && a.email?.trim().toLowerCase() === trimmed.email.toLowerCase())
+      );
+      let next: SavedAuthor[];
+      if (existing) {
+        next = prev.map((a) =>
+          a.id === existing.id
+            ? {
+                ...a,
+                name: trimmed.name || a.name,
+                email: trimmed.email || a.email,
+                orcid: trimmed.orcid || a.orcid,
+                institution: trimmed.institution || a.institution,
+              }
+            : a
+        );
+      } else {
+        next = [...prev, { id: newId(), name: trimmed.name, email: trimmed.email, orcid: trimmed.orcid, institution: trimmed.institution }];
+      }
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('endnotere-author-pool', JSON.stringify(next));
+      }
+      return next;
+    });
+  };
+
+  const applySavedAuthor = (idx: number, authorId: string) => {
+    const saved = savedAuthors.find((a) => a.id === authorId);
+    if (!saved) return;
+    setTitlePageAuthors((prev) =>
+      prev.map((a, i) =>
+        i === idx
+          ? {
+              ...a,
+              name: saved.name,
+              email: saved.email || a.email,
+              orcid: saved.orcid || a.orcid,
+              institution: saved.institution || a.institution,
+            }
+          : a
+      )
+    );
+  };
+
   const TABS: Array<{ id: LetterType; label: string }> = [
     { id: 'cover', label: t('letters_cover') },
     { id: 'title-page', label: t('letters_title_page') || 'Title Page' },
@@ -176,10 +258,10 @@ export function LettersPanel({ defaultTitle, lang, aiEnabled, onClose, t }: Lett
   const inputCls = 'w-full text-xs border border-border rounded px-2 py-1.5 bg-surface text-primary';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[70] flex items-start justify-center pt-20 pb-4 px-4 pointer-events-none">
       <div className="absolute inset-0 bg-black/40" />
       <div
-        className="relative bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col"
+        className="relative bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col pointer-events-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-4 py-3 border-b border-border flex items-center justify-between">
@@ -222,11 +304,135 @@ export function LettersPanel({ defaultTitle, lang, aiEnabled, onClose, t }: Lett
             {type === 'title-page' && (
               <>
                 <input className={inputCls} placeholder={t('letters_running_title')} value={runningTitle} onChange={(e) => setRunningTitle(e.target.value)} />
-                <textarea className={`${inputCls} h-16 resize-none`} placeholder={t('letters_authors_list')} value={authorsStr} onChange={(e) => setAuthorsStr(e.target.value)} />
-                <input className={inputCls} placeholder={t('letters_corresponding')} value={corresponding} onChange={(e) => setCorresponding(e.target.value)} />
-                <input className={inputCls} placeholder={t('letters_corresponding_email')} value={correspondingEmail} onChange={(e) => setCorrespondingEmail(e.target.value)} />
-                <input className={inputCls} placeholder={t('letters_corresponding_address')} value={correspondingAddress} onChange={(e) => setCorrespondingAddress(e.target.value)} />
-                <input className={inputCls} placeholder={t('letters_orcid')} value={orcid} onChange={(e) => setOrcid(e.target.value)} />
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-secondary">{t('letters_authors')}</span>
+                    <button
+                      type="button"
+                      onClick={() => setTitlePageAuthors((prev) => [...prev, { name: '', email: '', orcid: '', institution: '' }])}
+                      className="text-[10px] text-violet-600 hover:text-violet-700 font-semibold"
+                    >
+                      ➕ {t('letters_add_author')}
+                    </button>
+                  </div>
+                  <div className="space-y-2 max-h-56 overflow-y-auto pr-0.5">
+                    {titlePageAuthors.map((author, idx) => {
+                      const isCorresponding =
+                        corresponding.trim().toLowerCase() === author.name.trim().toLowerCase() &&
+                        author.name.trim().length > 0;
+                      return (
+                        <div key={idx} className="p-2 bg-slate-50 rounded border border-border space-y-1.5">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-bold text-slate-400 shrink-0">#{idx + 1}</span>
+                            <button
+                              type="button"
+                              onClick={() => setCorresponding(author.name)}
+                              disabled={isCorresponding || !author.name.trim()}
+                              className={`text-[10px] px-2 py-0.5 rounded font-semibold leading-tight ${
+                                isCorresponding
+                                  ? 'bg-teal text-white cursor-default'
+                                  : 'bg-white border border-border text-secondary hover:text-primary hover:border-teal'
+                              } disabled:opacity-50`}
+                              title={lang === 'tr' ? 'Sorumlu yazar olarak işaretle' : 'Set as corresponding author'}
+                            >
+                              {isCorresponding ? '✓ ' + (lang === 'tr' ? 'Sorumlu Yazar' : 'Corresponding') : lang === 'tr' ? 'Sorumlu Yazar Yap' : 'Set as Corresponding'}
+                            </button>
+                            <div className="flex-1" />
+                            {titlePageAuthors.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => setTitlePageAuthors((prev) => prev.filter((_, i) => i !== idx))}
+                                className="text-slate-400 hover:text-red-500 text-xs"
+                                title={lang === 'tr' ? 'Yazarı kaldır' : 'Remove author'}
+                              >
+                                🗑️
+                              </button>
+                            )}
+                          </div>
+                          <div className="flex gap-2">
+                            <select
+                              className={`${inputCls} text-[10px] py-1`}
+                              value=""
+                              onChange={(e) => applySavedAuthor(idx, e.target.value)}
+                              disabled={savedAuthors.length === 0}
+                            >
+                              <option value="">
+                                {savedAuthors.length === 0
+                                  ? lang === 'tr'
+                                    ? 'Kayıtlı yazar yok'
+                                    : 'No saved authors'
+                                  : lang === 'tr'
+                                    ? 'Kayıtlı yazarlar...'
+                                    : 'Saved authors...'}
+                              </option>
+                              {savedAuthors.map((a) => (
+                                <option key={a.id} value={a.id}>
+                                  {a.name}
+                                </option>
+                              ))}
+                            </select>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                saveAuthorToPool(author);
+                                setJustSavedIdx(idx);
+                                setTimeout(() => setJustSavedIdx(null), 1500);
+                              }}
+                              disabled={!author.name.trim()}
+                              className={`text-[10px] px-2 py-1 rounded border font-semibold whitespace-nowrap ${
+                                justSavedIdx === idx
+                                  ? 'bg-teal text-white border-teal'
+                                  : 'bg-white border-border text-secondary hover:text-primary hover:border-teal'
+                              } disabled:opacity-40`}
+                            >
+                              {justSavedIdx === idx ? '✓ ' + (lang === 'tr' ? 'Kaydedildi' : 'Saved') : lang === 'tr' ? 'Hafızaya Kaydet' : 'Save to Pool'}
+                            </button>
+                          </div>
+                          <input
+                            className={inputCls}
+                            placeholder={t('letters_author_name')}
+                            value={author.name}
+                            onChange={(e) =>
+                              setTitlePageAuthors((prev) =>
+                                prev.map((a, i) => (i === idx ? { ...a, name: e.target.value } : a))
+                              )
+                            }
+                          />
+                          <input
+                            className={inputCls}
+                            placeholder={t('letters_author_institution')}
+                            value={author.institution}
+                            onChange={(e) =>
+                              setTitlePageAuthors((prev) =>
+                                prev.map((a, i) => (i === idx ? { ...a, institution: e.target.value } : a))
+                              )
+                            }
+                          />
+                          <input
+                            className={inputCls}
+                            placeholder={t('letters_author_email')}
+                            value={author.email}
+                            onChange={(e) =>
+                              setTitlePageAuthors((prev) =>
+                                prev.map((a, i) => (i === idx ? { ...a, email: e.target.value } : a))
+                              )
+                            }
+                          />
+                          <input
+                            className={inputCls}
+                            placeholder={t('letters_author_orcid')}
+                            value={author.orcid}
+                            onChange={(e) =>
+                              setTitlePageAuthors((prev) =>
+                                prev.map((a, i) => (i === idx ? { ...a, orcid: e.target.value } : a))
+                              )
+                            }
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
                 <div className="grid grid-cols-2 gap-2">
                   <input className={inputCls} placeholder={t('letters_abs_wc')} value={abstractWordCount} onChange={(e) => setAbstractWordCount(e.target.value)} />
                   <input className={inputCls} placeholder={t('letters_ms_wc')} value={manuscriptWordCount} onChange={(e) => setManuscriptWordCount(e.target.value)} />
