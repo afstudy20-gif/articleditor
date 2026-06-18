@@ -77,6 +77,7 @@ import { PhrasebankPanel } from '@/components/Phrasebank/PhrasebankPanel';
 import { SupplementaryPanel } from '@/components/Supplementary/SupplementaryPanel';
 import { AbbreviationsPanel } from '@/components/Abbreviations/AbbreviationsPanel';
 import { StickyNote } from '@/components/StickyNote';
+import { RagPanel } from '@/components/Rag/RagPanel';
 import { useTabSync } from '@/lib/hooks/useTabSync';
 import { useIsDesktop } from '@/lib/hooks/useIsDesktop';
 import { computeWritingStats } from '@/lib/stats/writing-stats';
@@ -268,6 +269,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
+  const [ragOpen, setRagOpen] = useState(false);
   const [snapshotsOpen, setSnapshotsOpen] = useState(false);
   const [figuresOpen, setFiguresOpen] = useState(false);
   const [tablesOpen, setTablesOpen] = useState(false);
@@ -560,6 +562,20 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
     // Use id directly — don't depend on stale highlightRefId closure.
     setTimeout(() => {
       const positions = findCitationsForRef(id);
+      if (positions.length > 0) scrollToPosition(positions[0]);
+    }, 80);
+  }
+
+  // Citation chips in the RAG panel route here: highlight the referenced ref in
+  // the library. Page numbers from the PDF source aren't mapped back into the
+  // editor — there's no in-document page concept — so the param is accepted but
+  // currently used only for future reader deep-links.
+  function highlightRefForRag(refId: string, _pageNo?: number): void {
+    if (!refs.some((r) => r.id === refId)) return;
+    setHighlightRefId(refId);
+    setOccurrenceCursor(0);
+    setTimeout(() => {
+      const positions = findCitationsForRef(refId);
       if (positions.length > 0) scrollToPosition(positions[0]);
     }, 80);
   }
@@ -2502,6 +2518,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
             <HeaderIcon onClick={() => setPaletteOpen(true)} title={`${t('cmd_open')} (⌘K)`} label="⌘K" caption={t('hdr_palette')} />
             <HeaderIcon onClick={openPhrasebank} title={t('pb_title')} label="§" caption={t('hdr_phrasebank')} />
             <HeaderIcon onClick={() => setStatsOpen(true)} title={t('ed_stats')} label="📊" caption={t('hdr_stats')} />
+            <HeaderIcon onClick={() => setRagOpen((o) => !o)} title={t('rag_panel_title')} label="📚" caption={t('hdr_rag')} accent={ragOpen} />
             <HeaderIcon onClick={() => setSnapshotsOpen(true)} title={t('ed_snapshots')} label="🕓" caption={t('hdr_versions')} />
             <HeaderIcon onClick={() => setJournalOpen(true)} title={t('ed_journal_check')} label="📋" caption={t('hdr_journal')} />
             <HeaderIcon onClick={() => setChecklistOpen(true)} title={t('ed_checklist')} label="✅" caption={t('hdr_checklist')} />
@@ -2653,6 +2670,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
               }}
               onFindReplace={() => setShowFind(true)}
               onRenumberCitations={updateAllCitations}
+              onAskLibrary={() => setRagOpen(true)}
             />
           </div>
         </div>
@@ -2795,6 +2813,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
           }}
           onFindReplace={() => setShowFind(true)}
           onRenumberCitations={updateAllCitations}
+          onAskLibrary={() => setRagOpen(true)}
         />
         <RefsPanel
           refs={refs}
@@ -3028,6 +3047,18 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
             onSetGoal={updateWordGoal}
             t={t}
             onClose={() => setStatsOpen(false)}
+          />
+        </div>
+      )}
+
+      {ragOpen && (
+        <div className="fixed right-4 top-24 bottom-4 w-[380px] z-40 shadow-2xl">
+          <RagPanel
+            projectId={project.id}
+            open={ragOpen}
+            onClose={() => setRagOpen(false)}
+            refs={refs}
+            onCiteClick={highlightRefForRag}
           />
         </div>
       )}

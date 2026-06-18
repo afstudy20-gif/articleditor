@@ -2,7 +2,17 @@
 
 import Dexie, { type EntityTable } from 'dexie';
 import { newId } from '@/lib/id';
-import type { PhraseCategory, Project, ProjectNote, Snapshot, Ref, UserPhrasebank } from './types';
+import type {
+  PhraseCategory,
+  Project,
+  ProjectNote,
+  Snapshot,
+  Ref,
+  UserPhrasebank,
+  ProjectPdf,
+  PdfChunk,
+  PdfEmbedding,
+} from './types';
 
 /** Generic local key/value row. Never synced — used for browser-bound objects
  *  like File System Access directory handles. */
@@ -13,6 +23,9 @@ export interface AppDB extends Dexie {
   snapshots: EntityTable<Snapshot, 'id'>;
   phrasebanks: EntityTable<UserPhrasebank, 'id'>;
   kv: EntityTable<KvRow, 'key'>;
+  projectPdfs: EntityTable<ProjectPdf, 'id'>;
+  pdfChunks: EntityTable<PdfChunk, 'id'>;
+  pdfEmbeddings: EntityTable<PdfEmbedding, 'chunkId'>;
 }
 
 let _db: AppDB | null = null;
@@ -43,6 +56,16 @@ export function getDb(): AppDB {
     snapshots: 'id, projectId, createdAt',
     phrasebanks: 'id, updatedAt',
     kv: 'key',
+  });
+  // v5 adds per-project PDF chunks + embeddings for RAG.
+  db.version(5).stores({
+    projects: 'id, updatedAt',
+    snapshots: 'id, projectId, createdAt',
+    phrasebanks: 'id, updatedAt',
+    kv: 'key',
+    projectPdfs: 'id, projectId, sha256, refId, [projectId+sha256]',
+    pdfChunks: 'id, pdfId, projectId, refId',
+    pdfEmbeddings: 'chunkId, pdfId, projectId',
   });
   _db = db;
   return db;
@@ -319,4 +342,68 @@ export async function deletePhrasebank(id: string): Promise<void> {
       if (next) await db.phrasebanks.update(next.id, { active: true, updatedAt: Date.now() });
     }
   });
+}
+
+export async function listProjectPdfs(projectId: string): Promise<ProjectPdf[]> {
+  return getDb().projectPdfs.where('projectId').equals(projectId).toArray();
+}
+
+export async function getProjectPdfByHash(
+  projectId: string,
+  sha256: string,
+): Promise<ProjectPdf | undefined> {
+  return getDb().projectPdfs.where({ projectId, sha256 }).first();
+}
+
+export async function addProjectPdf(pdf: Omit<ProjectPdf, 'id'>): Promise<ProjectPdf> {
+  const row: ProjectPdf = { ...pdf, id: newId('pdf') };
+  await getDb().projectPdfs.add(row);
+  return row;
+}
+
+export async function deleteProjectPdf(projectId: string, pdfId: string): Promise<void> {
+  const db = getDb();
+  await db.transaction('rw', db.projectPdfs, db.pdfChunks, db.pdfEmbeddings, async () => {
+    await db.projectPdfs.where({ id: pdfId, projectId }).delete();
+    await db.pdfChunks.where('pdfId').equals(pdfId).delete();
+    await db.pdfEmbeddings.where('pdfId').equals(pdfId).delete();
+  });
+}
+
+export async function clearProjectPdfs(projectId: string): Promise<void> {
+  const db = getDb();
+  await db.transaction('rw', db.projectPdfs, db.pdfChunks, db.pdfEmbeddings, async () => {
+    await db.projectPdfs.where('projectId').equals(projectId).delete();
+    await db.pdfChunks.where('projectId').equals(projectId).delete();
+    await db.pdfEmbeddings.where('projectId').equals(projectId).delete();
+  });
+}
+
+export async function putPdfChunksAndEmbeddings(
+  chunks: PdfChunk[],
+  embeddings: PdfEmbedding[],
+): Promise<void> {
+  const db = getDb();
+  await db.transaction('rw', db.pdfChunks, db.pdfEmbeddings, async () => {
+    await db.pdfChunks.bulkPut(chunks);
+    await db.pdfEmbeddings.bulkPut(embeddings);
+  });
+}
+
+export async function getProjectChunksAndEmbeddings(
+  projectId: string,
+): Promise<Array<PdfChunk & { vector: Float32Array }>> {
+  const db = getDb();
+  const [chunks, embeddings] = await Promise.all([
+    db.pdfChunks.where('projectId').equals(projectId).toArray(),
+    db.pdfEmbeddings.where('projectId').equals(projectId).toArray(),
+  ]);
+  const byChunkId = new Map<string, Float32Array>();
+  for (const e of embeddings) byChunkId.set(e.chunkId, new Float32Array(e.vector));
+  const out: Array<PdfChunk & { vector: Float32Array }> = [];
+  for (const chunk of chunks) {
+    const vector = byChunkId.get(chunk.id);
+    if (vector) out.push({ ...chunk, vector });
+  }
+  return out;
 }

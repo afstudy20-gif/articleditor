@@ -162,3 +162,35 @@ export type MarkerOccurrence = {
     suppressAuthor?: boolean;
   };
 };
+
+export type ProjectPdf = {
+  id: string;
+  projectId: string;
+  refId?: string;
+  filename: string;
+  sha256: string;
+  pageCount: number;
+  charCount: number;
+  addedAt: number;
+};
+
+export type PdfChunk = {
+  id: string;
+  pdfId: string;
+  projectId: string;
+  refId?: string;
+  pageNo: number;
+  text: string;
+  charStart: number;
+  charEnd: number;
+  tokenCount: number;
+};
+
+export type PdfEmbedding = {
+  chunkId: string;
+  pdfId: string;
+  projectId: string;
+  vector: ArrayBuffer;
+  model: string;
+  dim: number;
+};
