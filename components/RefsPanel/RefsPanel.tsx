@@ -149,43 +149,46 @@ export function RefsPanel({
         t={t}
       />
 
-      {tab === 'list' && onLookupAll && refs.length > 0 && (
-        <div className="px-3 py-2 border-b border-border flex items-center justify-between gap-2">
-          <span className="text-xs text-muted">
-            {refs.filter((r) => r.doi).length}/{refs.length} {t('rp_doi_with_count')} · {refs.filter((r) => r.abstract).length}{' '}
-            {t('rp_abstract_count')}
-          </span>
-          <button
-            onClick={onLookupAll}
-            disabled={lookupAllBusy}
-            className="btn-secondary text-xs px-2 py-1"
-          >
-            {lookupAllBusy ? t('rp_scanning') : t('rp_scan_all')}
-          </button>
-        </div>
-      )}
-
       {tab === 'list' && refs.length > 0 && (
-        <div className="px-3 py-1.5 border-b border-border flex items-center justify-between gap-2 text-xs">
-          <label className="flex items-center gap-1.5 cursor-pointer text-muted hover:text-primary">
-            <input
-              type="checkbox"
-              checked={selectedIds.size === refs.length}
-              ref={(el) => {
-                if (el) el.indeterminate = selectedIds.size > 0 && selectedIds.size < refs.length;
-              }}
-              onChange={toggleAll}
-            />
-            {t('rp_select_all')}
-          </label>
-          {selectedIds.size > 0 && (
-            <button
-              onClick={bulkDelete}
-              className="font-medium text-rose-600 hover:underline"
-            >
-              {t('rp_delete_selected').replace('{n}', String(selectedIds.size))}
-            </button>
-          )}
+        <div className="px-2 py-1 border-b border-border flex items-center justify-between gap-2 text-[10px]">
+          <div className="flex items-center gap-2 min-w-0">
+            <label className="flex items-center gap-1 cursor-pointer text-muted hover:text-primary shrink-0">
+              <input
+                type="checkbox"
+                checked={selectedIds.size === refs.length}
+                ref={(el) => {
+                  if (el) el.indeterminate = selectedIds.size > 0 && selectedIds.size < refs.length;
+                }}
+                onChange={toggleAll}
+              />
+              {t('rp_select_all')}
+            </label>
+            {onLookupAll && (
+              <span className="text-muted truncate">
+                {refs.filter((r) => r.doi).length}/{refs.length} {t('rp_doi_with_count')} · {refs.filter((r) => r.abstract).length}{' '}
+                {t('rp_abstract_count')}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {selectedIds.size > 0 && (
+              <button
+                onClick={bulkDelete}
+                className="font-medium text-rose-600 hover:underline"
+              >
+                {t('rp_delete_selected').replace('{n}', String(selectedIds.size))}
+              </button>
+            )}
+            {onLookupAll && (
+              <button
+                onClick={onLookupAll}
+                disabled={lookupAllBusy}
+                className="btn-secondary text-[10px] px-1.5 py-0.5 leading-tight"
+              >
+                {lookupAllBusy ? t('rp_scanning') : t('rp_scan_all')}
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -260,6 +263,10 @@ function CitedRefsSection({
   t: (k: string) => string;
 }): JSX.Element | null {
   const [expanded, setExpanded] = useState(true);
+  const [height, setHeight] = useState(180);
+  const dragging = useRef(false);
+  const startY = useRef(0);
+  const startHeight = useRef(0);
 
   // Compute cited refs sorted by citation order
   const citedRefs = useMemo(() => {
@@ -273,6 +280,36 @@ function CitedRefsSection({
     cited.sort((a, b) => a.order - b.order);
     return cited;
   }, [refs, refOrder]);
+
+  function startDrag(e: React.MouseEvent): void {
+    e.preventDefault();
+    dragging.current = true;
+    startY.current = e.clientY;
+    startHeight.current = height;
+    document.body.style.cursor = 'row-resize';
+    document.body.style.userSelect = 'none';
+  }
+
+  useEffect(() => {
+    function onMove(e: MouseEvent): void {
+      if (!dragging.current) return;
+      const delta = e.clientY - startY.current;
+      const next = Math.max(80, Math.min(360, startHeight.current + delta));
+      setHeight(next);
+    }
+    function onUp(): void {
+      if (!dragging.current) return;
+      dragging.current = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    }
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, [height]);
 
   if (citedRefs.length === 0) return null;
 
@@ -291,29 +328,38 @@ function CitedRefsSection({
         <span className="text-muted text-[10px]">{expanded ? '▼' : '▶'}</span>
       </button>
       {expanded && (
-        <div className="px-2 pb-2 max-h-[200px] overflow-y-auto space-y-0.5">
-          {citedRefs.map(({ ref: r, order }) => (
-            <button
-              key={r.id}
-              onClick={() => onSelectRef?.(r.id)}
-              className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-teal-bg transition text-left group"
-              title={r.title || ''}
-            >
-              <span className="shrink-0 w-5 h-5 rounded text-[10px] font-bold flex items-center justify-center bg-teal text-white">
-                {order}
-              </span>
-              <div className="flex-1 min-w-0">
-                <div className="text-xs text-primary font-medium truncate leading-tight group-hover:text-teal">
-                  {r.title || r.raw?.slice(0, 50) || '—'}
+        <>
+          <div className="px-2 pb-1 overflow-y-auto space-y-0.5" style={{ maxHeight: height }}>
+            {citedRefs.map(({ ref: r, order }) => (
+              <button
+                key={r.id}
+                onClick={() => onSelectRef?.(r.id)}
+                className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-teal-bg transition text-left group"
+                title={r.title || ''}
+              >
+                <span className="shrink-0 w-5 h-5 rounded text-[10px] font-bold flex items-center justify-center bg-teal text-white">
+                  {order}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs text-primary font-medium truncate leading-tight group-hover:text-teal">
+                    {r.title || r.raw?.slice(0, 50) || '—'}
+                  </div>
+                  <div className="text-[10px] text-muted truncate leading-tight">
+                    {r.authors[0]?.family || r.authors[0]?.literal || '—'}
+                    {r.authors.length > 1 ? ' et al.' : ''} · {r.year ?? '?'}
+                  </div>
                 </div>
-                <div className="text-[10px] text-muted truncate leading-tight">
-                  {r.authors[0]?.family || r.authors[0]?.literal || '—'}
-                  {r.authors.length > 1 ? ' et al.' : ''} · {r.year ?? '?'}
-                </div>
-              </div>
-            </button>
-          ))}
-        </div>
+              </button>
+            ))}
+          </div>
+          <div
+            onMouseDown={startDrag}
+            className="h-2 cursor-row-resize flex items-center justify-center group"
+            title={t('rp_drag_resize') || 'Drag to resize'}
+          >
+            <div className="h-0.5 w-10 bg-border group-hover:bg-teal rounded-full transition" />
+          </div>
+        </>
       )}
     </div>
   );
