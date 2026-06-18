@@ -37,6 +37,8 @@ type Props = {
   onUndoHistory?: (id: string) => void;
   onClearHistory?: () => void;
   onInsertText?: (text: string) => void;
+  getRefCitationCount?: (refId: string) => number;
+  onJumpToRefCitation?: (refId: string, direction: 1 | -1) => void;
 };
 
 export function RefsPanel({
@@ -65,6 +67,8 @@ export function RefsPanel({
   onUndoHistory,
   onClearHistory,
   onInsertText,
+  getRefCitationCount,
+  onJumpToRefCitation,
 }: Props) {
   const { t } = useLang();
   const [tab, setTab] = useState<'list' | 'add' | 'history'>('list');
@@ -146,6 +150,8 @@ export function RefsPanel({
         refs={refs}
         refOrder={refOrder}
         onSelectRef={onSelectRef}
+        getRefCitationCount={getRefCitationCount}
+        onJumpToRefCitation={onJumpToRefCitation}
         t={t}
       />
 
@@ -255,11 +261,15 @@ function CitedRefsSection({
   refs,
   refOrder,
   onSelectRef,
+  getRefCitationCount,
+  onJumpToRefCitation,
   t,
 }: {
   refs: Ref[];
   refOrder: Map<string, number>;
   onSelectRef?: (id: string) => void;
+  getRefCitationCount?: (refId: string) => number;
+  onJumpToRefCitation?: (refId: string, direction: 1 | -1) => void;
   t: (k: string) => string;
 }): JSX.Element | null {
   const [expanded, setExpanded] = useState(true);
@@ -330,27 +340,61 @@ function CitedRefsSection({
       {expanded && (
         <>
           <div className="px-2 pb-1 overflow-y-auto space-y-0.5" style={{ maxHeight: height }}>
-            {citedRefs.map(({ ref: r, order }) => (
-              <button
-                key={r.id}
-                onClick={() => onSelectRef?.(r.id)}
-                className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-teal-bg transition text-left group"
-                title={r.title || ''}
-              >
-                <span className="shrink-0 w-5 h-5 rounded text-[10px] font-bold flex items-center justify-center bg-teal text-white">
-                  {order}
-                </span>
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs text-primary font-medium truncate leading-tight group-hover:text-teal">
-                    {r.title || r.raw?.slice(0, 50) || '—'}
-                  </div>
-                  <div className="text-[10px] text-muted truncate leading-tight">
-                    {r.authors[0]?.family || r.authors[0]?.literal || '—'}
-                    {r.authors.length > 1 ? ' et al.' : ''} · {r.year ?? '?'}
-                  </div>
+            {citedRefs.map(({ ref: r, order }) => {
+              const count = getRefCitationCount?.(r.id) ?? 0;
+              return (
+                <div
+                  key={r.id}
+                  className="flex items-center gap-2 px-2 py-1 rounded-md hover:bg-teal-bg transition group"
+                >
+                  <button
+                    onClick={() => onSelectRef?.(r.id)}
+                    className="flex-1 min-w-0 flex items-center gap-2 text-left"
+                    title={r.title || ''}
+                  >
+                    <span className="shrink-0 w-5 h-5 rounded text-[10px] font-bold flex items-center justify-center bg-teal text-white">
+                      {order}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs text-primary font-medium truncate leading-tight group-hover:text-teal">
+                        {r.title || r.raw?.slice(0, 50) || '—'}
+                      </div>
+                      <div className="text-[10px] text-muted truncate leading-tight">
+                        {r.authors[0]?.family || r.authors[0]?.literal || '—'}
+                        {r.authors.length > 1 ? ' et al.' : ''} · {r.year ?? '?'}
+                      </div>
+                    </div>
+                  </button>
+                  {count > 0 && onJumpToRefCitation && (
+                    <div className="flex items-center gap-0.5 shrink-0">
+                      <span className="text-[10px] text-muted px-1">{count}×</span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onJumpToRefCitation(r.id, -1);
+                        }}
+                        disabled={count < 2}
+                        className="px-1 py-0.5 rounded text-[10px] border border-border hover:bg-white disabled:opacity-40"
+                        title={t('rp_prev_citation') || 'Previous citation'}
+                      >
+                        ↑
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onJumpToRefCitation(r.id, 1);
+                        }}
+                        disabled={count < 2}
+                        className="px-1 py-0.5 rounded text-[10px] border border-border hover:bg-white disabled:opacity-40"
+                        title={t('rp_next_citation') || 'Next citation'}
+                      >
+                        ↓
+                      </button>
+                    </div>
+                  )}
                 </div>
-              </button>
-            ))}
+              );
+            })}
           </div>
           <div
             onMouseDown={startDrag}

@@ -572,6 +572,44 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
     scrollToPosition(positions[next]);
   }
 
+  function getRefCitationCount(refId: string): number {
+    const ed = editorInstance.current;
+    if (!ed) return 0;
+    let count = 0;
+    ed.state.doc.descendants((node: any) => {
+      if (node.type?.name === 'citation') {
+        const ids: string[] = node.attrs?.refIds ?? [];
+        if (ids.includes(refId)) count++;
+      }
+      return true;
+    });
+    return count;
+  }
+
+  function jumpToRefCitation(refId: string, direction: 1 | -1): void {
+    const ed = editorInstance.current;
+    if (!ed) return;
+    const positions: number[] = [];
+    ed.state.doc.descendants((node: any, pos: number) => {
+      if (node.type?.name === 'citation') {
+        const ids: string[] = node.attrs?.refIds ?? [];
+        if (ids.includes(refId)) positions.push(pos);
+      }
+      return true;
+    });
+    if (positions.length === 0) {
+      setHighlightRefId(refId);
+      setOccurrenceCursor(0);
+      return;
+    }
+    const isSameRef = highlightRefId === refId;
+    const current = isSameRef ? occurrenceCursor : 0;
+    const next = (current + direction + positions.length) % positions.length;
+    setHighlightRefId(refId);
+    setOccurrenceCursor(next);
+    scrollToPosition(positions[next]);
+  }
+
   function selectRef(id: string): void {
     if (id === highlightRefId) {
       setHighlightRefId(null);
@@ -2798,6 +2836,8 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
                 ed.chain().focus().insertContent(text).run();
               }
             }}
+            getRefCitationCount={getRefCitationCount}
+            onJumpToRefCitation={jumpToRefCitation}
           />
           </div>
         </div>
@@ -2930,6 +2970,8 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
               ed.chain().focus().insertContent(text).run();
             }
           }}
+          getRefCitationCount={getRefCitationCount}
+          onJumpToRefCitation={jumpToRefCitation}
         />
         <BibliographyPreview refs={refs} refOrder={refOrder} style={style} selectedId={highlightRefId} onSelect={selectRef} />
         <RefDetail
