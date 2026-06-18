@@ -61,6 +61,32 @@ describe('splitAbstractMetadataFromParagraphs', () => {
     assert.deepEqual(out.keywords, ['ST Elevation Myocardial Infarction', 'Angioplasty']);
     assert.deepEqual(out.bodyParagraphs.map((p) => p.text), ['Introduction', 'Main body.']);
   });
+
+  it('extracts inline keywords even when the label has no colon', () => {
+    const out = splitAbstractMetadataFromParagraphs([
+      paragraph('Keywords no-reflow, ST-elevation myocardial infarction, mean platelet volume'),
+      paragraph('Introduction', 'Heading2'),
+      paragraph('Main body.'),
+    ]);
+
+    assert.deepEqual(out.keywords, [
+      'no-reflow',
+      'ST-elevation myocardial infarction',
+      'mean platelet volume',
+    ]);
+    assert.deepEqual(out.bodyParagraphs.map((p) => p.text), ['Introduction', 'Main body.']);
+  });
+
+  it('extracts Turkish inline keywords separated by bullets', () => {
+    const out = splitAbstractMetadataFromParagraphs([
+      paragraph('Anahtar kelimeler - no-reflow • mean platelet volume • inflammation'),
+      paragraph('Giriş', 'Heading2'),
+      paragraph('Ana metin.'),
+    ]);
+
+    assert.deepEqual(out.keywords, ['no-reflow', 'mean platelet volume', 'inflammation']);
+    assert.deepEqual(out.bodyParagraphs.map((p) => p.text), ['Giriş', 'Ana metin.']);
+  });
 });
 
 describe('countWords', () => {

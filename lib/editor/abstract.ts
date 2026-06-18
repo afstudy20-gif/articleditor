@@ -2,6 +2,9 @@ import type { ImportParagraph } from './import-rich';
 
 const ABSTRACT_INLINE_RE = /^(abstract|summary|öz|özet)\s*[:：]\s*(.+)$/i;
 const ABSTRACT_HEADING_RE = /^(abstract|summary|öz|özet)\s*[:：]?\s*$/i;
+const KEYWORD_LABEL = String.raw`(?:key\s*words?|keywords?|anahtar\s+(?:kelimeler|sözcükler))`;
+const KEYWORD_INLINE_RE = new RegExp(`^${KEYWORD_LABEL}\\b\\s*(?:[:：\\-–—]\\s*|\\s+)(.+)$`, 'i');
+const KEYWORD_HEADING_RE = new RegExp(`^${KEYWORD_LABEL}\\b\\s*[:：]?\\s*$`, 'i');
 const SECTION_HEADING_RE =
   /^(introduction|background|methods?|materials?(?:\s+and\s+methods)?|patients?(?:\s+and\s+methods)?|results?|findings?|discussion|conclusions?|limitations?|references?|bibliography|keywords?|acknowledg(?:e)?ments?|funding|conflicts?\s+of\s+interest|ethics|giri[şs]|arka\s+plan|y[öo]ntem(?:ler)?|materyal|hastalar|bulgular|tart[ıi][şs]ma|sonu[çc](?:lar)?|k[ıi]s[ıi]tl[ıi]l[ıi]klar|kaynak(?:lar|ça|ca)?|anahtar\s+kelimeler|te[şs]ekkür|finansman|[çc][ıi]kar\s+[çc]at[ıi][şs]mas[ıi]|etik)\b/i;
 
@@ -54,9 +57,9 @@ function splitKeywordsFromParagraphs(
   if (index < 0) return { bodyParagraphs: paragraphs, keywords: [] };
 
   const first = paragraphs[index].text.trim();
-  const inline = first.match(/^(key\s*words?|keywords?|anahtar\s+(?:kelimeler|sözcükler))\s*[:：]\s*(.+)$/i);
+  const inline = first.match(KEYWORD_INLINE_RE);
   const parts: string[] = [];
-  if (inline?.[2]) parts.push(inline[2]);
+  if (inline?.[1]) parts.push(inline[1]);
 
   let end = index + 1;
   for (; end < paragraphs.length; end += 1) {
@@ -92,7 +95,7 @@ function isAbstractBoundary(paragraph: ImportParagraph, hasAbstractText: boolean
 
 function isKeywordStart(paragraph: ImportParagraph): boolean {
   const text = paragraph.text.trim();
-  return /^(key\s*words?|keywords?|anahtar\s+(?:kelimeler|sözcükler))\s*[:：]?/i.test(text);
+  return KEYWORD_HEADING_RE.test(text) || KEYWORD_INLINE_RE.test(text);
 }
 
 function isKeywordBoundary(paragraph: ImportParagraph, hasKeywordText: boolean): boolean {
@@ -108,7 +111,7 @@ function parseKeywords(text: string): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
   text
-    .split(/[;,]\s*|\n+/)
+    .split(/[;,|•·]\s*|\n+/)
     .map((part) => part.trim().replace(/[.:]+$/g, ''))
     .filter(Boolean)
     .forEach((keyword) => {

@@ -17,6 +17,17 @@ type MeshSuggestion = {
   resource: string;
 };
 
+type MeshLookupResponse = {
+  suggestions?: MeshSuggestion[];
+  exact?: MeshSuggestion | null;
+};
+
+type MeshKeywordStatus =
+  | { status: 'checking' }
+  | { status: 'verified'; label: string; resource: string }
+  | { status: 'suggested'; label: string; resource: string }
+  | { status: 'custom' };
+
 export function AbstractPanel({
   value,
   onChange,
@@ -30,6 +41,7 @@ export function AbstractPanel({
   const [draft, setDraft] = useState('');
   const [suggestions, setSuggestions] = useState<MeshSuggestion[]>([]);
   const [loading, setLoading] = useState(false);
+  const [meshStatusByKeyword, setMeshStatusByKeyword] = useState<Record<string, MeshKeywordStatus>>({});
 
   useEffect(() => {
     const query = draft.trim();
@@ -43,7 +55,7 @@ export function AbstractPanel({
       setLoading(true);
       fetch(`/api/mesh/lookup?q=${encodeURIComponent(query)}`, { signal: controller.signal })
         .then((res) => (res.ok ? res.json() : { suggestions: [] }))
-        .then((data) => {
+        .then((data: MeshLookupResponse) => {
           const next = Array.isArray(data?.suggestions) ? data.suggestions : [];
           setSuggestions(next.slice(0, 8));
         })
@@ -61,8 +73,54 @@ export function AbstractPanel({
     };
   }, [draft]);
 
+  useEffect(() => {
+    const cleanKeywords = keywords.map(cleanKeyword).filter(Boolean);
+    if (cleanKeywords.length === 0) {
+      setMeshStatusByKeyword({});
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    setMeshStatusByKeyword((prev) => {
+      const next: Record<string, MeshKeywordStatus> = {};
+      for (const keyword of cleanKeywords) {
+        next[keyword] = prev[keyword] ?? { status: 'checking' };
+      }
+      return next;
+    });
+
+    Promise.all(
+      cleanKeywords.map(async (keyword): Promise<[string, MeshKeywordStatus]> => {
+        try {
+          const res = await fetch(`/api/mesh/lookup?q=${encodeURIComponent(keyword)}&exact=1`, {
+            signal: controller.signal,
+          });
+          if (!res.ok) return [keyword, { status: 'custom' }];
+          const data = (await res.json()) as MeshLookupResponse;
+          if (data.exact?.label && data.exact.resource) {
+            return [keyword, { status: 'verified', label: data.exact.label, resource: data.exact.resource }];
+          }
+          const first = Array.isArray(data.suggestions) ? data.suggestions[0] : undefined;
+          if (first?.label && first.resource) {
+            return [keyword, { status: 'suggested', label: first.label, resource: first.resource }];
+          }
+        } catch {
+          if (controller.signal.aborted) return [keyword, { status: 'checking' }];
+        }
+        return [keyword, { status: 'custom' }];
+      }),
+    ).then((entries) => {
+      if (controller.signal.aborted) return;
+      setMeshStatusByKeyword(Object.fromEntries(entries));
+    });
+
+    return () => {
+      controller.abort();
+    };
+  }, [keywords]);
+
   const addKeyword = (keyword: string): void => {
-    const clean = keyword.trim().replace(/[;,]+$/g, '');
+    const clean = cleanKeyword(keyword);
     if (!clean) return;
     if (keywords.some((item) => item.toLowerCase() === clean.toLowerCase())) {
       setDraft('');
@@ -75,6 +133,21 @@ export function AbstractPanel({
 
   const removeKeyword = (keyword: string): void => {
     onKeywordsChange(keywords.filter((item) => item !== keyword));
+  };
+
+  const replaceKeyword = (oldKeyword: string, nextKeyword: string): void => {
+    const clean = cleanKeyword(nextKeyword);
+    if (!clean) return;
+    const seen = new Set<string>();
+    const next: string[] = [];
+    for (const keyword of keywords) {
+      const candidate = keyword === oldKeyword ? clean : keyword;
+      const key = candidate.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      next.push(candidate);
+    }
+    onKeywordsChange(next);
   };
 
   return (
@@ -106,17 +179,42 @@ export function AbstractPanel({
             </div>
             {keywords.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
-                {keywords.map((keyword) => (
-                  <button
-                    key={keyword}
-                    type="button"
-                    onClick={() => removeKeyword(keyword)}
-                    className="px-2 py-1 rounded-full bg-teal-bg text-teal border border-teal/20 text-xs font-semibold hover:bg-teal hover:text-white"
-                    title={lang === 'tr' ? 'Kaldır' : 'Remove'}
-                  >
-                    {keyword} ×
-                  </button>
-                ))}
+                {keywords.map((keyword) => {
+                  const status = meshStatusByKeyword[cleanKeyword(keyword)] ?? { status: 'checking' };
+                  return (
+                    <div
+                      key={keyword}
+                      className={[
+                        'inline-flex max-w-full items-center gap-1.5 rounded-full border px-2 py-1 text-xs',
+                        status.status === 'verified'
+                          ? 'bg-teal-bg text-teal border-teal/25'
+                          : status.status === 'suggested'
+                            ? 'bg-amber-50 text-amber-800 border-amber-200'
+                            : 'bg-slate-50 text-secondary border-border',
+                      ].join(' ')}
+                      title={meshStatusTitle(status, lang)}
+                    >
+                      <span className="min-w-0 max-w-[24rem] truncate font-semibold">{keyword}</span>
+                      <MeshStatusBadge
+                        status={status}
+                        lang={lang}
+                        onUseSuggestion={
+                          status.status === 'suggested'
+                            ? () => replaceKeyword(keyword, status.label)
+                            : undefined
+                        }
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeKeyword(keyword)}
+                        className="shrink-0 text-current opacity-70 hover:opacity-100"
+                        title={lang === 'tr' ? 'Kaldır' : 'Remove'}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             )}
             <div className="relative">
@@ -165,4 +263,62 @@ export function AbstractPanel({
       </div>
     </div>
   );
+}
+
+function MeshStatusBadge({
+  status,
+  lang,
+  onUseSuggestion,
+}: {
+  status: MeshKeywordStatus;
+  lang: 'tr' | 'en';
+  onUseSuggestion?: () => void;
+}): JSX.Element {
+  if (status.status === 'checking') {
+    return <span className="shrink-0 rounded-full bg-white/70 px-1.5 py-0.5 text-[10px] text-muted">...</span>;
+  }
+  if (status.status === 'verified') {
+    return (
+      <span className="shrink-0 rounded-full bg-white/80 px-1.5 py-0.5 text-[10px] font-bold text-teal">
+        ✓ MeSH
+      </span>
+    );
+  }
+  if (status.status === 'suggested') {
+    return (
+      <button
+        type="button"
+        onClick={onUseSuggestion}
+        className="shrink-0 rounded-full bg-white px-1.5 py-0.5 text-[10px] font-bold text-amber-800 hover:bg-amber-100"
+      >
+        {lang === 'tr' ? 'MeSH:' : 'Use:'} {status.label}
+      </button>
+    );
+  }
+  return (
+    <span className="shrink-0 rounded-full bg-white/80 px-1.5 py-0.5 text-[10px] font-bold text-slate-500">
+      Custom
+    </span>
+  );
+}
+
+function meshStatusTitle(status: MeshKeywordStatus, lang: 'tr' | 'en'): string {
+  if (status.status === 'verified') {
+    return lang === 'tr'
+      ? `MeSH descriptor doğrulandı: ${status.label}`
+      : `Verified MeSH descriptor: ${status.label}`;
+  }
+  if (status.status === 'suggested') {
+    return lang === 'tr'
+      ? `Tam MeSH değil. Önerilen descriptor: ${status.label}`
+      : `Not an exact MeSH heading. Suggested descriptor: ${status.label}`;
+  }
+  if (status.status === 'checking') {
+    return lang === 'tr' ? 'MeSH kontrol ediliyor' : 'Checking MeSH';
+  }
+  return lang === 'tr' ? 'MeSH descriptor olarak doğrulanmadı' : 'Not verified as a MeSH descriptor';
+}
+
+function cleanKeyword(keyword: string): string {
+  return keyword.trim().replace(/[;,]+$/g, '');
 }
