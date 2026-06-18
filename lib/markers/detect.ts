@@ -28,7 +28,7 @@ export function normalizeSuperscripts(s: string): string {
 }
 
 const RANGE_RE =
-  /\[\s*((?:\d+\s*[,–—\-]?\s*)+)\s*\]/g;
+  /(?:\[\s*((?:\d+\s*[,;–—\-]?\s*)+)\s*\]|\(\s*((?:\d+\s*[,;–—\-]?\s*)+)\s*\))/g;
 
 export function detectMarkers(text: string): MarkerOccurrence[] {
   const out: MarkerOccurrence[] = [];
@@ -39,7 +39,7 @@ export function detectMarkers(text: string): MarkerOccurrence[] {
   let m: RegExpExecArray | null;
   while ((m = RANGE_RE.exec(normalized))) {
     const raw = m[0];
-    const inner = m[1];
+    const inner = m[1] ?? m[2];
     const refNumbers = expandRange(inner);
     if (refNumbers.length === 0) continue;
     out.push({

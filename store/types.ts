@@ -35,6 +35,8 @@ export type Ref = {
   confidence?: number;
   enRecNum?: number;
   source?: string;
+  /** Keep this reference in generated bibliographies even when no citation node exists. */
+  includeInBibliography?: boolean;
   // Cached embedding of (title + abstract + container) for semantic citation
   // suggestion. Regenerated when any of those fields change.
   embedding?: number[];

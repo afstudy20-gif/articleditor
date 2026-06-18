@@ -27,6 +27,12 @@ describe('detectMarkers', () => {
     assert.deepEqual(nums, [6, 7, 9, 10, 11]);
   });
 
+  it('expands comma lists and dash ranges inside parentheses', () => {
+    const occ = detectMarkers('primary PCI (4-6), stenting (8; 10).');
+    const nums = occ.flatMap((o) => o.refNumbers);
+    assert.deepEqual(nums, [4, 5, 6, 8, 10]);
+  });
+
   it('detects citations written as literal superscript characters', () => {
     const occ = detectMarkers('no-reflow.¹¹ Platelets');
     assert.deepEqual(occ[0]?.refNumbers, [11]);

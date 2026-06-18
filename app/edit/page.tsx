@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useSearchParams, useRouter } from 'next/navigation';
-import type { Project, Ref } from '@/store/types';
+import type { MarkerOccurrence, Project, Ref } from '@/store/types';
 import {
   createProject,
   listProjects,
@@ -25,11 +25,13 @@ import { DRTR_TOOLS } from '@/lib/i18n';
 import { newId } from '@/lib/id';
 import { parseDocx } from '@/lib/docx/parse';
 import { splitBodyAndBiblio, parseBiblioLines } from '@/lib/refs/parse-biblio';
+import { detectMarkers } from '@/lib/markers/detect';
 import {
   buildDocWithCitations,
   parseHtmlToParagraphs,
   type ImportParagraph,
 } from '@/lib/editor/import-rich';
+import { DocImportModal, type ImportPreview } from '@/components/Import/DocImportModal';
 
 const EditorClient = dynamic(() => import('./EditorClient').then((m) => m.EditorClient), {
   ssr: false,
@@ -52,12 +54,18 @@ function EditPageInner() {
   const [importMsg, setImportMsg] = useState<string | null>(null);
   const [conversionBusy, setConversionBusy] = useState(false);
   const [conversionError, setConversionError] = useState<string | null>(null);
+  const [conversionPreview, setConversionPreview] = useState<ImportPreview>(null);
+  const [conversionTitle, setConversionTitle] = useState('');
+  const [conversionPasteText, setConversionPasteText] = useState('');
+  const [conversionHtmlParagraphs, setConversionHtmlParagraphs] = useState<ImportParagraph[] | null>(null);
+  const [conversionPlainReference, setConversionPlainReference] = useState<string | null>(null);
   const [convTab, setConvTab] = useState<'upload' | 'paste'>('upload');
   const [syncState, setSyncState] = useState<gdrive.SyncState | null>(null);
   const [trashOpen, setTrashOpen] = useState(false);
   const [showSyncSettings, setShowSyncSettings] = useState(false);
   const [clientIdInput, setClientIdInput] = useState('');
   const backupInputRef = useRef<HTMLInputElement>(null);
+  const conversionDocxInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setClientIdInput(gdrive.getClientId());
@@ -149,7 +157,7 @@ function EditPageInner() {
     try {
       const buf = await file.arrayBuffer();
       const { paragraphs, plainText } = await parseDocx(buf);
-      await convertAndOpen(
+      prepareConversionPreview(
         plainText,
         file.name.replace(/\.docx$/i, '') || (lang === 'tr' ? 'Dönüştürülen Makale' : 'Converted Manuscript'),
         paragraphs,
@@ -166,7 +174,7 @@ function EditPageInner() {
     setConversionBusy(true);
     setConversionError(null);
     try {
-      await convertAndOpen(
+      prepareConversionPreview(
         text,
         lang === 'tr' ? 'Yapıştırılan Metin' : 'Pasted Text',
         html ? parseHtmlToParagraphs(html) : undefined,
@@ -179,18 +187,13 @@ function EditPageInner() {
     }
   }
 
-  async function convertAndOpen(
+  function prepareConversionPreview(
     text: string,
     defaultTitle: string,
     richParagraphs?: ImportParagraph[],
-  ): Promise<void> {
+  ): void {
     const split = splitBodyAndBiblio(text);
     const { refs: parsedRefs } = parseBiblioLines(split.refLines);
-
-    const refsWithIds: Ref[] = parsedRefs.map((r) => ({
-      ...r,
-      id: newId('r'),
-    }));
 
     const bibliographyStart = richParagraphs?.findIndex((paragraph) =>
       isBibliographyHeading(paragraph.text),
@@ -201,19 +204,79 @@ function EditPageInner() {
         .split(/\r?\n+/)
         .filter((paragraph) => paragraph.trim().length > 0)
         .map((paragraph) => ({ text: paragraph }));
-    const tiptapDoc = buildDocWithCitations(bodyParagraphs, refsWithIds);
+    const bodyText = bodyParagraphs.map((paragraph) => paragraph.text).join('\n');
+    const markers = detectMarkers(bodyText);
+    const citationCounts = countCitationsPerRef(parsedRefs.length, markers);
+
+    setConversionTitle(defaultTitle);
+    setConversionPreview({
+      paragraphs: bodyParagraphs,
+      bodyText,
+      refs: parsedRefs,
+      markerCount: markers.length,
+      citationCounts,
+    });
+  }
+
+  async function createProjectFromPreview(_replace: boolean, selectedIndices?: number[]): Promise<void> {
+    if (!conversionPreview) return;
+    const indices =
+      selectedIndices && selectedIndices.length > 0
+        ? selectedIndices
+        : conversionPreview.refs.map((_, i) => i);
+    const refsWithIds: Ref[] = indices.map((idx) => ({
+      ...conversionPreview.refs[idx],
+      id: newId('r'),
+      includeInBibliography: true,
+    }));
+    const selectedRefNumbers = indices.map((idx) => idx + 1);
+    const tiptapDoc = buildDocWithCitations(
+      conversionPreview.paragraphs,
+      refsWithIds,
+      selectedRefNumbers,
+    );
 
     const p: Project = createProject({
-      title: defaultTitle,
+      title: conversionTitle || (lang === 'tr' ? 'Dönüştürülen Makale' : 'Converted Manuscript'),
       refs: refsWithIds,
       doc: tiptapDoc,
-      bodyText: split.bodyText,
+      bodyText: conversionPreview.bodyText,
     });
     await saveProject(p);
     gdrive.markDirty(p.id);
     await refreshList();
     setActiveId(p.id);
     setActiveSubView('workspace');
+    setConversionPreview(null);
+    setConversionTitle('');
+    setConversionPasteText('');
+    setConversionHtmlParagraphs(null);
+    setConversionPlainReference(null);
+  }
+
+  function processConversionPaste(): void {
+    const text = conversionPasteText;
+    if (conversionHtmlParagraphs && conversionPlainReference && text.trim() === conversionPlainReference.trim()) {
+      prepareConversionPreview(
+        text,
+        lang === 'tr' ? 'Yapıştırılan Metin' : 'Pasted Text',
+        conversionHtmlParagraphs,
+      );
+      return;
+    }
+    prepareConversionPreview(text, lang === 'tr' ? 'Yapıştırılan Metin' : 'Pasted Text');
+  }
+
+  function countCitationsPerRef(refCount: number, markers: MarkerOccurrence[]): number[] {
+    const counts = new Array(refCount).fill(0);
+    for (const marker of markers) {
+      for (const n of marker.refNumbers) {
+        if (n >= 1 && n <= refCount) {
+          counts[n - 1]++;
+        }
+      }
+    }
+    return counts;
   }
 
   if (!loaded) {
@@ -594,6 +657,37 @@ function EditPageInner() {
             </div>
           </section>
         </main>
+        {conversionPreview && (
+          <DocImportModal
+            onClose={() => {
+              setConversionPreview(null);
+              setConversionTitle('');
+              setConversionPasteText('');
+              setConversionHtmlParagraphs(null);
+              setConversionPlainReference(null);
+            }}
+            docxInputRef={conversionDocxInputRef}
+            onSelectDocx={async (file) => {
+              await handleConvertFile(file);
+            }}
+            pasteText={conversionPasteText}
+            setPasteText={setConversionPasteText}
+            onProcessPaste={processConversionPaste}
+            onPasteHtml={(html, plain) => {
+              const parsed = parseHtmlToParagraphs(html);
+              if (parsed.length > 0) {
+                setConversionHtmlParagraphs(parsed);
+                setConversionPlainReference(plain);
+              }
+            }}
+            preview={conversionPreview}
+            onApply={(replace, selectedIndices) => {
+              void createProjectFromPreview(replace, selectedIndices);
+            }}
+            showAddButton={false}
+            replaceLabel={lang === 'tr' ? 'Projeyi oluştur' : 'Create project'}
+          />
+        )}
       </div>
     );
   }
