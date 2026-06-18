@@ -7,7 +7,7 @@ const AFFILIATION_RE =
 const NAME_LABEL_RE = /^(?:name|author|corresponding\s+author|isim|ad\s+soyad|yazar)\s*[:：-]\s*/i;
 const EMAIL_LABEL_SOURCE = String.raw`(?:e[\s-]?mail(?:\s+address)?|email(?:\s+address)?|mail|e[\s-]?posta)`;
 const META_LABEL_RE = new RegExp(String.raw`^(?:${EMAIL_LABEL_SOURCE}|orcid)\s*[:：-]\s*`, 'i');
-const CONTACT_LABEL_RE = new RegExp(String.raw`\b(?:${EMAIL_LABEL_SOURCE}|orcid)\b\s*[:：-]?\s*`, 'gi');
+const CONTACT_LABEL_RE = new RegExp(String.raw`[(:]?\s*\b(?:${EMAIL_LABEL_SOURCE}|orcid)\b\s*[:：-]?\s*`, 'gi');
 
 export function parseTitlePageAuthors(raw: string): TitlePageAuthor[] {
   const blocks = splitAuthorBlocks(raw);
@@ -106,6 +106,7 @@ function cleanName(name: string): string {
 function cleanInstitution(institution: string): string {
   return institution
     .replace(/^[\s,.;:-]+/, '')
+    .replace(/[\s,.;:)]+$/, '')
     .replace(/\s+([,.;])/g, '$1')
     .replace(/\s+/g, ' ')
     .trim();
