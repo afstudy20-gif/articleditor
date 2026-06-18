@@ -305,15 +305,59 @@ function extractAuthorBlock(s: string): { text: string; endIndex: number } {
   return { text: '', endIndex: 0 };
 }
 
+const CORPORATE_AUTHOR_RE =
+  /\b(Investigators|Group|Committee|Consortium|Collaborators|Trial|Trialists|Society|Association|Network|Working Party|Steering Committee|Authors|Centers? for Disease Control|World Health Organi[sz]ation|WHO)\b/i;
+
+function isCorporateAuthor(s: string): boolean {
+  const t = s.trim().replace(/^The\s+/i, '');
+  if (!t) return false;
+  if (!CORPORATE_AUTHOR_RE.test(t)) return false;
+  // All non-stopword tokens must start with a capital letter (allow short stopwords).
+  const tokens = t.split(/\s+/);
+  for (const tok of tokens) {
+    if (!tok) continue;
+    if (/^(?:the|of|and|for|in|on|de|la|le|du)$/i.test(tok)) continue;
+    if (!/^[A-ZÇĞİÖŞÜ]/.test(tok)) return false;
+  }
+  return tokens.length <= 12;
+}
+
+function looksLikeSingleAuthorToken(s: string): boolean {
+  const t = s.trim().replace(/\.$/, '');
+  if (!t) return false;
+  // "Smith J" / "Smith JA" / "Smith-Jones JA"
+  if (/^[A-ZÇĞİÖŞÜ][\w'\-]+(?:\s+[A-ZÇĞİÖŞÜ][\w'\-]+)?\s+[A-ZÇĞİÖŞÜ]{1,4}$/.test(t)) return true;
+  // Initials-only continuation token
+  if (/^[A-ZÇĞİÖŞÜ](?:\.?[A-ZÇĞİÖŞÜ]){0,3}\.?$/.test(t)) return true;
+  // "First Last" pattern (two capitalized tokens) — rare but plausible
+  if (/^[A-ZÇĞİÖŞÜ][\w'\-]+\s+[A-ZÇĞİÖŞÜ][\w'\-]+$/.test(t)) return true;
+  return false;
+}
+
 function looksLikeAuthorList(s: string): boolean {
   if (!s) return false;
-  // Heuristics: short, contains commas or "et al", and ends with initials or family name.
-  if (s.length > 500) return false;
-  const endingInitials = /[A-ZÇĞİÖŞÜ]{1,4}\s*$/.test(s);
-  const hasComma = /,/.test(s);
-  const hasEtAl = /\bet\s+al/i.test(s);
-  const singleAuthorWithInitial = /^[A-ZÇĞİÖŞÜ][\w'\-]+\s+[A-ZÇĞİÖŞÜ]{1,4}\s*$/.test(s.trim());
-  return endingInitials || singleAuthorWithInitial || (hasComma && hasEtAl) || (hasComma && s.length < 250);
+  const trimmed = s.trim();
+  if (trimmed.length > 500) return false;
+
+  // Corporate / single-entity author block (no comma): e.g. "The GUSTO Angiographic Investigators".
+  if (!/,/.test(trimmed)) {
+    if (isCorporateAuthor(trimmed)) return true;
+    return looksLikeSingleAuthorToken(trimmed);
+  }
+
+  // Multi-token list: most comma-separated tokens must look author-shaped.
+  const rawTokens = trimmed
+    .replace(/\s+et\s+al\.?$/i, '')
+    .split(/\s*,\s*/)
+    .map((t) => t.trim())
+    .filter(Boolean);
+  if (rawTokens.length === 0) return false;
+  let authorish = 0;
+  for (const tok of rawTokens) {
+    if (looksLikeSingleAuthorToken(tok) || isCorporateAuthor(tok)) authorish += 1;
+  }
+  const ratio = authorish / rawTokens.length;
+  return ratio >= 0.6 && authorish >= 2;
 }
 
 function extractJournalLikely(s: string): { name?: string; volume?: string; issue?: string; pages?: string } | undefined {

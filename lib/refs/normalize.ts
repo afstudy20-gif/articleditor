@@ -46,9 +46,15 @@ function looksLikeInitials(s: string): boolean {
   return /^[A-ZÇĞİÖŞÜ](\.?[A-ZÇĞİÖŞÜ])*\.?$/.test(s.trim());
 }
 
+const CORPORATE_KEYWORDS_RE =
+  /\b(Investigators|Group|Committee|Consortium|Collaborators|Trial|Trialists|Society|Association|Network|Working Party|Steering Committee|Authors|Centers? for Disease Control|World Health Organi[sz]ation|WHO)\b/i;
+
 function parseSingleAuthor(s: string): Author {
   const t = s.trim();
   if (!t) return {};
+  // Corporate / consortium author — keep as a single literal entry so it does
+  // not get split into a fake "family + given" pair.
+  if (CORPORATE_KEYWORDS_RE.test(t)) return { literal: t };
   // "Smith J" or "Smith JA"
   const m1 = t.match(/^([A-ZÇĞİÖŞÜ][\w'\-]+(?:\s+[A-ZÇĞİÖŞÜ][\w'\-]+)?)\s+([A-ZÇĞİÖŞÜ]{1,4})$/);
   if (m1) return { family: m1[1], given: m1[2] };

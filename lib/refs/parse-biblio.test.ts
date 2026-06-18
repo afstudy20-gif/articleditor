@@ -206,6 +206,32 @@ describe('splitBodyAndBiblio', () => {
     assert.ok(!split.refLines.some(l => l.includes('Variable Group')));
   });
 
+  it('keeps a corporate author as a single literal entry (GUSTO case)', () => {
+    const line =
+      '1. The GUSTO Angiographic Investigators. The effects of tissue plasminogen activator, streptokinase, or both on coronary-artery patency, ventricular function, and survival after acute myocardial infarction. N Engl J Med. 1993;329:1615-1622.';
+    const { ref } = parseRefLine(line, 'gusto');
+    assert.equal(ref.authors.length, 1);
+    assert.equal(ref.authors[0].literal, 'The GUSTO Angiographic Investigators');
+    assert.ok(ref.title?.toLowerCase().includes('tissue plasminogen activator'));
+    assert.ok(ref.title?.toLowerCase().includes('myocardial infarction'));
+    assert.equal(ref.year, 1993);
+  });
+
+  it('does not split a long title sentence into fake authors when no real author list exists', () => {
+    const line =
+      '1. The effects of tissue plasminogen activator, streptokinase, or both on coronary-artery patency, ventricular function, and survival after acute myocardial infarction. N Engl J Med. 1993;329:1615-1622.';
+    const { ref } = parseRefLine(line, 'no-corp');
+    // Every author the parser keeps must look real (>=1 char, not just a
+    // lowercase phrase fragment).
+    for (const a of ref.authors) {
+      const surname = a.family ?? a.literal ?? '';
+      assert.ok(
+        /^[A-ZÇĞİÖŞÜ]/.test(surname),
+        `Suspicious author surname extracted from title: "${surname}"`,
+      );
+    }
+  });
+
   it('stops at tabular rows even without an explicit Table caption', () => {
     const text = [
       'Body text.',
