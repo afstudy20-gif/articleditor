@@ -205,4 +205,21 @@ describe('splitBodyAndBiblio', () => {
     assert.ok(split.refLines[1].includes('Lee CD'));
     assert.ok(!split.refLines.some(l => l.includes('Variable Group')));
   });
+
+  it('stops at tabular rows even without an explicit Table caption', () => {
+    const text = [
+      'Body text.',
+      'References',
+      '1. Smith JA. Title. Nature. 2019;1:1-2.',
+      '2. Lee CD. Title. Science. 2020;2:3-4.',
+      '3. Brown K. Title. Cell. 2021;3:4-5.',
+      'Variable\tGroup A (n=10)\tGroup B (n=10)\tP',
+      'Age, years\t55 (10)\t60 (12)\t0.04',
+      'OR (95% CI)\t1.2 (0.9–1.5)\t1.5 (1.1–2.0)\t0.03',
+    ].join('\n');
+
+    const split = splitBodyAndBiblio(text);
+    assert.equal(split.refLines.length, 3);
+    assert.ok(!split.refLines.some((l) => l.includes('Group A') || l.includes('Age, years')));
+  });
 });

@@ -16,6 +16,7 @@ export type ImportParagraph = {
 export function buildDocWithCitations(
   paragraphs: ImportParagraph[],
   refs: Ref[],
+  selectedRefNumbers?: number[],
 ): Record<string, unknown> {
   const content: unknown[] = [];
   let pendingList: { type: 'bullet' | 'ordered'; items: unknown[] } | null = null;
@@ -45,7 +46,7 @@ export function buildDocWithCitations(
         type: 'listItem',
         content: [{
           type: 'paragraph',
-          content: paragraphToCitationInlineRich(paragraph.text, paragraph.runs, refs),
+          content: paragraphToCitationInlineRich(paragraph.text, paragraph.runs, refs, selectedRefNumbers),
         }],
       };
       if (pendingList && pendingList.type === paragraph.list.type) {
@@ -65,7 +66,7 @@ export function buildDocWithCitations(
     }
 
     const headingLevel = headingLevelFromStyle(style);
-    const inline = paragraphToCitationInlineRich(paragraph.text, paragraph.runs, refs);
+    const inline = paragraphToCitationInlineRich(paragraph.text, paragraph.runs, refs, selectedRefNumbers);
     if (headingLevel !== null) {
       content.push({
         type: 'heading',
@@ -180,6 +181,7 @@ function paragraphToCitationInlineRich(
   paragraphText: string,
   runs: ImportRun[] | undefined,
   refs: Ref[],
+  selectedRefNumbers?: number[],
 ): Array<Record<string, unknown>> {
   const activeRuns = runs && runs.length > 0 ? runs : [{ text: paragraphText }];
   const markers = detectMarkers(paragraphText);
@@ -206,8 +208,16 @@ function paragraphToCitationInlineRich(
         characterStyles,
       ));
     }
-    const refIds = marker.refNumbers
-      .map((number) => refs[number - 1]?.id)
+    const activeNumbers = selectedRefNumbers
+      ? marker.refNumbers.filter((number) => selectedRefNumbers.includes(number))
+      : marker.refNumbers;
+    const refIds = activeNumbers
+      .map((number) => {
+        const newIndex = selectedRefNumbers
+          ? selectedRefNumbers.indexOf(number)
+          : number - 1;
+        return refs[newIndex]?.id;
+      })
       .filter((id): id is string => Boolean(id));
     if (refIds.length > 0) {
       output.push({ type: 'citation', attrs: { refIds } });

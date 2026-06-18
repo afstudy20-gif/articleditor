@@ -77,7 +77,15 @@ export function splitBodyAndBiblio(fullText: string): BibSplit {
   const stopPatterns = [
     /^\s*(?:Table|Tablo|Figure|Fig|Şekil|Resim)\s+\d+/i,
     /^\s*(?:Author Contributions|Conflict of Interest|Funding|Acknowledgments|Acknowledgements|Appendix)\b/i,
+    // Common table header / statistical output rows that appear after references
+    // when supplementary tables are placed at the end of the document.
+    /^\s*(?:Variable|Univariate|Multivariate|Model\s+\d+|OR\s*\(95%\s*CI\))\b/i,
   ];
+
+  // A pasted table row has multiple tab-separated columns. DOCX tables are
+  // flattened into lines like "Column A\tColumn B\tColumn C"; these must not
+  // be swallowed as bibliography entries.
+  const isTableRow = (line: string): boolean => (line.match(/\t/g) ?? []).length >= 2;
 
   for (let i = headingIdx + 1; i < lines.length; i++) {
     const line = lines[i];
@@ -85,6 +93,7 @@ export function splitBodyAndBiblio(fullText: string): BibSplit {
     if (trimmed.length === 0) continue;
     const shouldStop = stopPatterns.some((pattern) => pattern.test(trimmed));
     if (shouldStop) break;
+    if (isTableRow(line)) break;
     refsRawAll.push(line.replace(/\s+$/g, ''));
   }
 

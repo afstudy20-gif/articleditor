@@ -10,6 +10,7 @@ dist
 coverage
 .vercel
 next-env.d.ts
+*.tsbuildinfo
 
 # Tauri
 src-tauri/target/

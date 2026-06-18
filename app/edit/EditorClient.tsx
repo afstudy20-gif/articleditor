@@ -19,6 +19,7 @@ import { refsToRis } from '@/lib/refs/ris';
 import { parseDocx } from '@/lib/docx/parse';
 import { splitBodyAndBiblio, parseBiblioLines } from '@/lib/refs/parse-biblio';
 import { detectMarkers } from '@/lib/markers/detect';
+import type { MarkerOccurrence } from '@/store/types';
 import { newId } from '@/lib/id';
 import { backupToBlob, buildBackup, projectFilename, parseBackup } from '@/lib/projects/backup';
 import { type StyleId, listAllStyles, isNumericStyle } from '@/lib/refs/styles';
@@ -107,6 +108,8 @@ type ImportPreview = {
   bodyText: string;
   refs: Ref[];
   markerCount: number;
+  /** Number of in-text citations for each reference (index 0 = reference #1). */
+  citationCounts: number[];
 } | null;
 
 export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoToDocuments }: Props) {
@@ -2138,13 +2141,16 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
       }
 
       const bodyParagraphs = paragraphs.slice(0, referencesStartIndex);
-      const markers = detectMarkers(bodyParagraphs.map((p) => p.text).join('\n'));
+      const bodyText = bodyParagraphs.map((p) => p.text).join('\n');
+      const markers = detectMarkers(bodyText);
+      const citationCounts = countCitationsPerRef(parsedRefs.length, markers);
 
       setImportPreview({
         paragraphs: bodyParagraphs,
-        bodyText: bodyParagraphs.map((p) => p.text).join('\n'),
+        bodyText,
         refs: parsedRefs,
         markerCount: markers.length,
+        citationCounts,
       });
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -2172,13 +2178,16 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
       }
 
       const bodyParagraphs = pastedHtmlParagraphs.slice(0, referencesStartIndex);
-      const markers = detectMarkers(bodyParagraphs.map((p) => p.text).join('\n'));
+      const bodyText = bodyParagraphs.map((p) => p.text).join('\n');
+      const markers = detectMarkers(bodyText);
+      const citationCounts = countCitationsPerRef(parsedRefs.length, markers);
 
       setImportPreview({
         paragraphs: bodyParagraphs,
-        bodyText: bodyParagraphs.map((p) => p.text).join('\n'),
+        bodyText,
         refs: parsedRefs,
         markerCount: markers.length,
+        citationCounts,
       });
       return;
     }
@@ -2193,19 +2202,35 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
     });
 
     const markers = detectMarkers(split.bodyText);
+    const citationCounts = countCitationsPerRef(parsedRefs.length, markers);
     setImportPreview({
       paragraphs,
       bodyText: split.bodyText,
       refs: parsedRefs,
       markerCount: markers.length,
+      citationCounts,
     });
   }
 
-  function applyImport(replace: boolean): void {
+  function applyImport(replace: boolean, selectedIndices?: number[]): void {
     if (!importPreview) return;
-    const newRefs: Ref[] = importPreview.refs.map((r) => ({ ...r, id: newRefId() }));
+    const indices =
+      selectedIndices && selectedIndices.length > 0
+        ? selectedIndices
+        : importPreview.refs.map((_, i) => i);
+    const newRefs: Ref[] = indices.map((idx) => ({
+      ...importPreview.refs[idx],
+      id: newRefId(),
+    }));
     // Build TipTap doc with citation nodes inserted at [N], [N,M], [N-M] marker positions.
-    const newDoc = buildDocWithCitations(importPreview.paragraphs, newRefs);
+    // Re-map citation markers so only selected references are cited and their
+    // numbers are compressed to the new bibliography order.
+    const selectedRefNumbers = indices.map((idx) => idx + 1);
+    const newDoc = buildDocWithCitations(
+      importPreview.paragraphs,
+      newRefs,
+      selectedRefNumbers,
+    );
     if (replace) {
       setRefs(newRefs);
       setDoc(newDoc);
@@ -2231,6 +2256,18 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
     setImportPasteText('');
     setPastedHtmlParagraphs(null);
     setPastedPlainReference(null);
+  }
+
+  function countCitationsPerRef(refCount: number, markers: MarkerOccurrence[]): number[] {
+    const counts = new Array(refCount).fill(0);
+    for (const marker of markers) {
+      for (const n of marker.refNumbers) {
+        if (n >= 1 && n <= refCount) {
+          counts[n - 1]++;
+        }
+      }
+    }
+    return counts;
   }
 
   const aiOff = aiConfigured === false;
@@ -3165,9 +3202,23 @@ function ImportModal({
   onProcessPaste: () => void;
   onPasteHtml?: (html: string, plain: string) => void;
   preview: ImportPreview;
-  onApply: (replace: boolean) => void;
+  onApply: (replace: boolean, selectedIndices?: number[]) => void;
 }): JSX.Element {
   const { lang } = useLang();
+  const [selectedRefs, setSelectedRefs] = useState<Set<number>>(new Set());
+
+  useEffect(() => {
+    if (preview) {
+      // Default: select references that have at least one in-text citation.
+      const defaults = new Set<number>();
+      preview.citationCounts.forEach((count, idx) => {
+        if (count > 0) defaults.add(idx);
+      });
+      setSelectedRefs(defaults);
+    } else {
+      setSelectedRefs(new Set());
+    }
+  }, [preview]);
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-auto">
@@ -3233,35 +3284,95 @@ function ImportModal({
           {preview && (
             <>
               <div className="text-sm text-secondary">
-                <strong>{preview.refs.length}</strong> referans, <strong>{preview.markerCount}</strong> atıf işareti
-                bulundu.
+                <strong>{preview.refs.length}</strong>{' '}
+                {lang === 'tr' ? 'referans,' : 'references,'}{' '}
+                <strong>{preview.markerCount}</strong>{' '}
+                {lang === 'tr' ? 'atıf işareti bulundu.' : 'citation markers found.'}
               </div>
               <div className="card p-3 max-h-[200px] overflow-auto bg-slate-50 text-xs font-mono whitespace-pre-wrap leading-relaxed">
                 {preview.bodyText.slice(0, 1500)}
                 {preview.bodyText.length > 1500 ? '\n…' : ''}
               </div>
-              <details className="text-xs">
-                <summary className="cursor-pointer text-teal hover:underline">
-                  Algılanan referanslar ({preview.refs.length})
-                </summary>
-                <ol className="mt-2 space-y-1">
-                  {preview.refs.map((r, i) => (
-                    <li key={i} className="text-secondary">
-                      <span className="font-bold">{i + 1}.</span>{' '}
-                      {r.title || r.raw?.slice(0, 80) || (lang === 'tr' ? '(başlıksız)' : '(untitled)')}
-                    </li>
-                  ))}
+              <div className="text-xs">
+                <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
+                  <span className="font-medium text-secondary">
+                    {lang === 'tr' ? 'Algılanan referanslar' : 'Detected references'} ({preview.refs.length})
+                  </span>
+                  <div className="flex gap-3">
+                    <button
+                      className="text-teal hover:underline"
+                      onClick={() => setSelectedRefs(new Set(preview.refs.map((_, i) => i)))}
+                    >
+                      {lang === 'tr' ? 'Tümünü seç' : 'Select all'}
+                    </button>
+                    <button
+                      className="text-teal hover:underline"
+                      onClick={() => {
+                        const next = new Set<number>();
+                        preview.citationCounts.forEach((count, idx) => {
+                          if (count > 0) next.add(idx);
+                        });
+                        setSelectedRefs(next);
+                      }}
+                    >
+                      {lang === 'tr' ? 'Sadece atıf yapılanlar' : 'Only cited'}
+                    </button>
+                    <button
+                      className="text-teal hover:underline"
+                      onClick={() => setSelectedRefs(new Set())}
+                    >
+                      {lang === 'tr' ? 'Hiçbirini seçme' : 'Select none'}
+                    </button>
+                  </div>
+                </div>
+                <ol className="max-h-[240px] overflow-auto border border-border rounded-lg p-2 space-y-1">
+                  {preview.refs.map((r, i) => {
+                    const refId = `import-ref-${i}`;
+                    return (
+                      <li key={i} className="flex gap-2 items-start">
+                        <input
+                          id={refId}
+                          type="checkbox"
+                          checked={selectedRefs.has(i)}
+                          onChange={(e) => {
+                            const next = new Set(selectedRefs);
+                            if (e.target.checked) next.add(i);
+                            else next.delete(i);
+                            setSelectedRefs(next);
+                          }}
+                          className="mt-1 shrink-0"
+                        />
+                        <label htmlFor={refId} className="flex-1 text-secondary cursor-pointer">
+                          <span className="font-bold">{i + 1}.</span>{' '}
+                          <span className="font-mono text-[11px]">
+                            {r.raw || r.title || (lang === 'tr' ? '(boş)' : '(empty)')}
+                          </span>
+                          <span className="ml-2 text-[10px] text-muted">
+                            {preview.citationCounts[i] || 0} {lang === 'tr' ? 'atıf' : 'cites'}
+                          </span>
+                        </label>
+                      </li>
+                    );
+                  })}
                 </ol>
-              </details>
+              </div>
               <div className="flex gap-2 justify-end pt-2 border-t border-border">
                 <button className="btn-secondary text-sm" onClick={onClose}>
-                  İptal
+                  {lang === 'tr' ? 'İptal' : 'Cancel'}
                 </button>
-                <button className="btn-secondary text-sm" onClick={() => onApply(false)}>
-                  Mevcut çalışmaya ekle
+                <button
+                  className="btn-secondary text-sm"
+                  onClick={() => onApply(false, Array.from(selectedRefs).sort((a, b) => a - b))}
+                  disabled={selectedRefs.size === 0}
+                >
+                  {lang === 'tr' ? 'Mevcut çalışmaya ekle' : 'Add to current'}
                 </button>
-                <button className="btn-primary text-sm" onClick={() => onApply(true)}>
-                  Üzerine yaz
+                <button
+                  className="btn-primary text-sm"
+                  onClick={() => onApply(true, Array.from(selectedRefs).sort((a, b) => a - b))}
+                  disabled={selectedRefs.size === 0}
+                >
+                  {lang === 'tr' ? 'Üzerine yaz' : 'Replace'}
                 </button>
               </div>
             </>
