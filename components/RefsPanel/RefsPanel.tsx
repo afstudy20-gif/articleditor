@@ -345,11 +345,11 @@ function CitedRefsSection({
               return (
                 <div
                   key={r.id}
-                  className="flex items-center gap-2 px-2 py-1 rounded-md hover:bg-teal-bg transition group"
+                  className="flex flex-col gap-0.5 px-2 py-1 rounded-md hover:bg-teal-bg transition group"
                 >
                   <button
                     onClick={() => onSelectRef?.(r.id)}
-                    className="flex-1 min-w-0 flex items-center gap-2 text-left"
+                    className="w-full flex items-center gap-2 text-left"
                     title={r.title || ''}
                   >
                     <span className="shrink-0 w-5 h-5 rounded text-[10px] font-bold flex items-center justify-center bg-teal text-white">
@@ -366,15 +366,15 @@ function CitedRefsSection({
                     </div>
                   </button>
                   {count > 0 && onJumpToRefCitation && (
-                    <div className="flex items-center gap-0.5 shrink-0">
-                      <span className="text-[10px] text-muted px-1">{count}×</span>
+                    <div className="flex items-center gap-1 pl-7">
+                      <span className="text-[10px] text-muted">{count} atıf</span>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           onJumpToRefCitation(r.id, -1);
                         }}
                         disabled={count < 2}
-                        className="px-1 py-0.5 rounded text-[10px] border border-border hover:bg-white disabled:opacity-40"
+                        className="px-1 py-0 rounded text-[10px] border border-border hover:bg-white disabled:opacity-40"
                         title={t('rp_prev_citation') || 'Previous citation'}
                       >
                         ↑
@@ -385,7 +385,7 @@ function CitedRefsSection({
                           onJumpToRefCitation(r.id, 1);
                         }}
                         disabled={count < 2}
-                        className="px-1 py-0.5 rounded text-[10px] border border-border hover:bg-white disabled:opacity-40"
+                        className="px-1 py-0 rounded text-[10px] border border-border hover:bg-white disabled:opacity-40"
                         title={t('rp_next_citation') || 'Next citation'}
                       >
                         ↓

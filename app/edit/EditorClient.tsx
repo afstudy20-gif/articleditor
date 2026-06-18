@@ -2698,38 +2698,6 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
         >
           {/* Top-left: Editor */}
           <div className="flex-1 min-h-0 min-w-0 flex flex-col gap-2 pr-2 overflow-hidden">
-          {highlightRefId && activeCitationCount > 0 && (
-            <div className="card flex items-center justify-between gap-2 px-3 py-2 bg-red-bg border-red-200">
-              <span className="text-xs text-red font-semibold">
-                Ref {refOrder.get(highlightRefId) ?? '?'}: {occurrenceCursor + 1}/{activeCitationCount} atıf
-                yerleştirilmiş
-              </span>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => jumpToCitation(-1)}
-                  disabled={activeCitationCount < 2}
-                  className="px-2 py-0.5 rounded border border-border hover:bg-white disabled:opacity-40"
-                  title={lang === 'tr' ? 'Önceki atıf' : 'Previous citation'}
-                >
-                  ↑
-                </button>
-                <button
-                  onClick={() => jumpToCitation(1)}
-                  disabled={activeCitationCount < 2}
-                  className="px-2 py-0.5 rounded border border-border hover:bg-white disabled:opacity-40"
-                  title={lang === 'tr' ? 'Sonraki atıf' : 'Next citation'}
-                >
-                  ↓
-                </button>
-                <button
-                  onClick={() => setHighlightRefId(null)}
-                  className="text-xs text-muted hover:text-primary ml-1"
-                >
-                  vurguyu kapat
-                </button>
-              </div>
-            </div>
-          )}
           {highlightRefId && activeCitationCount === 0 && (
             <div className="card flex items-center justify-between gap-2 px-3 py-2 bg-slate-50">
               <span className="text-xs text-muted">
