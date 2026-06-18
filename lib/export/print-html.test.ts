@@ -77,6 +77,18 @@ describe('buildPrintDocumentHtml', () => {
     assert.ok(buildPrintDocumentHtml({ ...base, doubleSpaced: true }).includes('enr-print-double'));
     assert.ok(!buildPrintDocumentHtml(base).includes('enr-print-double'));
   });
+
+  it('renders keywords inside the abstract block', () => {
+    const html = buildPrintDocumentHtml({
+      ...base,
+      abstractText: 'Platelet activation was associated with no-reflow.',
+      keywords: ['Blood Platelets', 'Myocardial Infarction'],
+    });
+
+    assert.ok(html.includes('<section class="enr-print-abstract">'));
+    assert.ok(html.includes('Platelet activation was associated with no-reflow.'));
+    assert.ok(html.includes('<strong>Keywords:</strong> Blood Platelets; Myocardial Infarction'));
+  });
 });
 
 describe('printStylesheet', () => {

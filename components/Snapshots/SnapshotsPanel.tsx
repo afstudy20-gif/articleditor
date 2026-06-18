@@ -10,6 +10,8 @@ interface SnapshotsPanelProps {
   projectId: string;
   currentDoc: unknown;
   currentRefs: Ref[];
+  currentAbstractText?: string;
+  currentKeywords?: string[];
   currentWordCount: number;
   onRestore: (snap: Snapshot) => void;
   onClose: () => void;
@@ -28,6 +30,8 @@ export function SnapshotsPanel({
   projectId,
   currentDoc,
   currentRefs,
+  currentAbstractText,
+  currentKeywords,
   currentWordCount,
   onRestore,
   onClose,
@@ -53,6 +57,8 @@ export function SnapshotsPanel({
         label: t('snap_manual_label'),
         doc: currentDoc,
         refs: currentRefs,
+        abstractText: currentAbstractText,
+        keywords: currentKeywords,
         wordCount: currentWordCount,
         auto: false,
       });

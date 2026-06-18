@@ -141,6 +141,21 @@ describe('buildLatex', () => {
     assert.ok(output.bib.includes('@article{smith2024,'));
   });
 
+  it('renders keywords inside the abstract block', () => {
+    const output = buildLatex({
+      doc: { type: 'doc', content: [] },
+      refs: [],
+      title: 'Keyword test',
+      abstractText: 'Platelet activation was associated with no-reflow.',
+      keywords: ['Blood Platelets', 'Myocardial Infarction'],
+      style: 'vancouver',
+    });
+
+    assert.ok(output.tex.includes('\\begin{abstract}'));
+    assert.ok(output.tex.includes('Platelet activation was associated with no-reflow.'));
+    assert.ok(output.tex.includes('\\noindent\\textbf{Keywords:} Blood Platelets; Myocardial Infarction'));
+  });
+
   it('extracts embedded images and preserves figure cross-references', () => {
     const doc = {
       type: 'doc',

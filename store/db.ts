@@ -88,7 +88,7 @@ const MAX_SNAPSHOTS_PER_PROJECT = 30;
 
 export async function createSnapshot(
   projectId: string,
-  data: { label: string; doc?: unknown; refs: Ref[]; auto?: boolean; wordCount?: number; supplementary?: string },
+  data: { label: string; doc?: unknown; refs: Ref[]; auto?: boolean; wordCount?: number; supplementary?: string; abstractText?: string; keywords?: string[] },
 ): Promise<Snapshot> {
   const db = getDb();
   const snap: Snapshot = {
@@ -101,6 +101,8 @@ export async function createSnapshot(
     refs: data.refs,
     wordCount: data.wordCount,
     supplementary: data.supplementary,
+    abstractText: data.abstractText,
+    keywords: data.keywords,
   };
   await db.snapshots.put(snap);
   // Prune oldest beyond the cap to bound storage.
@@ -136,6 +138,8 @@ export function createProject(partial: Partial<Project> = {}): Project {
     refs: partial.refs ?? [],
     doc: partial.doc,
     bodyText: partial.bodyText,
+    abstractText: partial.abstractText,
+    keywords: partial.keywords,
     settings: partial.settings ?? { style: 'vancouver' },
   };
 }

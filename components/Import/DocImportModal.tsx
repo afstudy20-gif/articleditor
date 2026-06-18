@@ -11,6 +11,8 @@ export type ImportPreview = {
   bodyText: string;
   refs: Ref[];
   markerCount: number;
+  abstractText?: string;
+  keywords?: string[];
   /** Number of in-text citations for each reference (index 0 = reference #1). */
   citationCounts: number[];
 } | null;

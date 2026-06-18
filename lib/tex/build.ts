@@ -12,6 +12,8 @@ export type TexBuildInput = {
   doc: Json;
   refs: Ref[];
   title?: string;
+  abstractText?: string;
+  keywords?: string[];
   style: StyleId;
   language?: 'tr' | 'en';
   bibliographyTitle?: string;
@@ -104,6 +106,8 @@ export function buildLatex(input: TexBuildInput): TexBuildOutput {
     bibFilename: 'refs',
     language: input.language ?? 'en',
     bibliographyTitle: input.bibliographyTitle ?? 'References',
+    abstractText: input.abstractText,
+    keywords: input.keywords,
     figureLegends: figureCaptionPlacement === 'after-bibliography'
       ? renderer.renderFigureLegends()
       : '',
@@ -134,6 +138,8 @@ function buildTexSource(o: {
   bibFilename: string;
   language: 'tr' | 'en';
   bibliographyTitle: string;
+  abstractText?: string;
+  keywords?: string[];
   figureLegends: string;
   exportDate: string;
 }): string {
@@ -194,6 +200,8 @@ ${bibliographyNameOptions ? `${bibliographyNameOptions}\n` : ''}  maxcitenames=2
 \\begin{document}
 \\maketitle
 
+${renderAbstractBlock(o.abstractText, o.keywords)}
+
 ${o.body}
 
 \\clearpage
@@ -203,6 +211,39 @@ ${o.figureLegends}
 
 \\end{document}
 `;
+}
+
+function renderAbstractBlock(abstractText?: string, keywords?: string[]): string {
+  const text = abstractText?.trim();
+  const cleanKeywords = normalizeKeywords(keywords);
+  if (!text && cleanKeywords.length === 0) return '';
+  const paragraphs = text
+    ? text
+        .split(/\n{2,}/)
+        .map((part) => escapeTex(part.trim()))
+        .filter(Boolean)
+        .join('\n\n')
+    : '';
+  const keywordLine = cleanKeywords.length > 0
+    ? `\\noindent\\textbf{Keywords:} ${escapeTex(cleanKeywords.join('; '))}`
+    : '';
+  return `\\begin{abstract}
+${[paragraphs, keywordLine].filter(Boolean).join('\n\n')}
+\\end{abstract}`;
+}
+
+function normalizeKeywords(keywords: string[] | undefined): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const keyword of keywords ?? []) {
+    const clean = keyword.trim().replace(/[;,]+$/g, '');
+    if (!clean) continue;
+    const key = clean.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(clean);
+  }
+  return out;
 }
 
 class LatexRenderer {

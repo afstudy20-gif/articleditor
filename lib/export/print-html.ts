@@ -36,6 +36,8 @@ export interface PrintManuscriptInput {
   orderedRefs: Ref[];
   style: StyleId;
   lang: 'tr' | 'en';
+  abstractText?: string;
+  keywords?: string[];
   bibHeading?: string;
   doubleSpaced?: boolean;
 }
@@ -69,14 +71,41 @@ export function buildPrintDocumentHtml(input: PrintManuscriptInput): string {
   const bibliography = buildBibliographyHtml(input.orderedRefs, input.style, heading);
   const title = input.title.trim();
   const titleHtml = title ? `<h1 class="enr-print-title">${escapeHtml(title)}</h1>` : '';
+  const abstractText = input.abstractText?.trim();
+  const keywords = normalizeKeywords(input.keywords);
+  const abstractHtml = abstractText || keywords.length > 0
+    ? `<section class="enr-print-abstract"><h2>Abstract</h2>${abstractText
+        ? abstractText
+            .split(/\n{2,}/)
+            .map((part) => `<p>${escapeHtml(part.trim())}</p>`)
+            .join('')
+        : ''}${keywords.length > 0
+        ? `<p class="enr-print-keywords"><strong>Keywords:</strong> ${escapeHtml(keywords.join('; '))}</p>`
+        : ''}</section>`
+    : '';
   const docClass = `enr-print-doc${input.doubleSpaced ? ' enr-print-double' : ''}`;
   return (
     `<article class="${docClass}">` +
     titleHtml +
+    abstractHtml +
     `<div class="enr-print-body">${input.bodyHtml}</div>` +
     bibliography +
     `</article>`
   );
+}
+
+function normalizeKeywords(keywords: string[] | undefined): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const keyword of keywords ?? []) {
+    const clean = keyword.trim().replace(/[;,]+$/g, '');
+    if (!clean) continue;
+    const key = clean.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(clean);
+  }
+  return out;
 }
 
 /**
@@ -105,6 +134,7 @@ export function printStylesheet(): string {
   font-size: 12pt;
   line-height: 1.5;
 }
+.${PRINT_HOST_CLASS} .enr-print-double .enr-print-abstract,
 .${PRINT_HOST_CLASS} .enr-print-double .enr-print-body,
 .${PRINT_HOST_CLASS} .enr-print-double .enr-print-bib { line-height: 2; }
 .${PRINT_HOST_CLASS} .enr-print-title {
@@ -114,6 +144,9 @@ export function printStylesheet(): string {
   margin: 0 0 1.4em;
 }
 .${PRINT_HOST_CLASS} .enr-print-body { text-align: justify; }
+.${PRINT_HOST_CLASS} .enr-print-abstract { margin: 0 0 1em; text-align: justify; }
+.${PRINT_HOST_CLASS} .enr-print-abstract h2 { font-size: 13.5pt; font-weight: 700; margin: 0 0 0.45em; }
+.${PRINT_HOST_CLASS} .enr-print-abstract p { margin: 0 0 0.6em; }
 .${PRINT_HOST_CLASS} .enr-print-body p { margin: 0 0 0.6em; }
 .${PRINT_HOST_CLASS} .enr-print-body h1 { font-size: 15pt; font-weight: 700; margin: 1.1em 0 0.5em; }
 .${PRINT_HOST_CLASS} .enr-print-body h2 { font-size: 13.5pt; font-weight: 700; margin: 1em 0 0.45em; }

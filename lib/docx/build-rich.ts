@@ -54,6 +54,10 @@ export type RichBuildInput = {
   bibHeading?: string;
   /** Add the title as the first body paragraph. Defaults to true. */
   includeDocumentTitle?: boolean;
+  /** Optional manuscript abstract inserted before the main body. */
+  abstractText?: string;
+  /** Optional keywords rendered inside the abstract block. */
+  keywords?: string[];
   /** Add the bibliography heading and entries. Defaults to true. */
   includeBibliography?: boolean;
   /** Keep figure captions inline or collect them after the bibliography. */
@@ -240,6 +244,26 @@ ${this.rels.join('\n')}
       && !hasHeading1
     ) {
       paragraphs.push(`<w:p><w:pPr><w:pStyle w:val="${titleStyle}"/></w:pPr>${textRun(this.input.title)}</w:p>`);
+    }
+
+    const abstractText = this.input.abstractText?.trim() ?? '';
+    const keywords = normalizeKeywords(this.input.keywords);
+    if (abstractText || keywords.length > 0) {
+      paragraphs.push(`<w:p><w:pPr><w:pStyle w:val="${h1Style}"/></w:pPr>${textRun('Abstract')}</w:p>`);
+      abstractText
+        .split(/\n{2,}/)
+        .map((part) => part.trim())
+        .filter(Boolean)
+        .forEach((part) => {
+          const pPr = normalStyle ? `<w:pPr><w:pStyle w:val="${normalStyle}"/></w:pPr>` : '';
+          paragraphs.push(`<w:p>${pPr}${textRun(part)}</w:p>`);
+        });
+      if (keywords.length > 0) {
+        const pPr = normalStyle ? `<w:pPr><w:pStyle w:val="${normalStyle}"/></w:pPr>` : '';
+        paragraphs.push(
+          `<w:p>${pPr}<w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">Keywords: </w:t></w:r>${textRun(keywords.join('; '))}</w:p>`,
+        );
+      }
     }
 
     if (Array.isArray(doc?.content)) {
@@ -616,6 +640,20 @@ ${paragraphs.join('\n')}
     }
     return out;
   }
+}
+
+function normalizeKeywords(keywords: string[] | undefined): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const keyword of keywords ?? []) {
+    const clean = keyword.trim().replace(/[;,]+$/g, '');
+    if (!clean) continue;
+    const key = clean.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(clean);
+  }
+  return out;
 }
 
 // ─── Helpers ────────────────────────────────────────────────

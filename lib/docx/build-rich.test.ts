@@ -158,6 +158,24 @@ describe('buildRichDocx', () => {
     assert.ok(xml.includes('Zeta, A.'));
   });
 
+  it('renders keywords inside the abstract block', async () => {
+    const blob = await buildRichDocx({
+      doc: { type: 'doc', content: [] },
+      refsById: new Map(),
+      refOrder: new Map(),
+      style: 'vancouver',
+      mode: 'plain',
+      abstractText: 'Platelet activation was associated with no-reflow.',
+      keywords: ['Blood Platelets', 'Myocardial Infarction'],
+    });
+    const xml = await documentXml(blob);
+
+    assert.ok(xml.includes('Abstract'));
+    assert.ok(xml.includes('Platelet activation was associated with no-reflow.'));
+    assert.ok(xml.includes('Keywords: '));
+    assert.ok(xml.includes('Blood Platelets; Myocardial Infarction'));
+  });
+
   it('can move figure captions into Figure Legends after References', async () => {
     const figureDoc = {
       type: 'doc',

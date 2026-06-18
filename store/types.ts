@@ -93,6 +93,8 @@ export type Project = {
   doc?: unknown;
   refs: Ref[];
   bodyText?: string;
+  abstractText?: string;
+  keywords?: string[];
   settings?: {
     // Built-in citation style id or a 'custom:<id>' style.
     style?: string;
@@ -119,6 +121,8 @@ export type Snapshot = {
   refs: Ref[];
   wordCount?: number;
   supplementary?: string;
+  abstractText?: string;
+  keywords?: string[];
 };
 
 export type Phrase = {

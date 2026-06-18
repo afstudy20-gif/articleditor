@@ -224,6 +224,7 @@ const tr: Dict = {
   ed_export_ris: '.ris',
   ed_export_latex: 'LaTeX (.zip)',
   ed_export_pdf: 'PDF (yazdır / kaydet)',
+  ed_export_include_abstract: 'Abstract dahil',
   ed_import_error: 'İçe aktarma hatası: {msg}',
 
   // Editor (TipTap)
@@ -318,7 +319,8 @@ const tr: Dict = {
   ed_journal_check: 'Dergi kontrolü',
   ed_checklist: 'Raporlama listesi',
   ed_checklist_hint: 'Otomatik tespit yalnızca ipucudur; her maddeyi siz onaylayın.',
-  ed_letters: 'Mektuplar',
+  ed_abstract: 'Abstract',
+  ed_letters: 'Diğer Dosyalar',
   // Snapshots
   snap_title: 'Sürümler / Geri Yükleme Noktaları',
   snap_create: 'Sürüm kaydet',
@@ -461,7 +463,7 @@ const tr: Dict = {
   ws_main_manuscript: 'Ana Yazı',
   ws_manuscript_desc: 'Makalenin ana metnini, referanslarını ve biçimlendirmesini buradan yönetin.',
   ws_open_manuscript: 'Düzenleyiciyi Aç',
-  ws_other_docs: 'Diğer Yazılar (Mektuplar & Ek Belgeler)',
+  ws_other_docs: 'Diğer Dosyalar',
   ws_other_docs_desc: 'Cover letter, Başlık Sayfası, Hakem Yanıtı gibi ek belgeleri şablonlardan oluşturun ve düzenleyin.',
   ws_no_docs: 'Henüz bu proje için bir ek belge veya mektup oluşturulmamış.',
   ws_create_doc: 'Şablondan Yeni Belge Oluştur',
@@ -741,7 +743,7 @@ const tr: Dict = {
   hdr_figures: 'Şekil',
   hdr_journal: 'Dergi',
   hdr_checklist: 'Liste',
-  hdr_letters: 'Mektup',
+  hdr_letters: 'Dosyalar',
   hdr_focus: 'Odak',
   hdr_settings: 'Ayar',
   // Custom citation styles
@@ -1039,6 +1041,7 @@ const en: Dict = {
   ed_export_ris: '.ris',
   ed_export_latex: 'LaTeX (.zip)',
   ed_export_pdf: 'PDF (print / save)',
+  ed_export_include_abstract: 'Include Abstract',
   ed_import_error: 'Import error: {msg}',
 
   // Editor (TipTap)
@@ -1133,7 +1136,8 @@ const en: Dict = {
   ed_journal_check: 'Journal check',
   ed_checklist: 'Reporting checklist',
   ed_checklist_hint: 'Auto-detection is only a hint; confirm each item yourself.',
-  ed_letters: 'Letters',
+  ed_abstract: 'Abstract',
+  ed_letters: 'Other Files',
   // Snapshots
   snap_title: 'Versions / Restore Points',
   snap_create: 'Save version',
@@ -1276,7 +1280,7 @@ const en: Dict = {
   ws_main_manuscript: 'Main Manuscript',
   ws_manuscript_desc: 'Manage the main text, references, and styling of your manuscript.',
   ws_open_manuscript: 'Open Editor',
-  ws_other_docs: 'Other Documents (Letters & Metadata)',
+  ws_other_docs: 'Other Files',
   ws_other_docs_desc: 'Create and edit cover letters, title pages, reviewer responses, and other attachments from templates.',
   ws_no_docs: 'No other documents or letters created for this project yet.',
   ws_create_doc: 'Create from Template',
@@ -1556,7 +1560,7 @@ const en: Dict = {
   hdr_figures: 'Figures',
   hdr_journal: 'Journal',
   hdr_checklist: 'Checklist',
-  hdr_letters: 'Letters',
+  hdr_letters: 'Files',
   hdr_focus: 'Focus',
   hdr_settings: 'Settings',
   // Custom citation styles

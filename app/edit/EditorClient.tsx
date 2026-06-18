@@ -78,6 +78,7 @@ import { SupplementaryPanel } from '@/components/Supplementary/SupplementaryPane
 import { AbbreviationsPanel } from '@/components/Abbreviations/AbbreviationsPanel';
 import { StickyNote } from '@/components/StickyNote';
 import { RagPanel } from '@/components/Rag/RagPanel';
+import { AbstractPanel } from '@/components/Abstract/AbstractPanel';
 import { DocImportModal, type ImportPreview } from '@/components/Import/DocImportModal';
 import { useTabSync } from '@/lib/hooks/useTabSync';
 import { useIsDesktop } from '@/lib/hooks/useIsDesktop';
@@ -88,6 +89,7 @@ import {
   parseHtmlToParagraphs,
   type ImportParagraph,
 } from '@/lib/editor/import-rich';
+import { splitAbstractMetadataFromParagraphs } from '@/lib/editor/abstract';
 import {
   encodeSelection,
   decodeToTipTapContent,
@@ -271,8 +273,12 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
   const [journalOpen, setJournalOpen] = useState(false);
   const [checklistOpen, setChecklistOpen] = useState(false);
   const [lettersOpen, setLettersOpen] = useState(false);
+  const [abstractOpen, setAbstractOpen] = useState(false);
+  const [includeAbstractExport, setIncludeAbstractExport] = useState(true);
+  const [keywords, setKeywords] = useState<string[]>(project.keywords ?? []);
   const [phrasebankOpen, setPhrasebankOpen] = useState(false);
   const [supplementary, setSupplementary] = useState<string>(project.supplementary ?? '');
+  const [abstractText, setAbstractText] = useState<string>(project.abstractText ?? '');
   const [suppOpen, setSuppOpen] = useState(false);
   const [abbrOpen, setAbbrOpen] = useState(false);
   const [phrasebankSection, setPhrasebankSection] = useState<string | null>(null);
@@ -302,6 +308,8 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
           doc: liveDoc,
           refs,
           supplementary,
+          abstractText,
+          keywords,
           auto: true,
           wordCount: computeWritingStats(liveDoc).words,
         });
@@ -310,7 +318,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
       }
     },
     // editorInstance is a stable ref-like object
-    [doc, refs, supplementary, project.id],
+    [doc, refs, supplementary, abstractText, keywords, project.id],
   );
 
   const restoreSnapshot = useCallback(
@@ -320,6 +328,12 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
       setDoc(snap.doc);
       if (snap.supplementary !== undefined) {
         setSupplementary(snap.supplementary ?? '');
+      }
+      if (snap.abstractText !== undefined) {
+        setAbstractText(snap.abstractText ?? '');
+      }
+      if (snap.keywords !== undefined) {
+        setKeywords(snap.keywords ?? []);
       }
       const ed = editorInstance.current;
       if (ed && !ed.isDestroyed && snap.doc) {
@@ -653,6 +667,8 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
         refs,
         doc,
         supplementary,
+        abstractText,
+        keywords,
         settings: { ...(project.settings ?? {}), style, figureCaptionPlacement, fontFamily },
       });
       setSavedAt(Date.now());
@@ -668,6 +684,8 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
     doc,
     style,
     supplementary,
+    abstractText,
+    keywords,
     figureCaptionPlacement,
     fontFamily,
     project,
@@ -684,6 +702,8 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
       setRefs(fresh.refs);
       setDoc(fresh.doc);
       setSupplementary(fresh.supplementary ?? '');
+      setAbstractText(fresh.abstractText ?? '');
+      setKeywords(fresh.keywords ?? []);
       const ed = editorInstance.current;
       if (ed && !ed.isDestroyed) {
         ed.commands.setContent(fresh.doc ?? { type: 'doc', content: [{ type: 'paragraph' }] });
@@ -1382,17 +1402,19 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
 
   // Try to detect abstract (paragraph after first heading containing "abstract"/"özet").
   const detectAbstract = useCallback((): string => {
+    const savedAbstract = abstractText.trim();
+    if (savedAbstract) return savedAbstract;
     const ed = editorInstance.current;
     if (!ed) return '';
     const doc = ed.state.doc;
-    let abstractText = '';
+    let detectedAbstract = '';
     let inAbstract = false;
     let firstParaText = '';
     doc.descendants((node: any) => {
-      if (abstractText) return false;
+      if (detectedAbstract) return false;
       if (node.type?.name === 'heading') {
         const text = (node.textContent ?? '').toLowerCase();
-        if (inAbstract && abstractText === '') {
+        if (inAbstract && detectedAbstract === '') {
           // Found a new heading after abstract; stop accumulation.
           return false;
         }
@@ -1407,14 +1429,14 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
         const t = node.textContent ?? '';
         if (!firstParaText && t.length > 20) firstParaText = t;
         if (inAbstract && t.length > 20) {
-          abstractText = t;
+          detectedAbstract = t;
           return false;
         }
       }
       return true;
     });
-    return abstractText || firstParaText;
-  }, []);
+    return detectedAbstract || firstParaText;
+  }, [abstractText]);
 
   const runAICompare = useCallback(() => {
     if (refs.length === 0) {
@@ -1967,6 +1989,8 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
       title,
       lineNumbers: exportLineNumbers,
       bibHeading: 'References',
+      abstractText: includeAbstractExport ? abstractText : undefined,
+      keywords: includeAbstractExport ? keywords : undefined,
       figureCaptionPlacement,
       fontFamily,
     });
@@ -1988,6 +2012,8 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
         style,
         mode: 'active',
         title,
+        abstractText: includeAbstractExport ? abstractText : undefined,
+        keywords: includeAbstractExport ? keywords : undefined,
         figureCaptionPlacement,
         // Template sectPr already carries the journal's line numbering.
         lineNumbers: false,
@@ -2011,6 +2037,8 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
       doc: doc as any,
       refs: orderedRefs,
       title,
+      abstractText: includeAbstractExport ? abstractText : undefined,
+      keywords: includeAbstractExport ? keywords : undefined,
       style,
       language: lang,
       bibliographyTitle: 'References',
@@ -2089,6 +2117,8 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
       orderedRefs,
       style,
       lang,
+      abstractText: includeAbstractExport ? abstractText : undefined,
+      keywords: includeAbstractExport ? keywords : undefined,
       bibHeading: 'References',
     });
 
@@ -2115,7 +2145,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
   }
 
   function exportProjectJson(): void {
-    const p: Project = { ...project, title, refs, doc };
+    const p: Project = { ...project, title, refs, doc, supplementary, abstractText, keywords };
     const blob = backupToBlob(buildBackup([p]));
     download(blob, projectFilename(p));
   }
@@ -2138,6 +2168,9 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
       setTitle(p.title ?? title);
       setRefs(p.refs ?? []);
       setDoc(p.doc ?? null);
+      setAbstractText(p.abstractText ?? '');
+      setKeywords(p.keywords ?? []);
+      setSupplementary(p.supplementary ?? '');
 
       editorRegistry.current.forEach((ed) => {
         if (ed && !ed.isDestroyed && p.doc) {
@@ -2170,7 +2203,9 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
         }
       }
 
-      const bodyParagraphs = paragraphs.slice(0, referencesStartIndex);
+      const { bodyParagraphs, abstractText: importedAbstract, keywords: importedKeywords } = splitAbstractMetadataFromParagraphs(
+        paragraphs.slice(0, referencesStartIndex),
+      );
       const bodyText = bodyParagraphs.map((p) => p.text).join('\n');
       const markers = detectMarkers(bodyText);
       const citationCounts = countCitationsPerRef(parsedRefs.length, markers);
@@ -2180,6 +2215,8 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
         bodyText,
         refs: parsedRefs,
         markerCount: markers.length,
+        abstractText: importedAbstract,
+        keywords: importedKeywords,
         citationCounts,
       });
     } catch (e: unknown) {
@@ -2207,7 +2244,9 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
         }
       }
 
-      const bodyParagraphs = pastedHtmlParagraphs.slice(0, referencesStartIndex);
+      const { bodyParagraphs, abstractText: importedAbstract, keywords: importedKeywords } = splitAbstractMetadataFromParagraphs(
+        pastedHtmlParagraphs.slice(0, referencesStartIndex),
+      );
       const bodyText = bodyParagraphs.map((p) => p.text).join('\n');
       const markers = detectMarkers(bodyText);
       const citationCounts = countCitationsPerRef(parsedRefs.length, markers);
@@ -2217,6 +2256,8 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
         bodyText,
         refs: parsedRefs,
         markerCount: markers.length,
+        abstractText: importedAbstract,
+        keywords: importedKeywords,
         citationCounts,
       });
       return;
@@ -2231,13 +2272,17 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
       };
     });
 
-    const markers = detectMarkers(split.bodyText);
+    const { bodyParagraphs, abstractText: importedAbstract, keywords: importedKeywords } = splitAbstractMetadataFromParagraphs(paragraphs);
+    const bodyText = bodyParagraphs.map((p) => p.text).join('\n');
+    const markers = detectMarkers(bodyText);
     const citationCounts = countCitationsPerRef(parsedRefs.length, markers);
     setImportPreview({
-      paragraphs,
-      bodyText: split.bodyText,
+      paragraphs: bodyParagraphs,
+      bodyText,
       refs: parsedRefs,
       markerCount: markers.length,
+      abstractText: importedAbstract,
+      keywords: importedKeywords,
       citationCounts,
     });
   }
@@ -2265,9 +2310,17 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
     if (replace) {
       setRefs(newRefs);
       setDoc(newDoc);
+      setAbstractText(importPreview.abstractText ?? '');
+      setKeywords(importPreview.keywords ?? []);
     } else {
       setRefs((prev) => [...prev, ...newRefs]);
       setDoc((prev: any) => mergeTipTapDocs(prev, newDoc));
+      if (!abstractText.trim() && importPreview.abstractText?.trim()) {
+        setAbstractText(importPreview.abstractText);
+      }
+      if (keywords.length === 0 && importPreview.keywords?.length) {
+        setKeywords(importPreview.keywords);
+      }
     }
 
     editorRegistry.current.forEach((ed) => {
@@ -2323,6 +2376,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
     },
     { id: 'journal-check', group: t('cmd_g_doc'), label: t('ed_journal_check'), run: () => setJournalOpen(true) },
     { id: 'checklist', group: t('cmd_g_doc'), label: t('ed_checklist'), run: () => setChecklistOpen(true) },
+    { id: 'abstract', group: t('cmd_g_doc'), label: t('ed_abstract'), run: () => setAbstractOpen(true) },
     { id: 'letters', group: t('cmd_g_doc'), label: t('ed_letters'), run: () => { if (onGoToDocuments) onGoToDocuments(); else setLettersOpen(true); } },
     { id: 'snapshot-now', group: t('cmd_g_doc'), label: t('snap_create'), run: () => { void autoSnapshot(t('snap_manual_label')); setSnapshotsOpen(true); } },
     { id: 'settings', group: t('cmd_g_view'), label: t('ai_settings_title'), run: () => setSettingsOpen(true) },
@@ -2376,10 +2430,11 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
                     setFiguresOpen(false);
                     setSuppOpen(false);
                     setLettersOpen(false);
+                    setAbstractOpen(false);
                     setAbbrOpen(false);
                   }}
                   className={`px-1.5 py-0.5 rounded text-[11px] font-semibold transition flex items-center gap-1 shrink-0 ${
-                    (!tablesOpen && !figuresOpen && !suppOpen && !lettersOpen && !abbrOpen)
+                    (!tablesOpen && !figuresOpen && !suppOpen && !lettersOpen && !abstractOpen && !abbrOpen)
                       ? 'bg-teal text-white shadow-sm'
                       : 'text-secondary hover:text-primary hover:bg-slate-100'
                   }`}
@@ -2391,7 +2446,26 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
                     setTablesOpen(false);
                     setFiguresOpen(false);
                     setSuppOpen(false);
+                    setLettersOpen(false);
+                    setAbstractOpen(false);
                     setAbbrOpen(false);
+                    setAbstractOpen(true);
+                  }}
+                  className={`px-1.5 py-0.5 rounded text-[11px] font-semibold transition flex items-center gap-1 shrink-0 ${
+                    abstractOpen
+                      ? 'bg-teal text-white shadow-sm'
+                      : 'text-secondary hover:text-primary hover:bg-slate-100'
+                  }`}
+                >
+                  A {lang === 'tr' ? 'Abstract' : 'Abstract'}
+                </button>
+                <button
+                  onClick={() => {
+                    setTablesOpen(false);
+                    setFiguresOpen(false);
+                    setSuppOpen(false);
+                    setAbbrOpen(false);
+                    setAbstractOpen(false);
                     setLettersOpen(true);
                   }}
                   className={`px-1.5 py-0.5 rounded text-[11px] font-semibold transition flex items-center gap-1 shrink-0 ${
@@ -2400,7 +2474,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
                       : 'text-secondary hover:text-primary hover:bg-slate-100'
                   }`}
                 >
-                  ✉️ {lang === 'tr' ? 'Diğer Yazılar' : 'Letters'}
+                  📂 {t('ed_letters')}
                 </button>
                 <button
                   onClick={() => {
@@ -2408,6 +2482,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
                     setTablesOpen(false);
                     setSuppOpen(false);
                     setLettersOpen(false);
+                    setAbstractOpen(false);
                     setAbbrOpen(false);
                   }}
                   className={`px-1.5 py-0.5 rounded text-[11px] font-semibold transition flex items-center gap-1 shrink-0 ${
@@ -2441,6 +2516,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
                     setTablesOpen(false);
                     setFiguresOpen(false);
                     setLettersOpen(false);
+                    setAbstractOpen(false);
                     setAbbrOpen(false);
                   }}
                   className={`px-1.5 py-0.5 rounded text-[11px] font-semibold transition flex items-center gap-1 shrink-0 ${
@@ -2458,6 +2534,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
                     setTablesOpen(false);
                     setFiguresOpen(false);
                     setLettersOpen(false);
+                    setAbstractOpen(false);
                   }}
                   className={`px-1.5 py-0.5 rounded text-[11px] font-semibold transition flex items-center gap-1 shrink-0 ${
                     abbrOpen
@@ -2507,6 +2584,9 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
               }}
             />
             <HeaderDropdown label={`📤 ${t('ed_export')} ▾`} primary>
+              <DropItem onClick={(e) => { e.stopPropagation(); setIncludeAbstractExport(!includeAbstractExport); }}>
+                {includeAbstractExport ? '☑️' : '☐'} {t('ed_export_include_abstract')}
+              </DropItem>
               <DropItem onClick={(e) => { e.stopPropagation(); setExportLineNumbers(!exportLineNumbers); }}>
                 {exportLineNumbers ? '☑️' : '☐'} {lang === 'tr' ? 'Sürekli Satır Numaraları' : 'Continuous Line Numbers'}
               </DropItem>
@@ -2655,6 +2735,10 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
                 setTablePanelView('import');
                 setTablesOpen(true);
                 setFiguresOpen(false);
+                setSuppOpen(false);
+                setLettersOpen(false);
+                setAbstractOpen(false);
+                setAbbrOpen(false);
               }}
               onAIReview={runAIReview}
               onAIScore={runAIScore}
@@ -2801,6 +2885,10 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
             setTablePanelView('import');
             setTablesOpen(true);
             setFiguresOpen(false);
+            setSuppOpen(false);
+            setLettersOpen(false);
+            setAbstractOpen(false);
+            setAbbrOpen(false);
           }}
           onAIReview={runAIReview}
           onAIScore={runAIScore}
@@ -3090,6 +3178,8 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
             projectId={project.id}
             currentDoc={doc}
             currentRefs={refs}
+            currentAbstractText={abstractText}
+            currentKeywords={keywords}
             currentWordCount={writingStats.words}
             onRestore={restoreSnapshot}
             onClose={() => setSnapshotsOpen(false)}
@@ -3134,6 +3224,17 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
         </div>
       )}
 
+      {abstractOpen && (
+        <AbstractPanel
+          value={abstractText}
+          onChange={setAbstractText}
+          keywords={keywords}
+          onKeywordsChange={setKeywords}
+          onClose={() => setAbstractOpen(false)}
+          lang={lang}
+        />
+      )}
+
       {abbrOpen && editorInstance.current && (
         <div className="fixed right-4 top-24 bottom-4 w-[360px] z-40 shadow-2xl">
           <AbbreviationsPanel
@@ -3148,6 +3249,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
         <div className="fixed right-4 top-24 bottom-4 w-[360px] z-40 shadow-2xl">
           <JournalCheckPanel
             docJson={doc}
+            abstractText={abstractText}
             stats={writingStats}
             referenceStyle={style}
             bibliographyReferenceCount={refs.filter((ref) => refOrder.has(ref.id)).length}

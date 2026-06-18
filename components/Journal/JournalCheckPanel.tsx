@@ -10,6 +10,7 @@ import type { WritingStats } from '@/lib/stats/types';
 
 interface JournalCheckPanelProps {
   docJson: unknown;
+  abstractText?: string;
   stats: WritingStats;
   referenceStyle: string;
   bibliographyReferenceCount: number;
@@ -40,6 +41,7 @@ function scoreColor(score: number): string {
 
 export function JournalCheckPanel({
   docJson,
+  abstractText,
   stats,
   referenceStyle,
   bibliographyReferenceCount,
@@ -89,17 +91,18 @@ export function JournalCheckPanel({
 
   const report = useMemo(() => {
     if (!template) return null;
-    const { headings, plainText, abstractText } = extractDocStructure(docJson);
+    const structure = extractDocStructure(docJson);
+    const resolvedAbstract = abstractText?.trim() || structure.abstractText;
     return checkCompliance({
       template,
       stats,
-      plainText,
-      sectionHeadings: headings,
+      plainText: structure.plainText,
+      sectionHeadings: structure.headings,
       referenceStyle,
       bibliographyReferenceCount,
-      abstractText,
+      abstractText: resolvedAbstract,
     });
-  }, [template, docJson, stats, referenceStyle, bibliographyReferenceCount]);
+  }, [template, docJson, abstractText, stats, referenceStyle, bibliographyReferenceCount]);
 
   const handleAddClick = () => {
     setEditingTemplate(null);

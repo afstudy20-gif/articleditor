@@ -31,6 +31,7 @@ import {
   parseHtmlToParagraphs,
   type ImportParagraph,
 } from '@/lib/editor/import-rich';
+import { splitAbstractMetadataFromParagraphs } from '@/lib/editor/abstract';
 import { DocImportModal, type ImportPreview } from '@/components/Import/DocImportModal';
 
 const EditorClient = dynamic(() => import('./EditorClient').then((m) => m.EditorClient), {
@@ -198,12 +199,13 @@ function EditPageInner() {
     const bibliographyStart = richParagraphs?.findIndex((paragraph) =>
       isBibliographyHeading(paragraph.text),
     ) ?? -1;
-    const bodyParagraphs = richParagraphs
+    const rawBodyParagraphs = richParagraphs
       ? richParagraphs.slice(0, bibliographyStart >= 0 ? bibliographyStart : undefined)
       : split.bodyText
         .split(/\r?\n+/)
         .filter((paragraph) => paragraph.trim().length > 0)
         .map((paragraph) => ({ text: paragraph }));
+    const { bodyParagraphs, abstractText, keywords } = splitAbstractMetadataFromParagraphs(rawBodyParagraphs);
     const bodyText = bodyParagraphs.map((paragraph) => paragraph.text).join('\n');
     const markers = detectMarkers(bodyText);
     const citationCounts = countCitationsPerRef(parsedRefs.length, markers);
@@ -214,6 +216,8 @@ function EditPageInner() {
       bodyText,
       refs: parsedRefs,
       markerCount: markers.length,
+      abstractText,
+      keywords,
       citationCounts,
     });
   }
@@ -241,6 +245,8 @@ function EditPageInner() {
       refs: refsWithIds,
       doc: tiptapDoc,
       bodyText: conversionPreview.bodyText,
+      abstractText: conversionPreview.abstractText ?? '',
+      keywords: conversionPreview.keywords ?? [],
     });
     await saveProject(p);
     gdrive.markDirty(p.id);
