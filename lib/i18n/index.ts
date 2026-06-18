@@ -239,6 +239,8 @@ const tr: Dict = {
   ed_ai_discussion: 'Discussion güçlendir',
   ed_ai_conclusion: 'Conclusion güçlendir',
   ed_ai_disabled: 'AI yapılandırılmamış',
+  ed_group_integrity: 'Bütünlük',
+  ed_integrity: 'Özgünlük denetimi',
 
   // Editor formatting
   ed_placeholder: 'Metinden kaynaklarınızın ayrıştırılması için import ile dosya ekleyiniz',
@@ -1026,6 +1028,8 @@ const en: Dict = {
   ed_ai_discussion: 'Strengthen Discussion',
   ed_ai_conclusion: 'Strengthen Conclusion',
   ed_ai_disabled: 'AI not configured',
+  ed_group_integrity: 'Integrity',
+  ed_integrity: 'Integrity check',
 
   // Editor formatting
   ed_placeholder: 'Please import a file to parse your references from the text',

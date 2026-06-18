@@ -471,7 +471,7 @@ export function ArticleEditor({
         >
           {t('ed_insert_citation')}
         </button>
-        {(onAIReview || onAIScore || onAIEnhance || onAISuggestCitation || onAIDetectGaps || onAICompare || onAIDeepResearch || onAIStructureCheck || onAIManuscriptTool) && (
+        {(onAIReview || onAIScore || onAIEnhance || onAISuggestCitation || onAIDetectGaps || onAICompare || onAIDeepResearch || onAIStructureCheck || onAIManuscriptTool || onIntegrityCheck) && (
           <>
             <Sep />
             <AIMenu
@@ -485,17 +485,10 @@ export function ArticleEditor({
               onDeepResearch={onAIDeepResearch}
               onStructureCheck={onAIStructureCheck}
               onManuscriptTool={onAIManuscriptTool}
+              onIntegrityCheck={onIntegrityCheck}
               t={t}
             />
           </>
-        )}
-        {onIntegrityCheck && (
-          <button
-            onClick={onIntegrityCheck}
-            className="px-2.5 py-1 rounded-md border border-violet-300 text-violet-700 text-xs font-semibold hover:bg-violet-50 shrink-0"
-          >
-            {lang === 'tr' ? 'Özgünlük' : 'Integrity'}
-          </button>
         )}
         {styleId && styleOptions && onStyleChange && (
           <>
@@ -683,6 +676,7 @@ function AIMenu({
   onDeepResearch,
   onStructureCheck,
   onManuscriptTool,
+  onIntegrityCheck,
   t,
 }: {
   disabled?: boolean;
@@ -695,6 +689,7 @@ function AIMenu({
   onDeepResearch?: () => void;
   onStructureCheck?: () => void;
   onManuscriptTool?: (mode: 'abstract' | 'titles' | 'discussion' | 'conclusion') => void;
+  onIntegrityCheck?: () => void;
   t: (k: string) => string;
 }): JSX.Element {
   const [open, setOpen] = useState(false);
@@ -774,6 +769,12 @@ function AIMenu({
                 <MenuItem icon="T" label={t('ed_ai_titles')} onClick={() => pick(() => onManuscriptTool('titles'))} />
                 <MenuItem icon="D" label={t('ed_ai_discussion')} onClick={() => pick(() => onManuscriptTool('discussion'))} />
                 <MenuItem icon="C" label={t('ed_ai_conclusion')} onClick={() => pick(() => onManuscriptTool('conclusion'))} />
+              </>
+            )}
+            {onIntegrityCheck && (
+              <>
+                <MenuGroup label={t('ed_group_integrity') || 'Integrity'} />
+                <MenuItem icon="🛡️" label={t('ed_integrity') || 'Integrity check'} onClick={() => pick(onIntegrityCheck)} />
               </>
             )}
           </div>
