@@ -334,7 +334,7 @@ export function LettersPanel({ defaultTitle, lang, aiEnabled, onClose, t }: Lett
                   </div>
                   <textarea
                     className={`${inputCls} h-20 resize-none bg-white`}
-                    placeholder={`Fatih Akkaya Department of Cardiology, Faculty of Medicine, Ordu University, Ordu, Türkiye\nORCID: 0000-0002-9016-4986\nEmail: drfatihakkaya@gmail.com`}
+                    placeholder={`John Doe Department of Cardiology, Faculty of Medicine, Example University, City, Country\nORCID: 0000-0001-2345-6789\nEmail: john.doe@example.com`}
                     value={titlePageAuthorPaste}
                     onChange={(e) => setTitlePageAuthorPaste(e.target.value)}
                   />
