@@ -36,7 +36,7 @@ export function SiteHeader({
               href="/reader"
               className="text-sm text-secondary hover:text-primary px-2 py-1.5"
             >
-              PDF
+              PDF viewer
             </Link>
             <Link
               href="/tutorial"
