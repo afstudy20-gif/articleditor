@@ -56,4 +56,19 @@ E mail: ahmet@example.com`);
     assert.equal(authors[0].email, 'drfatihakkaya@gmail.com');
     assert.equal(authors[1].email, 'ahmet@example.com');
   });
+
+  it('parses a single-line parenthetical author block', () => {
+    const authors = parseTitlePageAuthors(
+      'Nihan Bahadır  Department of Cardiology, Faculty of Medicine, Ordu University, Ordu, Türkiye (ORCID: 0000-0001-6130-1884, Email: dr.nihanbahadir@gmail.com)',
+    );
+
+    assert.equal(authors.length, 1);
+    assert.equal(authors[0].name, 'Nihan Bahadır');
+    assert.equal(
+      authors[0].institution,
+      'Department of Cardiology, Faculty of Medicine, Ordu University, Ordu, Türkiye',
+    );
+    assert.equal(authors[0].email, 'dr.nihanbahadir@gmail.com');
+    assert.equal(authors[0].orcid, '0000-0001-6130-1884');
+  });
 });
