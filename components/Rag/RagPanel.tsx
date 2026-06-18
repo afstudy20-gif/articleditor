@@ -6,6 +6,7 @@ import { useLang } from '@/lib/i18n/hooks';
 import { searchProjectChunks } from '@/lib/rag/search';
 import { ragChat, type RagChatMessage } from '@/lib/rag/chat-client';
 import { RagChatError } from '@/lib/rag/errors';
+import { listProjectPdfs } from '@/store/db';
 import { ChatBubble, type ChatCitation } from './ChatBubble';
 
 type RagMessage = {
@@ -45,6 +46,7 @@ export function RagPanel({ projectId, open, onClose, refs, onCiteClick }: Props)
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
+  const [indexedCount, setIndexedCount] = useState(0);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -72,6 +74,24 @@ export function RagPanel({ projectId, open, onClose, refs, onCiteClick }: Props)
       setMessages([]);
     }
     setHydrated(true);
+  }, [projectId]);
+
+  // Count of indexed PDFs for this project. Fetched once per project on mount
+  // (no polling) — the panel re-fetches the next time it is reopened. The
+  // empty-state banner uses this to disable the input until the user has
+  // indexed at least one PDF via the library tab.
+  useEffect(() => {
+    let cancelled = false;
+    listProjectPdfs(projectId)
+      .then((pdfs) => {
+        if (!cancelled) setIndexedCount(pdfs.length);
+      })
+      .catch(() => {
+        /* IndexedDB read failed — keep the count at 0, input stays disabled. */
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [projectId]);
 
   // Persist on every change (after initial hydration).
@@ -113,7 +133,7 @@ export function RagPanel({ projectId, open, onClose, refs, onCiteClick }: Props)
 
   const send = useCallback(async () => {
     const question = input.trim();
-    if (!question || busy) return;
+    if (!question || busy || indexedCount === 0) return;
 
     setError(null);
     setInput('');
@@ -219,7 +239,7 @@ export function RagPanel({ projectId, open, onClose, refs, onCiteClick }: Props)
       setBusy(false);
       abortRef.current = null;
     }
-  }, [busy, input, messages, projectId, refsById, sourceTitleFor, t]);
+  }, [busy, input, messages, projectId, refsById, sourceTitleFor, t, indexedCount]);
 
   const clearChat = useCallback(() => {
     abortRef.current?.abort();
@@ -245,8 +265,13 @@ export function RagPanel({ projectId, open, onClose, refs, onCiteClick }: Props)
   return (
     <div className="card flex h-full flex-col">
       <div className="flex items-center justify-between border-b border-border px-3 py-2">
-        <h3 className="text-sm font-semibold text-primary">📚 {t('rag_panel_title')}</h3>
-        <div className="flex items-center gap-2">
+        <div className="flex items-baseline gap-2 min-w-0">
+          <h3 className="text-sm font-semibold text-primary">📚 {t('rag_panel_title')}</h3>
+          <span className="text-[11px] text-muted shrink-0">
+            {t('rag_indexed_count').replace('{count}', String(indexedCount))}
+          </span>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
           <button
             type="button"
             onClick={clearChat}
@@ -268,7 +293,13 @@ export function RagPanel({ projectId, open, onClose, refs, onCiteClick }: Props)
       </div>
 
       <div ref={scrollRef} className="flex-1 space-y-3 overflow-auto p-3">
-        {messages.length === 0 && !busy && (
+        {indexedCount === 0 && (
+          <p className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            {t('rag_no_pdfs')}
+          </p>
+        )}
+
+        {messages.length === 0 && !busy && indexedCount > 0 && (
           <p className="px-1 py-6 text-center text-xs text-muted">{t('rag_history_empty')}</p>
         )}
 
@@ -310,12 +341,13 @@ export function RagPanel({ projectId, open, onClose, refs, onCiteClick }: Props)
             onKeyDown={onKeyDown}
             placeholder={t('rag_input_placeholder')}
             rows={2}
-            className="flex-1 resize-none rounded border border-border bg-transparent px-2 py-1.5 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-teal"
+            disabled={indexedCount === 0}
+            className="flex-1 resize-none rounded border border-border bg-transparent px-2 py-1.5 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-teal disabled:opacity-50 disabled:cursor-not-allowed"
           />
           <button
             type="button"
             onClick={() => void send()}
-            disabled={busy || input.trim().length === 0}
+            disabled={busy || indexedCount === 0 || input.trim().length === 0}
             className="shrink-0 rounded-md bg-teal px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-dark disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {t('rag_send')}

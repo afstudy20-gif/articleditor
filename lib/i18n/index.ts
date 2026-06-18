@@ -172,6 +172,14 @@ const tr: Dict = {
   rp_type_other: 'Diğer',
   rp_fulltext: 'Tam metin',
   rp_scihub: 'Sci-Hub',
+  rp_rag_index: 'RAG\'a ekle',
+  rp_rag_indexed: 'Indexli',
+  rp_rag_indexing: 'Indexleniyor...',
+  rp_rag_failed: 'RAG indexleme hatası',
+  rp_rag_reindex_confirm: 'Bu PDF zaten indexli. Yeniden index?',
+  rp_rag_pick_pdf: 'PDF seç',
+  rp_rag_bulk_index: '🧠 Seçili refleri indexle',
+  rp_rag_bulk_progress: '{done}/{total} indexlendi',
   rp_aspects_goals: 'Hedefler',
   rp_aspects_methods: 'Yöntem',
   rp_aspects_datasets: 'Veri',
@@ -815,6 +823,9 @@ const tr: Dict = {
   rag_watcher_ingest: '{name} indexleniyor…',
   rag_watcher_done: '{name} indexlendi',
   rag_watcher_failed: '{name} indexleme başarısız',
+  rag_indexed_count: '{count} PDF indexli',
+  rag_no_pdfs:
+    'Henüz hiç PDF indexlenmemiş. Önce kütüphaneden ref seç ve "RAG\'a ekle" tıkla.',
 };
 
 const en: Dict = {
@@ -976,6 +987,14 @@ const en: Dict = {
   rp_type_other: 'Other',
   rp_fulltext: 'Full text',
   rp_scihub: 'Sci-Hub',
+  rp_rag_index: 'Index for RAG',
+  rp_rag_indexed: 'Indexed',
+  rp_rag_indexing: 'Indexing...',
+  rp_rag_failed: 'RAG indexing failed',
+  rp_rag_reindex_confirm: 'Already indexed. Re-index?',
+  rp_rag_pick_pdf: 'Pick PDF',
+  rp_rag_bulk_index: '🧠 Index selected refs',
+  rp_rag_bulk_progress: '{done}/{total} indexed',
   rp_aspects_goals: 'Goals',
   rp_aspects_methods: 'Methods',
   rp_aspects_datasets: 'Data',
@@ -1618,6 +1637,9 @@ const en: Dict = {
   rag_watcher_ingest: 'Indexing {name}…',
   rag_watcher_done: 'Indexed {name}',
   rag_watcher_failed: 'Failed to index {name}',
+  rag_indexed_count: '{count} PDFs indexed',
+  rag_no_pdfs:
+    'No PDFs indexed yet. Pick refs in the library and click "Index for RAG" first.',
 };
 
 const dicts: Record<Lang, Dict> = { tr, en };

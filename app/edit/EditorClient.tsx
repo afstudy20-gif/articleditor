@@ -95,6 +95,7 @@ import {
   type CitationNodeJSON,
 } from '@/lib/editor/mixed-content';
 import { useLang } from '@/lib/i18n/hooks';
+import { getWorkspaceRoot } from '@/lib/fs/workspace';
 import type { FigureCaptionPlacement } from '@/lib/figures/export-layout';
 
 type Props = {
@@ -262,6 +263,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
   const [focusMode, setFocusMode] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
   const [ragOpen, setRagOpen] = useState(false);
+  const [workspaceRoot, setWorkspaceRoot] = useState<FileSystemDirectoryHandle | null>(null);
   const [snapshotsOpen, setSnapshotsOpen] = useState(false);
   const [figuresOpen, setFiguresOpen] = useState(false);
   const [tablesOpen, setTablesOpen] = useState(false);
@@ -327,6 +329,21 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
     },
     [t],
   );
+
+  // Load workspace root handle once on mount.
+  useEffect(() => {
+    let alive = true;
+    getWorkspaceRoot()
+      .then((root) => {
+        if (alive) setWorkspaceRoot(root?.handle ?? null);
+      })
+      .catch(() => {
+        if (alive) setWorkspaceRoot(null);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   // One-shot AI config check on mount — disables AI buttons when no key.
   useEffect(() => {
@@ -2687,6 +2704,9 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
             <RefsPanel
             refs={refs}
             refOrder={refOrder}
+            projectId={project.id}
+            projectTitle={project.title}
+            workspaceHandle={workspaceRoot}
             onAddByDoi={addByDoi}
             onLookupDoi={lookupDoi}
             onSearch={search}
@@ -2816,6 +2836,9 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
         <RefsPanel
           refs={refs}
           refOrder={refOrder}
+          projectId={project.id}
+          projectTitle={project.title}
+          workspaceHandle={workspaceRoot}
           onAddByDoi={addByDoi}
           onLookupDoi={lookupDoi}
           onSearch={search}
