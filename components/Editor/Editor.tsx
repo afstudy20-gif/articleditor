@@ -54,7 +54,6 @@ type Props = {
   onStyleEdit?: () => void;
   onFindReplace?: () => void;
   onRenumberCitations?: () => void;
-  onAskLibrary?: () => void;
 };
 
 const SECTION_PRESETS: Array<{ label: string; level: 1 | 2 | 3 }> = [
@@ -147,7 +146,6 @@ export function ArticleEditor({
   onStyleEdit,
   onFindReplace,
   onRenumberCitations,
-  onAskLibrary,
 }: Props) {
   const { t, lang } = useLang();
   const refsById = useMemo(() => {
@@ -473,14 +471,6 @@ export function ArticleEditor({
         >
           {t('ed_insert_citation')}
         </button>
-        {onAskLibrary && (
-          <ToolbarButton
-            onClick={() => onAskLibrary()}
-            title={t('rag_panel_title')}
-          >
-            📚 {t('ed_ask_library')}
-          </ToolbarButton>
-        )}
         {(onAIReview || onAIScore || onAIEnhance || onAISuggestCitation || onAIDetectGaps || onAICompare || onAIDeepResearch || onAIStructureCheck || onAIManuscriptTool) && (
           <>
             <Sep />

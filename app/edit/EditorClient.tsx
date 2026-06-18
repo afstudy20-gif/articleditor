@@ -77,7 +77,6 @@ import { PhrasebankPanel } from '@/components/Phrasebank/PhrasebankPanel';
 import { SupplementaryPanel } from '@/components/Supplementary/SupplementaryPanel';
 import { AbbreviationsPanel } from '@/components/Abbreviations/AbbreviationsPanel';
 import { StickyNote } from '@/components/StickyNote';
-import { RagPanel } from '@/components/Rag/RagPanel';
 import { AbstractPanel } from '@/components/Abstract/AbstractPanel';
 import { DocImportModal, type ImportPreview } from '@/components/Import/DocImportModal';
 import { useTabSync } from '@/lib/hooks/useTabSync';
@@ -264,7 +263,6 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
-  const [ragOpen, setRagOpen] = useState(false);
   const [workspaceRoot, setWorkspaceRoot] = useState<FileSystemDirectoryHandle | null>(null);
   const [snapshotsOpen, setSnapshotsOpen] = useState(false);
   const [figuresOpen, setFiguresOpen] = useState(false);
@@ -585,20 +583,6 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
     // Use id directly — don't depend on stale highlightRefId closure.
     setTimeout(() => {
       const positions = findCitationsForRef(id);
-      if (positions.length > 0) scrollToPosition(positions[0]);
-    }, 80);
-  }
-
-  // Citation chips in the RAG panel route here: highlight the referenced ref in
-  // the library. Page numbers from the PDF source aren't mapped back into the
-  // editor — there's no in-document page concept — so the param is accepted but
-  // currently used only for future reader deep-links.
-  function highlightRefForRag(refId: string, _pageNo?: number): void {
-    if (!refs.some((r) => r.id === refId)) return;
-    setHighlightRefId(refId);
-    setOccurrenceCursor(0);
-    setTimeout(() => {
-      const positions = findCitationsForRef(refId);
       if (positions.length > 0) scrollToPosition(positions[0]);
     }, 80);
   }
@@ -2401,8 +2385,8 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
   return (
     <div className="min-h-screen flex flex-col">
       <header className={`border-b border-border bg-surface sticky top-0 z-[80] ${focusMode ? 'hidden' : ''}`}>
-        <div className="w-full px-4 sm:px-6 py-3 flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-3 flex-1 min-w-0">
+        <div className="w-full px-4 sm:px-6 py-3 flex items-start 2xl:items-center justify-between gap-3">
+          <div className="flex items-center gap-3 flex-1 min-w-0 overflow-hidden">
             <div className="flex flex-col gap-1 items-start shrink-0 mr-2">
               <div className="flex items-center gap-2 flex-wrap text-xs border border-border px-2 py-1 rounded-lg bg-white shadow-xs">
                 <button
@@ -2549,15 +2533,15 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="text-base font-bold text-primary bg-transparent outline-none border-b border-transparent focus:border-teal min-w-0 flex-1 max-w-xs"
+              className="text-base font-bold text-primary bg-transparent outline-none border-b border-transparent focus:border-teal min-w-0 flex-1 max-w-xs truncate"
             />
-            <span className="text-xs text-faint shrink-0">
+            <span className="hidden 2xl:inline text-xs text-faint shrink-0">
               {savingState === 'saving'
                 ? 'Kaydediliyor…'
                 : `Son kayıt ${new Date(savedAt).toLocaleTimeString('tr-TR')}`}
             </span>
           </div>
-          <div className="flex gap-1 items-center text-xs">
+          <div className="flex gap-1 items-center justify-end text-xs shrink-0 flex-wrap max-w-[56vw]">
 
             <HeaderDropdown label={`📥 ${t('ed_import')} ▾`}>
               <DropItem
@@ -2613,7 +2597,6 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
             <HeaderIcon onClick={() => setPaletteOpen(true)} title={`${t('cmd_open')} (⌘K)`} label="⌘K" caption={t('hdr_palette')} />
             <HeaderIcon onClick={openPhrasebank} title={t('pb_title')} label="§" caption={t('hdr_phrasebank')} />
             <HeaderIcon onClick={() => setStatsOpen(true)} title={t('ed_stats')} label="📊" caption={t('hdr_stats')} />
-            <HeaderIcon onClick={() => setRagOpen((o) => !o)} title={t('rag_panel_title')} label="📚" caption={t('hdr_rag')} accent={ragOpen} />
             <HeaderIcon onClick={() => setSnapshotsOpen(true)} title={t('ed_snapshots')} label="🕓" caption={t('hdr_versions')} />
             <HeaderIcon onClick={() => setJournalOpen(true)} title={t('ed_journal_check')} label="📋" caption={t('hdr_journal')} />
             <HeaderIcon onClick={() => setChecklistOpen(true)} title={t('ed_checklist')} label="✅" caption={t('hdr_checklist')} />
@@ -2769,7 +2752,6 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
               }}
               onFindReplace={() => setShowFind(true)}
               onRenumberCitations={updateAllCitations}
-              onAskLibrary={() => setRagOpen(true)}
             />
           </div>
         </div>
@@ -2788,9 +2770,6 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
             <RefsPanel
             refs={refs}
             refOrder={refOrder}
-            projectId={project.id}
-            projectTitle={project.title}
-            workspaceHandle={workspaceRoot}
             onAddByDoi={addByDoi}
             onLookupDoi={lookupDoi}
             onSearch={search}
@@ -2919,14 +2898,10 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
           }}
           onFindReplace={() => setShowFind(true)}
           onRenumberCitations={updateAllCitations}
-          onAskLibrary={() => setRagOpen(true)}
         />
         <RefsPanel
           refs={refs}
           refOrder={refOrder}
-          projectId={project.id}
-          projectTitle={project.title}
-          workspaceHandle={workspaceRoot}
           onAddByDoi={addByDoi}
           onLookupDoi={lookupDoi}
           onSearch={search}
@@ -3156,18 +3131,6 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
             onSetGoal={updateWordGoal}
             t={t}
             onClose={() => setStatsOpen(false)}
-          />
-        </div>
-      )}
-
-      {ragOpen && (
-        <div className="fixed right-4 top-24 bottom-4 w-[380px] z-40 shadow-2xl">
-          <RagPanel
-            projectId={project.id}
-            open={ragOpen}
-            onClose={() => setRagOpen(false)}
-            refs={refs}
-            onCiteClick={highlightRefForRag}
           />
         </div>
       )}
@@ -3438,7 +3401,7 @@ function HeaderIcon({
         {label}
         {badge && <span className="ml-0.5 inline-block w-1.5 h-1.5 rounded-full bg-red-500 align-middle" />}
       </span>
-      {caption && <span className="mt-0.5 text-[9px] text-muted">{caption}</span>}
+      {caption && <span className="mt-0.5 hidden xl:inline text-[9px] text-muted">{caption}</span>}
     </button>
   );
 }
@@ -3454,10 +3417,10 @@ function HeaderDropdown({
 }): JSX.Element {
   const [open, setOpen] = useState(false);
   return (
-    <div className="relative">
+    <div className="relative shrink-0">
       <button
         onClick={() => setOpen((v) => !v)}
-        className={`px-2 py-0.5 text-xs rounded border ${primary ? 'border-teal bg-teal text-white hover:bg-teal-dark' : 'border-border text-secondary hover:bg-slate-50'}`}
+        className={`px-2 py-0.5 text-xs rounded border whitespace-nowrap ${primary ? 'border-teal bg-teal text-white hover:bg-teal-dark' : 'border-border text-secondary hover:bg-slate-50'}`}
       >
         {label}
       </button>

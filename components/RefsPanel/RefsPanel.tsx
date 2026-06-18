@@ -11,16 +11,9 @@ import {
   formatHistoryTime,
   type HistoryEntry,
 } from '@/lib/history';
-import { indexPdf, type IngestProgress } from '@/lib/rag/ingest';
-import { resolvePdfForRef } from '@/lib/rag/ref-source';
-import { listProjectPdfs, deleteProjectPdf } from '@/store/db';
-
 type Props = {
   refs: Ref[];
   refOrder: Map<string, number>;
-  projectId: string;
-  projectTitle?: string;
-  workspaceHandle: FileSystemDirectoryHandle | null;
   onAddByDoi: (doi: string) => Promise<void>;
   onLookupDoi?: (doi: string) => Promise<Ref | null>;
   onSearch: (query: string, opts?: { fromYear?: number; toYear?: number }) => Promise<Ref[]>;
@@ -49,9 +42,6 @@ type Props = {
 export function RefsPanel({
   refs,
   refOrder,
-  projectId,
-  projectTitle,
-  workspaceHandle,
   onAddByDoi,
   onLookupDoi,
   onSearch,
@@ -116,130 +106,6 @@ export function RefsPanel({
     clearSelection();
   }
 
-  const [indexedRefIds, setIndexedRefIds] = useState<Set<string>>(new Set());
-  const [busyRefIds, setBusyRefIds] = useState<Map<string, number>>(new Map());
-  const [bulkBusy, setBulkBusy] = useState<{ done: number; total: number } | null>(null);
-  const [toastMsg, setToastMsg] = useState<string | null>(null);
-
-  function pushToast(message: string): void {
-    setToastMsg(message);
-    setTimeout(() => setToastMsg(null), 4000);
-  }
-
-  useEffect(() => {
-    let cancelled = false;
-    listProjectPdfs(projectId)
-      .then((pdfs) => {
-        if (cancelled) return;
-        const next = new Set<string>();
-        for (const pdf of pdfs) {
-          if (pdf.refId) next.add(pdf.refId);
-        }
-        setIndexedRefIds(next);
-      })
-      .catch(() => {
-        /* ignore */
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [projectId]);
-
-  function updateProgress(refId: string, p: IngestProgress): void {
-    let pct = 0;
-    if (p.phase === 'extracting') pct = 20 * (p.page / p.total);
-    else if (p.phase === 'chunking') pct = 30;
-    else if (p.phase === 'embedding') pct = 30 + 60 * (p.batch / p.totalBatches);
-    else if (p.phase === 'persisting') pct = 95;
-    else if (p.phase === 'done') pct = 100;
-    setBusyRefIds((prev) => new Map(prev).set(refId, pct));
-  }
-
-  async function pickPdfFile(): Promise<File | null> {
-    return new Promise((resolve) => {
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'application/pdf';
-      input.onchange = () => resolve(input.files?.[0] ?? null);
-      input.click();
-    });
-  }
-
-  async function ingestRef(ref: Ref): Promise<void> {
-    if (busyRefIds.has(ref.id)) return;
-    setBusyRefIds((prev) => new Map(prev).set(ref.id, 0));
-    try {
-      const src = await resolvePdfForRef({ ref, projectTitle, workspaceHandle });
-      let file: File | null = null;
-      if (src) {
-        file = src.file;
-      } else {
-        file = await pickPdfFile();
-      }
-      if (!file) return;
-      await indexPdf({
-        file,
-        projectId,
-        refId: ref.id,
-        onProgress: (p) => updateProgress(ref.id, p),
-      });
-      setIndexedRefIds((prev) => new Set(prev).add(ref.id));
-    } catch {
-      pushToast(t('rp_rag_failed'));
-    } finally {
-      setBusyRefIds((prev) => {
-        const next = new Map(prev);
-        next.delete(ref.id);
-        return next;
-      });
-    }
-  }
-
-  async function handleRagClick(ref: Ref): Promise<void> {
-    if (indexedRefIds.has(ref.id)) {
-      if (!confirm(t('rp_rag_reindex_confirm'))) return;
-      const pdfs = await listProjectPdfs(projectId);
-      const pdf = pdfs.find((p) => p.refId === ref.id);
-      if (pdf) {
-        await deleteProjectPdf(projectId, pdf.id);
-      }
-      setIndexedRefIds((prev) => {
-        const next = new Set(prev);
-        next.delete(ref.id);
-        return next;
-      });
-      await ingestRef(ref);
-      return;
-    }
-    await ingestRef(ref);
-  }
-
-  async function bulkIndex(): Promise<void> {
-    if (selectedIds.size === 0) return;
-    const ids = Array.from(selectedIds);
-    setBulkBusy({ done: 0, total: ids.length });
-    let done = 0;
-    const concurrency = 2;
-    let cursor = 0;
-    async function worker(): Promise<void> {
-      while (cursor < ids.length) {
-        const id = ids[cursor++];
-        const ref = refs.find((r) => r.id === id);
-        if (!ref) continue;
-        try {
-          await ingestRef(ref);
-        } catch {
-          /* individual failures ignored */
-        } finally {
-          done += 1;
-          setBulkBusy({ done, total: ids.length });
-        }
-      }
-    }
-    await Promise.all(Array.from({ length: concurrency }, () => worker()));
-    setBulkBusy(null);
-  }
-
   return (
     <div className="card flex flex-col h-full">
       <div className="flex border-b border-border">
@@ -299,21 +165,6 @@ export function RefsPanel({
         </div>
       )}
 
-      {bulkBusy && (
-        <div className="px-3 py-1.5 border-b border-border bg-teal-bg/30">
-          <div className="flex items-center justify-between text-xs text-teal mb-1">
-            <span>{t('rp_rag_bulk_progress').replace('{done}', String(bulkBusy.done)).replace('{total}', String(bulkBusy.total))}</span>
-            <span>{Math.round((bulkBusy.done / bulkBusy.total) * 100)}%</span>
-          </div>
-          <div className="h-1.5 w-full bg-slate-200 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-teal rounded-full transition-all"
-              style={{ width: `${(bulkBusy.done / bulkBusy.total) * 100}%` }}
-            />
-          </div>
-        </div>
-      )}
-
       {tab === 'list' && refs.length > 0 && (
         <div className="px-3 py-1.5 border-b border-border flex items-center justify-between gap-2 text-xs">
           <label className="flex items-center gap-1.5 cursor-pointer text-muted hover:text-primary">
@@ -328,21 +179,12 @@ export function RefsPanel({
             {t('rp_select_all')}
           </label>
           {selectedIds.size > 0 && (
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => void bulkIndex()}
-                disabled={Boolean(bulkBusy)}
-                className="font-medium text-teal hover:underline disabled:opacity-40"
-              >
-                {t('rp_rag_bulk_index')}
-              </button>
-              <button
-                onClick={bulkDelete}
-                className="font-medium text-rose-600 hover:underline"
-              >
-                {t('rp_delete_selected').replace('{n}', String(selectedIds.size))}
-              </button>
-            </div>
+            <button
+              onClick={bulkDelete}
+              className="font-medium text-rose-600 hover:underline"
+            >
+              {t('rp_delete_selected').replace('{n}', String(selectedIds.size))}
+            </button>
           )}
         </div>
       )}
@@ -363,9 +205,6 @@ export function RefsPanel({
             highlightedId={selectedId}
             onHighlight={onSelectRef}
             onInsertText={onInsertText}
-            indexedRefIds={indexedRefIds}
-            busyRefIds={busyRefIds}
-            onRagClick={(ref) => void handleRagClick(ref)}
             t={t}
           />
         ) : tab === 'add' ? (
@@ -398,11 +237,6 @@ export function RefsPanel({
         </>
       )}
 
-      {toastMsg && (
-        <div className="fixed bottom-4 right-4 z-50 max-w-xs rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-xs text-red-700 shadow-md">
-          {toastMsg}
-        </div>
-      )}
     </div>
   );
 }
@@ -499,9 +333,6 @@ function RefList({
   onHighlight,
   onUpdate,
   onInsertText,
-  indexedRefIds,
-  busyRefIds,
-  onRagClick,
   t,
 }: {
   refs: Ref[];
@@ -517,9 +348,6 @@ function RefList({
   highlightedId?: string | null;
   onHighlight?: (id: string) => void;
   onInsertText?: (text: string) => void;
-  indexedRefIds: Set<string>;
-  busyRefIds: Map<string, number>;
-  onRagClick: (ref: Ref) => void;
   t: (k: string) => string;
 }): JSX.Element {
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -655,18 +483,6 @@ function RefList({
                       {lookupBusyId === r.id ? t('rp_looking_up') : t('rp_lookup_doi')}
                     </button>
                   )}
-                  <button
-                    onClick={() => onRagClick(r)}
-                    disabled={busyRefIds.has(r.id)}
-                    className={`hover:underline ${indexedRefIds.has(r.id) ? 'text-green-600 font-medium' : 'text-teal'}`}
-                    title={indexedRefIds.has(r.id) ? t('rp_rag_indexed') : t('rp_rag_index')}
-                  >
-                    {busyRefIds.has(r.id)
-                      ? `🧠 ${t('rp_rag_indexing')} ${Math.round(busyRefIds.get(r.id) ?? 0)}%`
-                      : indexedRefIds.has(r.id)
-                        ? '🧠 ✓'
-                        : `🧠 ${t('rp_rag_index')}`}
-                  </button>
                   <button onClick={() => onInsert(r.id)} className="text-teal font-semibold hover:underline">
                     {t('rp_insert_citation')} →
                   </button>
