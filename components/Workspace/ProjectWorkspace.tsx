@@ -20,6 +20,7 @@ import {
   type CopyrightVariant,
   type LetterLang,
 } from '@/lib/letters/templates';
+import { parseTitlePageAuthors } from '@/lib/letters/parse-title-page-author';
 import { fillTemplateVars, hasTemplateVars } from '@/lib/letters/fill-template';
 import { t as tI18n } from '@/lib/i18n';
 
@@ -96,6 +97,7 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
   const [wizardAuthors, setWizardAuthors] = useState<WizardAuthor[]>([
     { name: '', email: '', orcid: '', institution: '' }
   ]);
+  const [titlePageAuthorPaste, setTitlePageAuthorPaste] = useState('');
   const [activeSelectIdx, setActiveSelectIdx] = useState<number | null>(null);
   const [savedFeedback, setSavedFeedback] = useState<Record<number, boolean>>({});
   const [corrFeedbackIdx, setCorrFeedbackIdx] = useState<number | null>(null);
@@ -902,6 +904,28 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
     );
   };
 
+  const applyTitlePageAuthorPaste = (): void => {
+    const parsed = parseTitlePageAuthors(titlePageAuthorPaste);
+    if (parsed.length === 0) return;
+    const nextAuthors = parsed.map((author) => ({
+      name: author.name,
+      email: author.email ?? '',
+      orcid: author.orcid ?? '',
+      institution: author.institution ?? '',
+    }));
+    setWizardAuthors((prev) =>
+      prev.some((author) => author.name.trim() || author.email.trim() || author.orcid.trim() || author.institution.trim())
+        ? [...prev, ...nextAuthors]
+        : nextAuthors,
+    );
+    const first = nextAuthors[0];
+    if (!correspondingAuthor.trim()) setCorrespondingAuthor(first.name);
+    if (!correspondingEmail.trim() && first.email) setCorrespondingEmail(first.email);
+    if (!orcid.trim() && first.orcid) setOrcid(first.orcid);
+    if (!correspondingAddress.trim() && first.institution) setCorrespondingAddress(first.institution);
+    setTitlePageAuthorPaste('');
+  };
+
   // Compute stats of manuscript
   const manuscriptWordCount = getWordCount(project.bodyText || '');
   const citationCount = project.refs.length;
@@ -927,6 +951,7 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
     setCopyrightVariant('cc-by');
     setCopyrightDate(localDateInputValue());
     setRunningTitle('');
+    setTitlePageAuthorPaste('');
     setAbsWordCount('');
     setMsWordCount(manuscriptWordCount.toString());
     setFigsCount('');
@@ -1680,6 +1705,27 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
                         placeholder="e.g. Deep Learning in Healthcare"
                         value={runningTitle}
                         onChange={(e) => setRunningTitle(e.target.value)}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1 sm:col-span-2 rounded-xl border border-violet-100 bg-violet-50/40 p-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <label className={labelCls}>
+                          {wizardLang === 'tr' ? 'Yazar bilgisini yapıştır' : 'Paste author details'}
+                        </label>
+                        <button
+                          type="button"
+                          onClick={applyTitlePageAuthorPaste}
+                          disabled={!titlePageAuthorPaste.trim()}
+                          className="text-[10px] px-2 py-1 rounded bg-violet-600 text-white font-semibold disabled:opacity-40"
+                        >
+                          {wizardLang === 'tr' ? 'Alanlara aktar' : 'Fill fields'}
+                        </button>
+                      </div>
+                      <textarea
+                        className={`${inputCls} h-24 resize-none bg-white`}
+                        placeholder={`Fatih Akkaya Department of Cardiology, Faculty of Medicine, Ordu University, Ordu, Türkiye\nORCID: 0000-0002-9016-4986\nEmail: drfatihakkaya@gmail.com`}
+                        value={titlePageAuthorPaste}
+                        onChange={(e) => setTitlePageAuthorPaste(e.target.value)}
                       />
                     </div>
                     {renderAuthorsManager()}

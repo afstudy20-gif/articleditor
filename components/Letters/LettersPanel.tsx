@@ -15,6 +15,7 @@ import {
 } from '@/lib/letters/templates';
 import { aiHeaders } from '@/lib/ai/user-keys';
 import { newId } from '@/lib/id';
+import { parseTitlePageAuthors } from '@/lib/letters/parse-title-page-author';
 
 type LetterType = 'cover' | 'title-page' | 'response' | 'contrib' | 'coi' | 'copyright';
 
@@ -65,6 +66,7 @@ export function LettersPanel({ defaultTitle, lang, aiEnabled, onClose, t }: Lett
   const [titlePageAuthors, setTitlePageAuthors] = useState<TitlePageAuthor[]>([
     { name: '', email: '', orcid: '', institution: '' },
   ]);
+  const [titlePageAuthorPaste, setTitlePageAuthorPaste] = useState('');
   const [savedAuthors, setSavedAuthors] = useState<SavedAuthor[]>([]);
   const [justSavedIdx, setJustSavedIdx] = useState<number | null>(null);
   const [abstractWordCount, setAbstractWordCount] = useState('');
@@ -246,6 +248,18 @@ export function LettersPanel({ defaultTitle, lang, aiEnabled, onClose, t }: Lett
     );
   };
 
+  const applyTitlePageAuthorPaste = (): void => {
+    const parsed = parseTitlePageAuthors(titlePageAuthorPaste);
+    if (parsed.length === 0) return;
+    setTitlePageAuthors((prev) =>
+      prev.some((author) => author.name.trim() || author.email?.trim() || author.orcid?.trim() || author.institution?.trim())
+        ? [...prev, ...parsed]
+        : parsed,
+    );
+    if (!corresponding.trim()) setCorresponding(parsed[0].name);
+    setTitlePageAuthorPaste('');
+  };
+
   const TABS: Array<{ id: LetterType; label: string }> = [
     { id: 'cover', label: t('letters_cover') },
     { id: 'title-page', label: t('letters_title_page') || 'Title Page' },
@@ -304,6 +318,27 @@ export function LettersPanel({ defaultTitle, lang, aiEnabled, onClose, t }: Lett
             {type === 'title-page' && (
               <>
                 <input className={inputCls} placeholder={t('letters_running_title')} value={runningTitle} onChange={(e) => setRunningTitle(e.target.value)} />
+                <div className="rounded border border-violet-100 bg-violet-50/40 p-2 space-y-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-semibold text-secondary">
+                      {lang === 'tr' ? 'Yazar bilgisini yapıştır' : 'Paste author details'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={applyTitlePageAuthorPaste}
+                      disabled={!titlePageAuthorPaste.trim()}
+                      className="text-[10px] px-2 py-1 rounded bg-violet-600 text-white font-semibold disabled:opacity-40"
+                    >
+                      {lang === 'tr' ? 'Alanlara aktar' : 'Fill fields'}
+                    </button>
+                  </div>
+                  <textarea
+                    className={`${inputCls} h-20 resize-none bg-white`}
+                    placeholder={`Fatih Akkaya Department of Cardiology, Faculty of Medicine, Ordu University, Ordu, Türkiye\nORCID: 0000-0002-9016-4986\nEmail: drfatihakkaya@gmail.com`}
+                    value={titlePageAuthorPaste}
+                    onChange={(e) => setTitlePageAuthorPaste(e.target.value)}
+                  />
+                </div>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-semibold text-secondary">{t('letters_authors')}</span>
