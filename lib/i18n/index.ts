@@ -1609,7 +1609,7 @@ export const DRTR_TOOLS = [
   { name: 'DrTR Tools', url: 'https://drtr.uk/', desc: { tr: 'Klinik & akademik araçlar', en: 'Clinical & academic tools' } },
   { name: 'uSTAT', url: 'https://ustat.drtr.uk/', desc: { tr: 'İstatistik platformu', en: 'Statistics platform' } },
   { name: 'ECG Cal', url: 'https://ecgcal.drtr.uk/', desc: { tr: 'EKG hesaplayıcı', en: 'ECG calculator' } },
-  { name: 'NeoDW', url: 'https://neodw.drtr.uk/', desc: { tr: 'Neonatal hesaplayıcı', en: 'Neonatal calculator' } },
+  { name: 'NeoDW', url: 'https://neodw.drtr.uk/', desc: { tr: 'DICOM görüntüleyici', en: 'DICOM viewer' } },
   { name: 'PDF Translator', url: 'https://pdftranslator.drtr.uk/', desc: { tr: 'Belge çevirmen', en: 'Document translator' } },
   { name: 'Veri Düzelt', url: 'https://veriduzelt.drtr.uk/', desc: { tr: 'Excel eşleştirici', en: 'Excel matcher' } },
   { name: 'Nöbet', url: 'https://nobet.drtr.uk/', desc: { tr: 'Nöbet çizelgesi', en: 'Shift schedule' } },
