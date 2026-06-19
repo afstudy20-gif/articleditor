@@ -42,6 +42,7 @@ type Props = {
 };
 
 type LibrarySort = 'record' | 'title';
+type SortDirection = 'asc' | 'desc';
 
 export function RefsPanel({
   refs,
@@ -77,6 +78,7 @@ export function RefsPanel({
   const [libMenu, setLibMenu] = useState<{ x: number; y: number } | null>(null);
   const [libraryQuery, setLibraryQuery] = useState('');
   const [librarySort, setLibrarySort] = useState<LibrarySort>('record');
+  const [librarySortDirection, setLibrarySortDirection] = useState<SortDirection>('asc');
   const [internalSelectedIds, setInternalSelectedIds] = useState<Set<string>>(new Set());
   const selectedIds = extSelectedIds ?? internalSelectedIds;
   const setSelectedIds = (next: Set<string>): void => {
@@ -113,6 +115,14 @@ export function RefsPanel({
     if (onBulkDelete) onBulkDelete(ids);
     clearSelection();
   }
+  function handleLibrarySort(nextSort: LibrarySort): void {
+    if (librarySort === nextSort) {
+      setLibrarySortDirection((current) => (current === 'asc' ? 'desc' : 'asc'));
+      return;
+    }
+    setLibrarySort(nextSort);
+    setLibrarySortDirection('asc');
+  }
 
   const libraryNoById = useMemo(
     () => new Map(refs.map((ref, index) => [ref.id, index + 1])),
@@ -140,14 +150,15 @@ export function RefsPanel({
         })
       : refs;
 
+    const direction = librarySortDirection === 'asc' ? 1 : -1;
     if (librarySort === 'title') {
       return [...filtered].sort((a, b) =>
-        (a.title || a.raw || '').localeCompare(b.title || b.raw || '', undefined, { sensitivity: 'base' }),
+        direction * (a.title || a.raw || '').localeCompare(b.title || b.raw || '', undefined, { sensitivity: 'base' }),
       );
     }
 
-    return [...filtered].sort((a, b) => (libraryNoById.get(a.id) ?? 0) - (libraryNoById.get(b.id) ?? 0));
-  }, [libraryNoById, libraryQuery, librarySort, refs]);
+    return [...filtered].sort((a, b) => direction * ((libraryNoById.get(a.id) ?? 0) - (libraryNoById.get(b.id) ?? 0)));
+  }, [libraryNoById, libraryQuery, librarySort, librarySortDirection, refs]);
 
   return (
     <div className="card flex flex-col h-full">
@@ -245,18 +256,24 @@ export function RefsPanel({
             />
             <div className="flex shrink-0 overflow-hidden rounded-md border border-border">
               <button
-                onClick={() => setLibrarySort('record')}
-                className={`px-2 py-1 font-semibold ${librarySort === 'record' ? 'bg-teal text-white' : 'bg-white text-muted hover:text-primary'}`}
+                onClick={() => handleLibrarySort('record')}
+                className={`px-2 py-1 font-semibold flex items-center gap-1 ${librarySort === 'record' ? 'bg-teal text-white' : 'bg-white text-muted hover:text-primary'}`}
                 title={t('rp_library_sort_record')}
               >
-                No
+                <span>No</span>
+                <span aria-hidden="true" className="text-[9px] leading-none">
+                  {librarySort === 'record' && librarySortDirection === 'desc' ? '↓' : '↑'}
+                </span>
               </button>
               <button
-                onClick={() => setLibrarySort('title')}
-                className={`px-2 py-1 font-semibold border-l border-border ${librarySort === 'title' ? 'bg-teal text-white' : 'bg-white text-muted hover:text-primary'}`}
+                onClick={() => handleLibrarySort('title')}
+                className={`px-2 py-1 font-semibold border-l border-border flex items-center gap-1 ${librarySort === 'title' ? 'bg-teal text-white' : 'bg-white text-muted hover:text-primary'}`}
                 title={t('rp_library_sort_title')}
               >
-                A-Z
+                <span>A-Z</span>
+                <span aria-hidden="true" className="text-[9px] leading-none">
+                  {librarySort === 'title' && librarySortDirection === 'desc' ? '↓' : '↑'}
+                </span>
               </button>
             </div>
           </div>
