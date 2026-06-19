@@ -163,4 +163,18 @@ describe('analyzeBlocks', () => {
     assert.equal(table.index, 1);
     assert.ok(table.abbreviations.some((a) => a.acronym === 'LVEF'));
   });
+
+  it('maps repeated full-term suggestions back to editor positions', () => {
+    const scopes = analyzeBlocks([
+      block('Deep Neural Network (DNN). The Deep Neural Network improved accuracy. DNN remained stable.', 20),
+    ]);
+    const main = scopes.find((s) => s.kind === 'main');
+    assert.ok(main);
+    assert.equal(main.suggestions.length, 1);
+    assert.equal(main.suggestions[0].acronym, 'DNN');
+    assert.equal(main.suggestions[0].textFound, 'Deep Neural Network');
+    assert.ok(main.suggestions[0].from != null);
+    assert.ok(main.suggestions[0].to != null);
+    assert.equal(main.suggestions[0].to! - main.suggestions[0].from!, 'Deep Neural Network'.length);
+  });
 });

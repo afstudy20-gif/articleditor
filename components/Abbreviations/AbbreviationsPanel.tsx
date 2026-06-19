@@ -6,6 +6,7 @@ import {
   analyzeAbbreviations,
   replaceTextInEditor,
   type AbbreviationScope,
+  type AbbrSuggestion,
   type ScopedAbbreviation,
 } from '@/lib/editor/abbreviations';
 
@@ -34,6 +35,12 @@ const localizations = {
     replaceAllTooltip: 'Metindeki tümünü kısaltma ile değiştir',
     suggestLabel: 'yerine kısaltmasını kullanın:',
     jumpHint: 'Geçtiği yerlere sırayla gitmek için tıklayın',
+    prevOccurrence: 'Önceki kullanım',
+    nextOccurrence: 'Sonraki kullanım',
+    openRepeats: 'açık tekrar',
+    noOpenRepeats: 'açık tekrar yok',
+    jumpToRepeat: 'Açık yazılmış terime git',
+    totalOccurrences: 'toplam kullanım',
     scopeAbstract: 'Özet',
     scopeMain: 'Ana Metin',
     scopeTable: 'Tablo',
@@ -56,6 +63,12 @@ const localizations = {
     replaceAllTooltip: 'Replace all instances with acronym',
     suggestLabel: 'use the acronym instead of:',
     jumpHint: 'Click to jump through its occurrences in order',
+    prevOccurrence: 'Previous occurrence',
+    nextOccurrence: 'Next occurrence',
+    openRepeats: 'open repeats',
+    noOpenRepeats: 'no open repeats',
+    jumpToRepeat: 'Jump to repeated full term',
+    totalOccurrences: 'total occurrences',
     scopeAbstract: 'Abstract',
     scopeMain: 'Main Text',
     scopeTable: 'Table',
@@ -90,12 +103,25 @@ export function AbbreviationsPanel({ editor, onClose, lang }: AbbreviationsPanel
 
   const totals = useMemo(() => {
     let abbrs = 0;
+    let occurrences = 0;
     let suggs = 0;
     for (const s of scopes) {
       abbrs += s.abbreviations.length;
+      occurrences += s.abbreviations.reduce((sum, abbr) => sum + abbr.occurrences.length, 0);
       suggs += s.suggestions.length;
     }
-    return { abbrs, suggs };
+    return { abbrs, occurrences, suggs };
+  }, [scopes]);
+
+  const repeatCountByKey = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const scope of scopes) {
+      for (const suggestion of scope.suggestions) {
+        const key = `${scope.key}:${suggestion.acronym}`;
+        counts.set(key, (counts.get(key) ?? 0) + 1);
+      }
+    }
+    return counts;
   }, [scopes]);
 
   const filteredScopes = useMemo(() => {
@@ -118,14 +144,22 @@ export function AbbreviationsPanel({ editor, onClose, lang }: AbbreviationsPanel
   };
 
   // Cycle through the occurrences of an abbreviation, selecting + scrolling to each.
-  const jumpToNext = (scopeKey: string, abbr: ScopedAbbreviation): void => {
+  const jumpToOccurrence = (scopeKey: string, abbr: ScopedAbbreviation, direction: 1 | -1): void => {
     if (!editor || editor.isDestroyed || abbr.occurrences.length === 0) return;
     const key = `${scopeKey}:${abbr.acronym}`;
-    const next = navCursor.current.get(key) ?? 0;
-    const occ = abbr.occurrences[next % abbr.occurrences.length];
-    navCursor.current.set(key, next + 1);
-    setActiveJump(`${key}#${next % abbr.occurrences.length}`);
+    const current = navCursor.current.get(key);
+    const next = current == null
+      ? (direction === -1 ? abbr.occurrences.length - 1 : 0)
+      : (current + direction + abbr.occurrences.length) % abbr.occurrences.length;
+    const occ = abbr.occurrences[next];
+    navCursor.current.set(key, next);
+    setActiveJump(`${key}#${next}`);
     editor.chain().focus().setTextSelection({ from: occ.from, to: occ.to }).scrollIntoView().run();
+  };
+
+  const jumpToSuggestion = (suggestion: AbbrSuggestion): void => {
+    if (!editor || editor.isDestroyed || suggestion.from == null || suggestion.to == null) return;
+    editor.chain().focus().setTextSelection({ from: suggestion.from, to: suggestion.to }).scrollIntoView().run();
   };
 
   const handleReplaceOne = (definition: string, acronym: string): void => {
@@ -190,6 +224,20 @@ export function AbbreviationsPanel({ editor, onClose, lang }: AbbreviationsPanel
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full text-xs px-2.5 py-1.5 border border-border rounded-lg focus:outline-none focus:border-teal bg-slate-50/30"
             />
+            <div className="grid grid-cols-3 gap-1.5">
+              <div className="rounded-md border border-border bg-slate-50 px-2 py-1">
+                <div className="text-[10px] text-muted">{t.tabDict}</div>
+                <div className="text-xs font-bold text-primary">{totals.abbrs}</div>
+              </div>
+              <div className="rounded-md border border-border bg-slate-50 px-2 py-1">
+                <div className="text-[10px] text-muted">{t.totalOccurrences}</div>
+                <div className="text-xs font-bold text-primary">{totals.occurrences}</div>
+              </div>
+              <div className="rounded-md border border-border bg-amber-50 px-2 py-1">
+                <div className="text-[10px] text-muted">{t.openRepeats}</div>
+                <div className="text-xs font-bold text-amber-700">{totals.suggs}</div>
+              </div>
+            </div>
 
             <div className="flex-1 overflow-y-auto pr-0.5 space-y-3">
               {scopesWithAbbrs.length === 0 ? (
@@ -204,7 +252,7 @@ export function AbbreviationsPanel({ editor, onClose, lang }: AbbreviationsPanel
                     </div>
                     {scope.abbreviations.map((a) => {
                       const key = `${scope.key}:${a.acronym}`;
-                      const cur = navCursor.current.get(key);
+                      const openRepeatCount = repeatCountByKey.get(key) ?? 0;
                       const showingIdx = activeJump.startsWith(`${key}#`)
                         ? Number(activeJump.split('#')[1]) + 1
                         : null;
@@ -215,7 +263,7 @@ export function AbbreviationsPanel({ editor, onClose, lang }: AbbreviationsPanel
                         >
                           <button
                             type="button"
-                            onClick={() => jumpToNext(scope.key, a)}
+                            onClick={() => jumpToOccurrence(scope.key, a, 1)}
                             title={t.jumpHint}
                             className="min-w-0 flex-1 text-left group"
                           >
@@ -231,7 +279,28 @@ export function AbbreviationsPanel({ editor, onClose, lang }: AbbreviationsPanel
                             <div className="text-[11px] text-secondary truncate mt-0.5" title={a.definition}>
                               {a.definition}
                             </div>
+                            <div className={`text-[10px] mt-1 ${openRepeatCount > 0 ? 'text-amber-700 font-semibold' : 'text-muted'}`}>
+                              {openRepeatCount > 0
+                                ? `${openRepeatCount} ${t.openRepeats}`
+                                : t.noOpenRepeats}
+                            </div>
                           </button>
+                          <div className="shrink-0 flex items-center gap-1">
+                            <button
+                              onClick={() => jumpToOccurrence(scope.key, a, -1)}
+                              className="w-6 h-6 rounded-md border border-border bg-white text-muted hover:text-teal hover:border-teal transition"
+                              title={t.prevOccurrence}
+                            >
+                              ↑
+                            </button>
+                            <button
+                              onClick={() => jumpToOccurrence(scope.key, a, 1)}
+                              className="w-6 h-6 rounded-md border border-border bg-white text-muted hover:text-teal hover:border-teal transition"
+                              title={t.nextOccurrence}
+                            >
+                              ↓
+                            </button>
+                          </div>
                           <button
                             onClick={() => handleInsertAcronym(a.acronym)}
                             className="shrink-0 flex flex-col items-center justify-center px-2 py-1 text-teal hover:bg-teal/10 rounded-lg transition bg-white border border-border hover:border-teal/40"
@@ -277,6 +346,15 @@ export function AbbreviationsPanel({ editor, onClose, lang }: AbbreviationsPanel
                           <strong className="text-teal font-extrabold">{s.acronym}</strong>
                         </div>
                         <div className="flex gap-1.5">
+                          {s.from != null && s.to != null && (
+                            <button
+                              onClick={() => jumpToSuggestion(s)}
+                              className="text-[10px] px-2.5 py-1 rounded-md border border-border bg-white text-secondary hover:text-teal hover:border-teal transition font-semibold"
+                              title={t.jumpToRepeat}
+                            >
+                              {lang === 'tr' ? 'Git' : 'Go'}
+                            </button>
+                          )}
                           <button
                             onClick={() => handleReplaceOne(s.textFound, s.acronym)}
                             className="text-[10px] px-2.5 py-1 rounded-md border border-border bg-white text-secondary hover:text-teal hover:border-teal transition font-semibold"

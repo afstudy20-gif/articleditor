@@ -11,6 +11,8 @@ export interface AbbrSuggestion {
   definition: string;
   textFound: string;
   index: number;
+  from?: number;
+  to?: number;
 }
 
 /** A single occurrence of an acronym in the document, as editor positions. */
@@ -139,7 +141,12 @@ function buildScope(key: string, kind: AbbrevScopeKind, index: number | undefine
     const occurrences = findOccurrences(text, map, abbr.acronym);
     return { ...abbr, count: occurrences.length, occurrences };
   });
-  const suggestions = findSuggestions(text, abbreviations);
+  const suggestions = findSuggestions(text, abbreviations).map((suggestion): AbbrSuggestion => {
+    const from = offsetToPos(map, suggestion.index);
+    return from === null
+      ? suggestion
+      : { ...suggestion, from, to: from + suggestion.textFound.length };
+  });
   return { key, kind, index, abbreviations, suggestions };
 }
 

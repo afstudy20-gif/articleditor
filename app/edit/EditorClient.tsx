@@ -2585,9 +2585,9 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="text-base font-bold text-primary bg-transparent outline-none border-b border-transparent focus:border-teal min-w-0 flex-1 max-w-xs truncate"
+              className="text-base font-bold text-primary bg-transparent outline-none border-b border-transparent focus:border-teal min-w-0 flex-1 2xl:flex-none 2xl:w-[22rem] max-w-xs 2xl:max-w-[22rem] truncate"
             />
-            <span className="hidden 2xl:inline text-xs text-faint shrink-0">
+            <span className="hidden 2xl:inline-block text-xs text-faint shrink-0 w-[8.75rem] text-right tabular-nums whitespace-nowrap">
               {savingState === 'saving'
                 ? 'Kaydediliyor…'
                 : `Son kayıt ${new Date(savedAt).toLocaleTimeString('tr-TR')}`}
