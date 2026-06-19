@@ -43,17 +43,6 @@ export async function buildDocx(input: BuildInput): Promise<Blob> {
   wordFolder.file('styles.xml', STYLES_XML);
   wordFolder.file('settings.xml', SETTINGS_XML);
 
-  const titleText = input.title ?? 'Manuscript';
-  const exportDateText = new Date().toLocaleDateString('tr-TR', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
-  wordFolder.file('header1.xml', headerXml(titleText));
-  wordFolder.file('footer1.xml', footerXml(exportDateText));
-
   wordFolder.folder('_rels')!.file('document.xml.rels', DOC_RELS_XML);
   return await zip.generateAsync({ type: 'blob', mimeType: WORD_MIME });
 }
@@ -98,7 +87,7 @@ function buildDocumentXml(input: BuildInput, refs: Ref[]): string {
             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006">
 <w:body>
 ${paragraphs.join('\n')}
-<w:sectPr><w:headerReference w:type="default" r:id="rIdHeader1"/><w:footerReference w:type="default" r:id="rIdFooter1"/>${lineNumXml}<w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="720" w:footer="720" w:gutter="0"/></w:sectPr>
+<w:sectPr>${lineNumXml}<w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="720" w:footer="720" w:gutter="0"/></w:sectPr>
 </w:body>
 </w:document>`;
 }
@@ -190,8 +179,6 @@ const CONTENT_TYPES_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"
 <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
 <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>
 <Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/>
-<Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>
-<Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>
 </Types>`;
 
 const ROOT_RELS_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -203,8 +190,6 @@ const DOC_RELS_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
 <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
 <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/>
-<Relationship Id="rIdHeader1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/>
-<Relationship Id="rIdFooter1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>
 </Relationships>`;
 
 const STYLES_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -218,90 +203,3 @@ const SETTINGS_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
 <w:updateFields w:val="true"/>
 </w:settings>`;
-
-function headerXml(title: string): string {
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
-       xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
-  <w:p>
-    <w:pPr>
-      <w:pBdr>
-        <w:bottom w:val="single" w:sz="4" w:space="1" w:color="D3D3D3"/>
-      </w:pBdr>
-      <w:jc w:val="both"/>
-    </w:pPr>
-    <w:r>
-      <w:rPr>
-        <w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:cs="Times New Roman" w:eastAsia="Times New Roman"/>
-        <w:sz w:val="18"/>
-        <w:i/>
-        <w:color w:val="808080"/>
-      </w:rPr>
-      <w:t>${escapeXml(title)}</w:t>
-    </w:r>
-  </w:p>
-</w:hdr>`;
-}
-
-function footerXml(exportDate: string): string {
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
-       xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
-  <w:p>
-    <w:pPr>
-      <w:pBdr>
-        <w:top w:val="single" w:sz="4" w:space="1" w:color="D3D3D3"/>
-      </w:pBdr>
-      <w:tabs>
-        <w:tab w:val="right" w:pos="9360"/>
-      </w:tabs>
-      <w:jc w:val="both"/>
-    </w:pPr>
-    <w:r>
-      <w:rPr>
-        <w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:cs="Times New Roman" w:eastAsia="Times New Roman"/>
-        <w:sz w:val="18"/>
-        <w:color w:val="808080"/>
-      </w:rPr>
-      <w:t>Export: ${escapeXml(exportDate)}</w:t>
-    </w:r>
-    <w:r>
-      <w:rPr>
-        <w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:cs="Times New Roman" w:eastAsia="Times New Roman"/>
-        <w:sz w:val="18"/>
-        <w:color w:val="808080"/>
-      </w:rPr>
-      <w:tab/>
-      <w:t>Page </w:t>
-    </w:r>
-    <w:fldSimple w:instr="PAGE">
-      <w:r>
-        <w:rPr>
-          <w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:cs="Times New Roman" w:eastAsia="Times New Roman"/>
-          <w:sz w:val="18"/>
-          <w:color w:val="808080"/>
-        </w:rPr>
-        <w:t>1</w:t>
-      </w:r>
-    </w:fldSimple>
-    <w:r>
-      <w:rPr>
-        <w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:cs="Times New Roman" w:eastAsia="Times New Roman"/>
-        <w:sz w:val="18"/>
-        <w:color w:val="808080"/>
-      </w:rPr>
-      <w:t> of </w:t>
-    </w:r>
-    <w:fldSimple w:instr="NUMPAGES">
-      <w:r>
-        <w:rPr>
-          <w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:cs="Times New Roman" w:eastAsia="Times New Roman"/>
-          <w:sz w:val="18"/>
-          <w:color w:val="808080"/>
-        </w:rPr>
-        <w:t>1</w:t>
-      </w:r>
-    </w:fldSimple>
-  </w:p>
-</w:ftr>`;
-}

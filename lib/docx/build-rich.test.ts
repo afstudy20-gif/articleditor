@@ -104,6 +104,10 @@ describe('buildRichDocx', () => {
     assert.ok(!xml.includes('Kaynakça'), 'no localized bibliography heading');
 
     const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+    assert.equal(zip.file('word/header1.xml'), null, 'no generated page header');
+    assert.equal(zip.file('word/footer1.xml'), null, 'no generated page footer');
+    assert.ok(!xml.includes('headerReference'), 'document has no page header reference');
+    assert.ok(!xml.includes('footerReference'), 'document has no page footer reference');
     const styles = await zip.file('word/styles.xml')!.async('string');
     assert.ok(styles.includes('Times New Roman'), 'editor font, not Calibri');
     assert.match(
