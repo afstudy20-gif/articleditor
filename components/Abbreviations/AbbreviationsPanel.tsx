@@ -29,7 +29,7 @@ const localizations = {
     replace: 'Değiştir',
     replaceAll: 'Hepsini Değiştir',
     searchAbbrs: 'Kısaltmalarda ara...',
-    add: 'ekle',
+    add: 'Metne ekle',
     insertTooltip: 'Kısaltmayı metne ekle',
     replaceTooltip: 'Kısaltma ile değiştir',
     replaceAllTooltip: 'Metindeki tümünü kısaltma ile değiştir',
@@ -57,7 +57,7 @@ const localizations = {
     replace: 'Replace',
     replaceAll: 'Replace All',
     searchAbbrs: 'Search abbreviations...',
-    add: 'add',
+    add: 'Add to text',
     insertTooltip: 'Insert acronym into the text',
     replaceTooltip: 'Replace with acronym',
     replaceAllTooltip: 'Replace all instances with acronym',
@@ -124,6 +124,17 @@ export function AbbreviationsPanel({ editor, onClose, lang }: AbbreviationsPanel
     return counts;
   }, [scopes]);
 
+  const firstRepeatByKey = useMemo(() => {
+    const repeats = new Map<string, AbbrSuggestion>();
+    for (const scope of scopes) {
+      for (const suggestion of scope.suggestions) {
+        const key = `${scope.key}:${suggestion.acronym}`;
+        if (!repeats.has(key)) repeats.set(key, suggestion);
+      }
+    }
+    return repeats;
+  }, [scopes]);
+
   const filteredScopes = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return scopes;
@@ -160,6 +171,11 @@ export function AbbreviationsPanel({ editor, onClose, lang }: AbbreviationsPanel
   const jumpToSuggestion = (suggestion: AbbrSuggestion): void => {
     if (!editor || editor.isDestroyed || suggestion.from == null || suggestion.to == null) return;
     editor.chain().focus().setTextSelection({ from: suggestion.from, to: suggestion.to }).scrollIntoView().run();
+  };
+
+  const jumpToFirstRepeat = (scopeKey: string, acronym: string): void => {
+    const suggestion = firstRepeatByKey.get(`${scopeKey}:${acronym}`);
+    if (suggestion) jumpToSuggestion(suggestion);
   };
 
   const handleReplaceOne = (definition: string, acronym: string): void => {
@@ -253,6 +269,7 @@ export function AbbreviationsPanel({ editor, onClose, lang }: AbbreviationsPanel
                     {scope.abbreviations.map((a) => {
                       const key = `${scope.key}:${a.acronym}`;
                       const openRepeatCount = repeatCountByKey.get(key) ?? 0;
+                      const firstRepeat = firstRepeatByKey.get(key);
                       const showingIdx = activeJump.startsWith(`${key}#`)
                         ? Number(activeJump.split('#')[1]) + 1
                         : null;
@@ -261,30 +278,57 @@ export function AbbreviationsPanel({ editor, onClose, lang }: AbbreviationsPanel
                           key={a.acronym}
                           className="p-2.5 rounded-lg border border-border hover:border-teal/40 bg-slate-50/20 flex items-center justify-between gap-3 transition"
                         >
-                          <button
-                            type="button"
-                            onClick={() => jumpToOccurrence(scope.key, a, 1)}
-                            title={t.jumpHint}
-                            className="min-w-0 flex-1 text-left group"
-                          >
-                            <div className="flex items-baseline gap-1.5 flex-wrap">
-                              <strong className="text-xs text-primary font-extrabold group-hover:text-teal">{a.acronym}</strong>
-                              <span className="text-[10px] text-muted">
-                                ({a.count} {t.occurrences})
-                              </span>
-                              {showingIdx !== null && (
-                                <span className="text-[10px] font-semibold text-teal">→ {showingIdx}/{a.occurrences.length}</span>
-                              )}
+                          <div className="min-w-0 flex-1">
+                            <div className="w-full text-left group">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <button
+                                  type="button"
+                                  onClick={() => jumpToOccurrence(scope.key, a, 1)}
+                                  title={t.jumpHint}
+                                  className="flex items-baseline gap-1.5 text-left"
+                                >
+                                  <strong className="text-xs text-primary font-extrabold group-hover:text-teal">{a.acronym}</strong>
+                                  <span className="text-[10px] text-muted">
+                                    ({a.count} {t.occurrences})
+                                  </span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    handleInsertAcronym(a.acronym);
+                                  }}
+                                  className="text-[10px] px-1.5 py-0.5 rounded border border-teal/30 bg-white text-teal font-semibold hover:bg-teal-bg cursor-pointer"
+                                  title={t.insertTooltip}
+                                >
+                                  + {t.add}
+                                </button>
+                                {showingIdx !== null && (
+                                  <span className="text-[10px] font-semibold text-teal">→ {showingIdx}/{a.occurrences.length}</span>
+                                )}
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => jumpToOccurrence(scope.key, a, 1)}
+                                title={t.jumpHint}
+                                className="block w-full text-left text-[11px] text-secondary truncate mt-0.5"
+                              >
+                                {a.definition}
+                              </button>
                             </div>
-                            <div className="text-[11px] text-secondary truncate mt-0.5" title={a.definition}>
-                              {a.definition}
-                            </div>
-                            <div className={`text-[10px] mt-1 ${openRepeatCount > 0 ? 'text-amber-700 font-semibold' : 'text-muted'}`}>
-                              {openRepeatCount > 0
-                                ? `${openRepeatCount} ${t.openRepeats}`
-                                : t.noOpenRepeats}
-                            </div>
-                          </button>
+                            {openRepeatCount > 0 ? (
+                              <button
+                                type="button"
+                                onClick={() => jumpToFirstRepeat(scope.key, a.acronym)}
+                                className="text-[10px] mt-1 text-left text-amber-700 font-semibold hover:underline"
+                                title={firstRepeat?.textFound ? `${t.jumpToRepeat}: ${firstRepeat.textFound}` : t.jumpToRepeat}
+                              >
+                                {openRepeatCount} {t.openRepeats}
+                              </button>
+                            ) : (
+                              <div className="text-[10px] mt-1 text-muted">{t.noOpenRepeats}</div>
+                            )}
+                          </div>
                           <div className="shrink-0 flex items-center gap-1">
                             <button
                               onClick={() => jumpToOccurrence(scope.key, a, -1)}
@@ -301,14 +345,6 @@ export function AbbreviationsPanel({ editor, onClose, lang }: AbbreviationsPanel
                               ↓
                             </button>
                           </div>
-                          <button
-                            onClick={() => handleInsertAcronym(a.acronym)}
-                            className="shrink-0 flex flex-col items-center justify-center px-2 py-1 text-teal hover:bg-teal/10 rounded-lg transition bg-white border border-border hover:border-teal/40"
-                            title={t.insertTooltip}
-                          >
-                            <span className="text-sm font-bold leading-none">＋</span>
-                            <span className="text-[8px] leading-none mt-0.5 text-muted">{t.add}</span>
-                          </button>
                         </div>
                       );
                     })}

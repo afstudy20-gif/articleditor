@@ -55,14 +55,16 @@ const SEPARATOR: Piece = { text: '\n', pos: -1 };
 
 // Section-heading detection — drives the Abstract vs Main split.
 const ABSTRACT_HEADING_RE = /^(abstract|öz|özet|summary|structured abstract)\b/i;
+const REFERENCES_HEADING_RE = /^(references|bibliography|kaynaklar|kaynakça|referanslar|literatür)\b/i;
 const SECTION_HEADING_RE =
   /^(introduction|background|methods?|materials?|patients?|results?|findings?|discussion|conclusions?|references?|bibliography|keywords?|acknowledg|funding|giri[şs]|y[öo]ntem|materyal|bulgular|tart[ıi][şs]ma|sonu[çc]|kaynak|anahtar)/i;
 
-function blockRole(block: DocBlock): 'abstract' | 'break' | null {
+function blockRole(block: DocBlock): 'abstract' | 'break' | 'stop' | null {
   const text = block.text.trim();
   const looksHeading =
     block.isHeading || (text.length > 0 && text.length <= 60 && (ABSTRACT_HEADING_RE.test(text) || SECTION_HEADING_RE.test(text)));
   if (!looksHeading) return null;
+  if (REFERENCES_HEADING_RE.test(text)) return 'stop';
   if (ABSTRACT_HEADING_RE.test(text)) return 'abstract';
   return 'break';
 }
@@ -81,10 +83,11 @@ export function splitScopes(blocks: DocBlock[]): {
   const abstract: Piece[] = [];
   const main: Piece[] = [];
   const tables: Piece[][] = [];
-  let scope: 'abstract' | 'main' = 'main';
+  let scope: 'abstract' | 'main' | 'ignore' = 'main';
   let sawAbstract = false;
 
   for (const block of blocks) {
+    if (scope === 'ignore') continue;
     if (block.isTable) {
       tables.push([...block.pieces, SEPARATOR]);
       continue;
@@ -95,6 +98,9 @@ export function splitScopes(blocks: DocBlock[]): {
       sawAbstract = true;
     } else if (role === 'break') {
       scope = 'main';
+    } else if (role === 'stop') {
+      scope = 'ignore';
+      continue;
     }
     const target = scope === 'abstract' ? abstract : main;
     for (const piece of block.pieces) target.push(piece);

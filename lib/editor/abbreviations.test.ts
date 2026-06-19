@@ -124,6 +124,16 @@ describe('splitScopes', () => {
     assert.equal(abstract.length, 0);
     assert.ok(main.length > 0);
   });
+
+  it('ignores bibliography content after a references heading', () => {
+    const { main } = splitScopes([
+      block('Percutaneous coronary intervention (PCI). PCI was successful.', 1),
+      block('References', 80, { heading: true }),
+      block('A paper mentioning percutaneous coronary intervention in its title.', 95),
+    ]);
+    assert.ok(main.some((p) => p.text.includes('PCI was successful')));
+    assert.ok(!main.some((p) => p.text.includes('A paper mentioning')));
+  });
 });
 
 describe('analyzeBlocks', () => {
@@ -176,5 +186,16 @@ describe('analyzeBlocks', () => {
     assert.ok(main.suggestions[0].from != null);
     assert.ok(main.suggestions[0].to != null);
     assert.equal(main.suggestions[0].to! - main.suggestions[0].from!, 'Deep Neural Network'.length);
+  });
+
+  it('does not flag repeated full terms inside the bibliography', () => {
+    const scopes = analyzeBlocks([
+      block('Percutaneous coronary intervention (PCI). PCI was successful.', 1),
+      block('References', 80, { heading: true }),
+      block('Trial of percutaneous coronary intervention outcomes.', 95),
+    ]);
+    const main = scopes.find((s) => s.kind === 'main');
+    assert.ok(main);
+    assert.equal(main.suggestions.length, 0);
   });
 });
