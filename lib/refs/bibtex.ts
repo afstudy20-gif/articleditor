@@ -18,19 +18,72 @@ const TYPE_MAP: Record<string, RefType> = {
 
 export function parseBibtex(text: string): Ref[] {
   const refs: Ref[] = [];
-  // Find all entries
-  const entryRe = /@(\w+)\s*\{\s*([^,]+),([\s\S]*?)\n\s*\}/g;
-  let m: RegExpExecArray | null;
   let i = 0;
-  while ((m = entryRe.exec(text))) {
-    const entryType = m[1].toLowerCase();
-    const key = m[2].trim();
-    const body = m[3];
+  // Scan for entry starts "@type{" and brace-match to the closing brace so we
+  // support both multi-line and single-line entries (the previous \n\s*\}
+  // regex dropped single-line and @string-less compact exports entirely).
+  let cursor = 0;
+  while (cursor < text.length) {
+    const at = text.indexOf('@', cursor);
+    if (at < 0) break;
+    const header = text.slice(at).match(/^@(\w+)\s*\{/);
+    if (!header) {
+      cursor = at + 1;
+      continue;
+    }
+    const entryType = header[1].toLowerCase();
+    // Skip @string / @comment / @preamble macros — they hold no reference.
+    if (entryType === 'string' || entryType === 'comment' || entryType === 'preamble') {
+      cursor = at + header[0].length;
+      continue;
+    }
+    const openBraceAt = at + header[0].length - 1;
+    const closeBraceAt = matchBrace(text, openBraceAt);
+    if (closeBraceAt < 0) break;
+    const inner = text.slice(openBraceAt + 1, closeBraceAt);
+    cursor = closeBraceAt + 1;
+
+    // Split off the citation key: everything up to the first top-level comma.
+    const commaIdx = findTopLevelComma(inner);
+    const key = (commaIdx >= 0 ? inner.slice(0, commaIdx) : inner).trim();
+    const body = commaIdx >= 0 ? inner.slice(commaIdx + 1) : '';
     const fields = parseFields(body);
     const ref = bibToRef(entryType, key, fields, `bib-${i++}`);
     if (ref) refs.push(ref);
   }
   return refs;
+}
+
+/** Index of the matching closing brace for the brace at `openIdx`, or -1. */
+function matchBrace(text: string, openIdx: number): number {
+  let depth = 0;
+  for (let i = openIdx; i < text.length; i += 1) {
+    const ch = text[i];
+    if (ch === '{') depth += 1;
+    else if (ch === '}') {
+      depth -= 1;
+      if (depth === 0) return i;
+    }
+  }
+  return -1;
+}
+
+/** First comma not nested inside braces or quotes (the key/body separator). */
+function findTopLevelComma(s: string): number {
+  let depth = 0;
+  let inQuotes = false;
+  for (let i = 0; i < s.length; i += 1) {
+    const ch = s[i];
+    if (inQuotes) {
+      if (ch === '"' && s[i - 1] !== '\\') inQuotes = false;
+      continue;
+    }
+    if (ch === '"') inQuotes = true;
+    else if (ch === '{') depth += 1;
+    else if (ch === '}') depth -= 1;
+    else if (ch === ',' && depth === 0) return i;
+  }
+  return -1;
 }
 
 function parseFields(body: string): Record<string, string> {
@@ -87,7 +140,7 @@ function bibToRef(
   const year = yearMatch ? parseInt(yearMatch[0], 10) : undefined;
   const pages = f.pages?.replace(/--/g, '-');
   const doi = f.doi ? cleanDoi(f.doi) : undefined;
-  const url = f.url || (doi ? undefined : undefined);
+  const url = f.url;
 
   if (!f.title && authors.length === 0 && !year) return null;
 

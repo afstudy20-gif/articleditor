@@ -619,6 +619,16 @@ export function buildTitlePage(input: TitlePageInput): string {
     : buildTitlePageEn(input);
 }
 
+const SUPERSCRIPT_DIGITS = ['⁰', '¹', '²', '³', '⁴', '⁵', '⁶', '⁷', '⁸', '⁹'];
+
+/** Render a positive integer as Unicode superscript (1 → ¹, 12 → ¹²). */
+function superscript(n: number): string {
+  return String(n)
+    .split('')
+    .map((d) => SUPERSCRIPT_DIGITS[Number(d)] ?? d)
+    .join('');
+}
+
 function formatTitlePageAuthors(
   authors: TitlePageAuthor[] | undefined,
   lang: LetterLang,
@@ -626,7 +636,7 @@ function formatTitlePageAuthors(
   const list = (authors ?? []).filter((a) => a.name.trim().length > 0);
   if (list.length === 0) return '';
 
-  const namesLine = list.map((a, idx) => `${a.name}${idx + 1}`).join(', ');
+  const namesLine = list.map((a, idx) => `${a.name}${superscript(idx + 1)}`).join(', ');
 
   const affiliations = list
     .map((a, idx) => {

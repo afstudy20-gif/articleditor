@@ -219,18 +219,24 @@ ${this.rels.join('\n')}
     const h1Style = this.sid('heading1', 'Heading1');
     const bibStyle = this.sid('bibliography');
     const normalStyle = this.sid('normal');
-
-    // Check if the document already has a Heading 1 node.
-    const hasHeading1 = Array.isArray(doc?.content) && doc.content.some(
-      (block: any) => block && block.type === 'heading' && block.attrs?.level === 1
-    );
+    const content = Array.isArray(doc?.content) ? doc.content : [];
+    const firstVisibleIndex = content.findIndex(hasVisibleBlockContent);
+    const titleBlockIndex =
+      firstVisibleIndex >= 0
+      && content[firstVisibleIndex]?.type === 'heading'
+      && Number(content[firstVisibleIndex]?.attrs?.level ?? 1) === 1
+        ? firstVisibleIndex
+        : -1;
 
     if (
       this.input.includeDocumentTitle !== false
       && this.input.title
-      && !hasHeading1
+      && titleBlockIndex < 0
     ) {
       paragraphs.push(`<w:p><w:pPr><w:pStyle w:val="${titleStyle}"/></w:pPr>${textRun(this.input.title)}</w:p>`);
+    }
+    if (titleBlockIndex >= 0) {
+      paragraphs.push(this.titleParagraph(content[titleBlockIndex], titleStyle));
     }
 
     const abstractText = this.input.abstractText?.trim() ?? '';
@@ -253,8 +259,10 @@ ${this.rels.join('\n')}
       }
     }
 
-    if (Array.isArray(doc?.content)) {
-      for (const block of doc.content) {
+    if (content.length > 0) {
+      for (let index = 0; index < content.length; index += 1) {
+        if (index === titleBlockIndex) continue;
+        const block = content[index];
         paragraphs.push(...this.blockToXml(block, {}));
       }
     }
@@ -405,6 +413,12 @@ ${paragraphs.join('\n')}
 
     const runs = this.inlineRuns(n.content ?? []);
     const pPrXml = pPr.length ? `<w:pPr>${pPr.join('')}</w:pPr>` : '';
+    return `<w:p>${pPrXml}${runs || textRun('')}</w:p>`;
+  }
+
+  private titleParagraph(n: Json, styleId?: string): string {
+    const pPrXml = styleId ? `<w:pPr><w:pStyle w:val="${styleId}"/></w:pPr>` : '';
+    const runs = this.inlineRuns(n.content ?? []);
     return `<w:p>${pPrXml}${runs || textRun('')}</w:p>`;
   }
 
@@ -641,6 +655,21 @@ function normalizeKeywords(keywords: string[] | undefined): string[] {
     out.push(clean);
   }
   return out;
+}
+
+function hasVisibleBlockContent(node: Json): boolean {
+  if (!node) return false;
+  if (node.type !== 'paragraph' && node.type !== 'heading') return true;
+  return nodeText(node).trim().length > 0;
+}
+
+function nodeText(node: Json): string {
+  if (!node) return '';
+  let text = typeof node.text === 'string' ? node.text : '';
+  if (Array.isArray(node.content)) {
+    for (const child of node.content) text += nodeText(child);
+  }
+  return text;
 }
 
 // ─── Helpers ────────────────────────────────────────────────

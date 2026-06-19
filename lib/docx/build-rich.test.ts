@@ -180,6 +180,42 @@ describe('buildRichDocx', () => {
     assert.ok(xml.includes('Blood Platelets; Myocardial Infarction'));
   });
 
+  it('keeps an explicit heading title above the exported abstract', async () => {
+    const blob = await buildRichDocx({
+      doc: {
+        type: 'doc',
+        content: [
+          {
+            type: 'heading',
+            attrs: { level: 1, textAlign: 'right' },
+            content: [{ type: 'text', text: 'Manuscript Heading Title' }],
+          },
+          {
+            type: 'paragraph',
+            content: [{ type: 'text', text: 'Main body starts here.' }],
+          },
+        ],
+      },
+      refsById: new Map(),
+      refOrder: new Map(),
+      style: 'vancouver',
+      mode: 'plain',
+      title: 'Project Title Should Not Duplicate',
+      abstractText: 'Structured abstract text.',
+    });
+    const xml = await documentXml(blob);
+    const titleIdx = xml.indexOf('Manuscript Heading Title');
+    const abstractIdx = xml.indexOf('Abstract');
+    const bodyIdx = xml.indexOf('Main body starts here.');
+
+    assert.ok(titleIdx > -1, 'explicit title exported');
+    assert.ok(abstractIdx > titleIdx, 'abstract follows explicit title');
+    assert.ok(bodyIdx > abstractIdx, 'body follows abstract');
+    assert.ok(xml.includes('<w:pPr><w:pStyle w:val="Title"/></w:pPr><w:r><w:t xml:space="preserve">Manuscript Heading Title</w:t></w:r>'));
+    assert.doesNotMatch(xml, /w:jc w:val="right"[\s\S]*?Manuscript Heading Title/);
+    assert.equal(xml.includes('Project Title Should Not Duplicate'), false);
+  });
+
   it('can move figure captions into Figure Legends after References', async () => {
     const figureDoc = {
       type: 'doc',
