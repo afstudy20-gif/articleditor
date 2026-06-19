@@ -657,11 +657,6 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
     const order = computeRefOrder(doc as any, refs.map((r) => r.id));
     const m = new Map<string, number>();
     order.forEach((id, i) => m.set(id, i + 1));
-    refs.forEach((ref) => {
-      if (ref.includeInBibliography && !m.has(ref.id)) {
-        m.set(ref.id, m.size + 1);
-      }
-    });
     return m;
   }, [doc, refs]);
 
@@ -2334,7 +2329,6 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
     const newRefs: Ref[] = indices.map((idx) => ({
       ...importPreview.refs[idx],
       id: newRefId(),
-      includeInBibliography: true,
     }));
     // Build TipTap doc with citation nodes inserted at [N], [N,M], [N-M] marker positions.
     // Re-map citation markers so only selected references are cited and their

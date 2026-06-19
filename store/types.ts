@@ -35,7 +35,7 @@ export type Ref = {
   confidence?: number;
   enRecNum?: number;
   source?: string;
-  /** Keep this reference in generated bibliographies even when no citation node exists. */
+  /** Legacy import flag; bibliography output is now driven by actual citation nodes. */
   includeInBibliography?: boolean;
   // Cached embedding of (title + abstract + container) for semantic citation
   // suggestion. Regenerated when any of those fields change.

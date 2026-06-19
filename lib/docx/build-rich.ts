@@ -44,7 +44,7 @@ export type RichBuildInput = {
   /** TipTap document JSON (editor state). */
   doc: Json;
   refsById: Map<string, Ref>;
-  /** Citation-order map (first-cited = 1) including uncited refs at the end. */
+  /** Citation-order map (first-cited = 1). Library-only refs are omitted. */
   refOrder: Map<string, number>;
   style: StyleId;
   mode: BuildMode;

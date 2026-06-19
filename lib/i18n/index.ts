@@ -695,7 +695,7 @@ const tr: Dict = {
 
   // Bibliography
   bib_title: 'Kaynakça',
-  bib_cited_count: '{cited} atıf yapılan · {uncited} atıf yapılmayan',
+  bib_cited_count: '{cited} atıf yapılan',
   bib_no_refs: 'Henüz referans yok.',
   bib_no_citations: 'Henüz metne atıf yerleştirilmemiş.',
   bib_uncited: 'Atıf yapılmayan',
@@ -1500,7 +1500,7 @@ const en: Dict = {
 
   // Bibliography
   bib_title: 'Bibliography',
-  bib_cited_count: '{cited} cited · {uncited} uncited',
+  bib_cited_count: '{cited} cited',
   bib_no_refs: 'No references yet.',
   bib_no_citations: 'No citations placed in the text yet.',
   bib_uncited: 'Uncited',

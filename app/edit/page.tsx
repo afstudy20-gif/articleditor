@@ -234,7 +234,6 @@ function EditPageInner() {
     const refsWithIds: Ref[] = indices.map((idx) => ({
       ...conversionPreview.refs[idx],
       id: newId('r'),
-      includeInBibliography: true,
     }));
     const selectedRefNumbers = indices.map((idx) => idx + 1);
     const tiptapDoc = buildDocWithCitations(
