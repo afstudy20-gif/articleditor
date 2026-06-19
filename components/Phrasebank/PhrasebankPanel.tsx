@@ -12,6 +12,7 @@ import {
 import { newId } from '@/lib/id';
 import { extractPdfText } from '@/lib/phrasebank/pdf';
 import { countPhrases, parsePhrasebankText } from '@/lib/phrasebank/parse';
+import { mergeCategories } from '@/lib/phrasebank/merge';
 import { categoryMatchesSection } from '@/lib/phrasebank/context';
 
 type Props = {
@@ -32,6 +33,14 @@ type BundledPhrasebank = {
   sourceFileName?: string;
   categories: Array<{ name: string; phrases: string[] }>;
 };
+
+/** Stable id for the always-present, read-only built-in phrasebank.
+ *  It lives only in component state (sourced from the bundled JSON asset) and
+ *  is never written to IndexedDB, so every user sees it without installing. */
+const BUILTIN_BANK_ID = 'builtin-academic-phrasebank';
+/** sourceFileName of legacy installs created by the old "install bundle" flow;
+ *  hidden now that the built-in bank is always shown from the source asset. */
+const LEGACY_BUILTIN_SOURCE = 'Academic-Phrasebank.pdf';
 
 function phraseScore(phrase: Phrase, query: string): number {
   const q = query.trim().toLowerCase();
@@ -71,14 +80,37 @@ function hydrateBundledCategories(bundle: BundledPhrasebank): PhraseCategory[] {
 
 export function PhrasebankPanel({ onInsert, onClose, currentSection, t }: Props): JSX.Element {
   const inputRef = useRef<HTMLInputElement>(null);
-  const [banks, setBanks] = useState<UserPhrasebank[]>([]);
+  const [userBanks, setUserBanks] = useState<UserPhrasebank[]>([]);
+  const [builtinCategories, setBuiltinCategories] = useState<PhraseCategory[] | null>(null);
   const [activeId, setActiveId] = useState<string>('');
   const [query, setQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [openCategories, setOpenCategories] = useState<Set<string>>(new Set());
   const [upload, setUpload] = useState<UploadState>({ status: 'idle' });
-  const [bundledBusy, setBundledBusy] = useState(false);
   const [dragging, setDragging] = useState(false);
+
+  // The built-in bank is read directly from the bundled JSON asset (never from
+  // IndexedDB), so it is available to every user immediately — no install step.
+  const builtinBank = useMemo<UserPhrasebank | null>(() => {
+    if (!builtinCategories) return null;
+    return {
+      id: BUILTIN_BANK_ID,
+      name: t('pb_title'),
+      createdAt: 0,
+      updatedAt: 0,
+      active: false,
+      categories: builtinCategories,
+      sourceFileName: LEGACY_BUILTIN_SOURCE,
+    };
+  }, [builtinCategories, t]);
+
+  // banks = [built-in (always first)] + user banks (legacy bundle installs hidden).
+  const banks = useMemo<UserPhrasebank[]>(() => {
+    const userFiltered = userBanks.filter((bank) => bank.sourceFileName !== LEGACY_BUILTIN_SOURCE);
+    return builtinBank ? [builtinBank, ...userFiltered] : userFiltered;
+  }, [userBanks, builtinBank]);
+
+  const isBuiltin = (id: string): boolean => id === BUILTIN_BANK_ID;
 
   const active = useMemo(
     () => banks.find((bank) => bank.id === activeId) ?? banks.find((bank) => bank.active) ?? banks[0] ?? null,
@@ -87,13 +119,37 @@ export function PhrasebankPanel({ onInsert, onClose, currentSection, t }: Props)
 
   const reload = async (): Promise<void> => {
     const rows = await listPhrasebanks();
-    setBanks(rows);
-    const nextActive = rows.find((bank) => bank.active) ?? rows[0] ?? null;
-    setActiveId((id) => (id && rows.some((bank) => bank.id === id) ? id : nextActive?.id ?? ''));
+    setUserBanks(rows);
+    const nextActive = rows.find((bank) => bank.active) ?? null;
+    setActiveId((id) => {
+      if (id && banks.some((bank) => bank.id === id)) return id;
+      return nextActive?.id ?? BUILTIN_BANK_ID;
+    });
   };
 
   useEffect(() => {
     void reload();
+  }, []);
+
+  // Load the bundled Academic Phrasebank once on mount, directly from the
+  // static asset — no IndexedDB write, so it ships with the app for everyone.
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/phrasebanks/academic-phrasebank.json')
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json() as Promise<BundledPhrasebank>;
+      })
+      .then((bundle) => {
+        if (cancelled) return;
+        setBuiltinCategories(hydrateBundledCategories(bundle));
+      })
+      .catch(() => {
+        // Offline / asset missing — the panel still works with user banks only.
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -126,13 +182,19 @@ export function PhrasebankPanel({ onInsert, onClose, currentSection, t }: Props)
     try {
       const text = await extractPdfText(file);
       setUpload({ status: 'busy', label: t('pb_parsing') });
-      const categories = parsePhrasebankText(text);
-      const total = countPhrases(categories);
-      if (total === 0) throw new Error(t('pb_no_phrases'));
+      const parsed = parsePhrasebankText(text);
+      if (countPhrases(parsed) === 0) throw new Error(t('pb_no_phrases'));
+      // Smart-merge: combine the parsed categories with the built-in phrasebank
+      // (matching categories pool their phrases; new categories are appended).
+      const merged = builtinCategories
+        ? mergeCategories(builtinCategories, parsed)
+        : parsed;
+      const total = countPhrases(merged);
       const bank = await createPhrasebank({
         name: phrasebankBaseName(file.name),
-        categories,
+        categories: merged,
         sourceFileName: file.name,
+        mergedWithBuiltin: Boolean(builtinCategories),
         active: true,
       });
       await reload();
@@ -147,43 +209,19 @@ export function PhrasebankPanel({ onInsert, onClose, currentSection, t }: Props)
 
   async function switchBank(id: string): Promise<void> {
     setActiveId(id);
-    await setActivePhrasebank(id);
-    await reload();
-  }
-
-  async function installBundledPhrasebank(): Promise<void> {
-    setBundledBusy(true);
-    setUpload({ status: 'busy', label: t('pb_installing_bundle') });
-    try {
-      const res = await fetch('/phrasebanks/academic-phrasebank.json');
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const bundle = (await res.json()) as BundledPhrasebank;
-      const categories = hydrateBundledCategories(bundle);
-      const total = countPhrases(categories);
-      const bank = await createPhrasebank({
-        name: bundle.name,
-        sourceFileName: bundle.sourceFileName,
-        categories,
-        active: true,
-      });
-      await reload();
-      setActiveId(bank.id);
-      setUpload({ status: 'done', message: t('pb_imported').replace('{count}', String(total)) });
-    } catch (err) {
-      setUpload({ status: 'error', message: t('pb_bundle_failed').replace('{msg}', err instanceof Error ? err.message : String(err)) });
-    } finally {
-      setBundledBusy(false);
-    }
+    // The built-in bank is not in IndexedDB — nothing to persist there.
+    if (!isBuiltin(id)) await setActivePhrasebank(id);
+    else await reload();
   }
 
   async function mutateActive(categories: PhraseCategory[]): Promise<void> {
-    if (!active) return;
+    if (!active || isBuiltin(active.id)) return;
     await updatePhrasebank(active.id, { categories });
     await reload();
   }
 
   async function removePhrase(categoryId: string, phraseId: string): Promise<void> {
-    if (!active) return;
+    if (!active || isBuiltin(active.id)) return;
     const next = active.categories
       .map((cat) =>
         cat.id === categoryId
@@ -195,7 +233,7 @@ export function PhrasebankPanel({ onInsert, onClose, currentSection, t }: Props)
   }
 
   async function removeCategory(categoryId: string): Promise<void> {
-    if (!active) return;
+    if (!active || isBuiltin(active.id)) return;
     const target = active.categories.find((cat) => cat.id === categoryId);
     if (!target) return;
     if (!confirm(t('pb_delete_category_confirm').replace('{name}', target.name))) return;
@@ -203,7 +241,7 @@ export function PhrasebankPanel({ onInsert, onClose, currentSection, t }: Props)
   }
 
   async function renameCategory(categoryId: string): Promise<void> {
-    if (!active) return;
+    if (!active || isBuiltin(active.id)) return;
     const target = active.categories.find((cat) => cat.id === categoryId);
     if (!target) return;
     const name = prompt(t('pb_rename_category'), target.name)?.trim();
@@ -222,7 +260,7 @@ export function PhrasebankPanel({ onInsert, onClose, currentSection, t }: Props)
   }
 
   async function removeBank(): Promise<void> {
-    if (!active) return;
+    if (!active || isBuiltin(active.id)) return;
     if (!confirm(t('pb_delete_bank_confirm').replace('{name}', active.name))) return;
     await deletePhrasebank(active.id);
     await reload();
@@ -283,13 +321,6 @@ export function PhrasebankPanel({ onInsert, onClose, currentSection, t }: Props)
           >
             {upload.status === 'busy' ? upload.label : t('pb_upload_pdf')}
           </button>
-          <button
-            onClick={() => void installBundledPhrasebank()}
-            disabled={upload.status === 'busy' || bundledBusy}
-            className="btn-secondary text-xs px-3 py-1.5 ml-2 disabled:opacity-50"
-          >
-            {bundledBusy ? t('pb_installing_bundle') : t('pb_install_bundle')}
-          </button>
           <div className="text-[11px] text-muted mt-1">{t('pb_drop_hint')}</div>
         </div>
 
@@ -308,12 +339,12 @@ export function PhrasebankPanel({ onInsert, onClose, currentSection, t }: Props)
             ) : (
               banks.map((bank) => (
                 <option key={bank.id} value={bank.id}>
-                  {bank.name} ({countPhrases(bank.categories)})
+                  {bank.name} ({countPhrases(bank.categories)}){isBuiltin(bank.id) ? ` · ${t('pb_builtin_badge')}` : ''}
                 </option>
               ))
             )}
           </select>
-          {active && (
+          {active && !isBuiltin(active.id) && (
             <button onClick={removeBank} className="btn-danger text-xs px-2 py-1" title={t('pb_delete_bank')}>
               {t('pb_delete')}
             </button>
@@ -362,6 +393,7 @@ export function PhrasebankPanel({ onInsert, onClose, currentSection, t }: Props)
         )}
         {filteredCategories.map((cat) => {
           const open = openCategories.has(cat.id);
+          const editable = active && !isBuiltin(active.id);
           return (
             <div key={cat.id} className="border-b border-border">
               <div className={`px-3 py-2 ${cat.recommended ? 'bg-teal-bg' : ''}`}>
@@ -384,12 +416,16 @@ export function PhrasebankPanel({ onInsert, onClose, currentSection, t }: Props)
                       {t('pb_relevant')}
                     </span>
                   )}
-                  <button onClick={() => void renameCategory(cat.id)} className="text-xs text-muted hover:text-primary">
-                    {t('rp_edit')}
-                  </button>
-                  <button onClick={() => void removeCategory(cat.id)} className="text-xs text-red hover:underline">
-                    {t('pb_delete')}
-                  </button>
+                  {editable && (
+                    <button onClick={() => void renameCategory(cat.id)} className="text-xs text-muted hover:text-primary">
+                      {t('rp_edit')}
+                    </button>
+                  )}
+                  {editable && (
+                    <button onClick={() => void removeCategory(cat.id)} className="text-xs text-red hover:underline">
+                      {t('pb_delete')}
+                    </button>
+                  )}
                 </div>
               </div>
               {open && (
@@ -413,12 +449,14 @@ export function PhrasebankPanel({ onInsert, onClose, currentSection, t }: Props)
                         <button onClick={() => void copyPhrase(phrase.text)} className="text-secondary hover:text-primary">
                           {t('pb_copy')}
                         </button>
-                        <button
-                          onClick={() => void removePhrase(cat.id, phrase.id)}
-                          className="text-red hover:underline ml-auto"
-                        >
-                          {t('pb_delete')}
-                        </button>
+                        {editable && (
+                          <button
+                            onClick={() => void removePhrase(cat.id, phrase.id)}
+                            className="text-red hover:underline ml-auto"
+                          >
+                            {t('pb_delete')}
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))}
