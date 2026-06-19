@@ -46,6 +46,10 @@ export function CitationPopover({
   );
   const refsById = useMemo(() => new Map(allRefs.map((r) => [r.id, r])), [allRefs]);
   const cited = refIds.map((id) => refsById.get(id)).filter((r): r is Ref => Boolean(r));
+  const refsWithLibraryNo = useMemo(
+    () => allRefs.map((ref, index) => ({ ref, libraryNo: index + 1 })),
+    [allRefs],
+  );
 
   useEffect(() => {
     function onKey(e: KeyboardEvent): void {
@@ -57,10 +61,12 @@ export function CitationPopover({
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return allRefs.slice(0, 40);
-    return allRefs
-      .filter((r) => {
+    if (!q) return refsWithLibraryNo.slice(0, 40);
+    return refsWithLibraryNo
+      .filter(({ ref: r, libraryNo }) => {
         const hay =
+          String(libraryNo) +
+          ' ' +
           (r.title ?? '') +
           ' ' +
           (r.authors[0]?.family ?? '') +
@@ -73,7 +79,7 @@ export function CitationPopover({
         return hay.toLowerCase().includes(q);
       })
       .slice(0, 40);
-  }, [query, allRefs]);
+  }, [query, refsWithLibraryNo]);
 
   function handleSelect(targetRef: Ref): void {
     if (mode === 'replace') {
@@ -270,18 +276,23 @@ export function CitationPopover({
               {filtered.length === 0 && (
                 <li className="text-sm text-muted text-center py-6">{tr ? 'Eşleşen ref yok.' : 'No matching references.'}</li>
               )}
-              {filtered.map((r) => (
+              {filtered.map(({ ref: r, libraryNo }) => (
                 <li
                   key={r.id}
                   onClick={() => handleSelect(r)}
-                  className="border border-border rounded-lg p-2 text-xs hover:bg-teal-bg hover:border-teal cursor-pointer transition"
+                  className="border border-border rounded-lg p-2 text-xs hover:bg-teal-bg hover:border-teal cursor-pointer transition flex gap-2"
                 >
-                  <div className="font-medium text-primary leading-snug line-clamp-2">
-                    {r.title || (tr ? '(Başlıksız)' : '(Untitled)')}
-                  </div>
-                  <div className="text-muted mt-0.5">
-                    {r.authors[0]?.family || '—'}
-                    {r.authors.length > 1 ? ' et al.' : ''} · {r.year ?? '?'} · {r.containerTitle ?? '—'}
+                  <span className="shrink-0 w-8 h-8 rounded-md bg-slate-100 text-muted font-bold flex items-center justify-center">
+                    #{libraryNo}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium text-primary leading-snug line-clamp-2">
+                      {r.title || (tr ? '(Başlıksız)' : '(Untitled)')}
+                    </div>
+                    <div className="text-muted mt-0.5">
+                      {r.authors[0]?.family || '—'}
+                      {r.authors.length > 1 ? ' et al.' : ''} · {r.year ?? '?'} · {r.containerTitle ?? '—'}
+                    </div>
                   </div>
                 </li>
               ))}

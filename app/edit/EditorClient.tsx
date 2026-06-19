@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { Project, Ref } from '@/store/types';
+import type { Project, ProjectTable, Ref } from '@/store/types';
 import { saveProject, getProject, createSnapshot } from '@/store/db';
 import type { Snapshot } from '@/store/types';
 import { ArticleEditor, computeRefOrder } from '@/components/Editor/Editor';
@@ -89,6 +89,7 @@ import {
   type ImportParagraph,
 } from '@/lib/editor/import-rich';
 import { splitAbstractMetadataFromParagraphs } from '@/lib/editor/abstract';
+import { extractProjectTables } from '@/lib/tables/project-tables';
 import {
   encodeSelection,
   decodeToTipTapContent,
@@ -111,6 +112,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
   const { t, lang } = useLang();
   const [title, setTitle] = useState(project.title);
   const [refs, setRefs] = useState<Ref[]>(project.refs);
+  const [manuscriptTables, setManuscriptTables] = useState<ProjectTable[]>(project.tables ?? []);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
 
   const addHistory = useCallback(
@@ -308,6 +310,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
           supplementary,
           abstractText,
           keywords,
+          tables: manuscriptTables,
           auto: true,
           wordCount: computeWritingStats(liveDoc).words,
         });
@@ -316,7 +319,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
       }
     },
     // editorInstance is a stable ref-like object
-    [doc, refs, supplementary, abstractText, keywords, project.id],
+    [doc, refs, supplementary, abstractText, keywords, manuscriptTables, project.id],
   );
 
   const restoreSnapshot = useCallback(
@@ -332,6 +335,9 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
       }
       if (snap.keywords !== undefined) {
         setKeywords(snap.keywords ?? []);
+      }
+      if (snap.tables !== undefined) {
+        setManuscriptTables(snap.tables ?? []);
       }
       const ed = editorInstance.current;
       if (ed && !ed.isDestroyed && snap.doc) {
@@ -691,6 +697,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
         supplementary,
         abstractText,
         keywords,
+        tables: manuscriptTables,
         settings: { ...(project.settings ?? {}), style, figureCaptionPlacement, fontFamily },
       });
       setSavedAt(Date.now());
@@ -708,6 +715,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
     supplementary,
     abstractText,
     keywords,
+    manuscriptTables,
     figureCaptionPlacement,
     fontFamily,
     project,
@@ -726,6 +734,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
       setSupplementary(fresh.supplementary ?? '');
       setAbstractText(fresh.abstractText ?? '');
       setKeywords(fresh.keywords ?? []);
+      setManuscriptTables(fresh.tables ?? []);
       const ed = editorInstance.current;
       if (ed && !ed.isDestroyed) {
         ed.commands.setContent(fresh.doc ?? { type: 'doc', content: [{ type: 'paragraph' }] });
@@ -2167,7 +2176,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
   }
 
   function exportProjectJson(): void {
-    const p: Project = { ...project, title, refs, doc, supplementary, abstractText, keywords };
+    const p: Project = { ...project, title, refs, doc, supplementary, abstractText, keywords, tables: manuscriptTables };
     const blob = backupToBlob(buildBackup([p]));
     download(blob, projectFilename(p));
   }
@@ -2193,6 +2202,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
       setAbstractText(p.abstractText ?? '');
       setKeywords(p.keywords ?? []);
       setSupplementary(p.supplementary ?? '');
+      setManuscriptTables(p.tables ?? []);
 
       editorRegistry.current.forEach((ed) => {
         if (ed && !ed.isDestroyed && p.doc) {
@@ -2228,17 +2238,19 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
       const { bodyParagraphs, abstractText: importedAbstract, keywords: importedKeywords } = splitAbstractMetadataFromParagraphs(
         paragraphs.slice(0, referencesStartIndex),
       );
-      const bodyText = bodyParagraphs.map((p) => p.text).join('\n');
+      const { paragraphs: manuscriptParagraphs, tables } = extractProjectTables(bodyParagraphs, file.name);
+      const bodyText = manuscriptParagraphs.map((p) => p.text).join('\n');
       const markers = detectMarkers(bodyText);
       const citationCounts = countCitationsPerRef(parsedRefs.length, markers);
 
       setImportPreview({
-        paragraphs: bodyParagraphs,
+        paragraphs: manuscriptParagraphs,
         bodyText,
         refs: parsedRefs,
         markerCount: markers.length,
         abstractText: importedAbstract,
         keywords: importedKeywords,
+        tables,
         citationCounts,
       });
     } catch (e: unknown) {
@@ -2269,17 +2281,19 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
       const { bodyParagraphs, abstractText: importedAbstract, keywords: importedKeywords } = splitAbstractMetadataFromParagraphs(
         pastedHtmlParagraphs.slice(0, referencesStartIndex),
       );
-      const bodyText = bodyParagraphs.map((p) => p.text).join('\n');
+      const { paragraphs: manuscriptParagraphs, tables } = extractProjectTables(bodyParagraphs, 'pasted-html');
+      const bodyText = manuscriptParagraphs.map((p) => p.text).join('\n');
       const markers = detectMarkers(bodyText);
       const citationCounts = countCitationsPerRef(parsedRefs.length, markers);
 
       setImportPreview({
-        paragraphs: bodyParagraphs,
+        paragraphs: manuscriptParagraphs,
         bodyText,
         refs: parsedRefs,
         markerCount: markers.length,
         abstractText: importedAbstract,
         keywords: importedKeywords,
+        tables,
         citationCounts,
       });
       return;
@@ -2295,16 +2309,18 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
     });
 
     const { bodyParagraphs, abstractText: importedAbstract, keywords: importedKeywords } = splitAbstractMetadataFromParagraphs(paragraphs);
-    const bodyText = bodyParagraphs.map((p) => p.text).join('\n');
+    const { paragraphs: manuscriptParagraphs, tables } = extractProjectTables(bodyParagraphs, 'pasted-text');
+    const bodyText = manuscriptParagraphs.map((p) => p.text).join('\n');
     const markers = detectMarkers(bodyText);
     const citationCounts = countCitationsPerRef(parsedRefs.length, markers);
     setImportPreview({
-      paragraphs: bodyParagraphs,
+      paragraphs: manuscriptParagraphs,
       bodyText,
       refs: parsedRefs,
       markerCount: markers.length,
       abstractText: importedAbstract,
       keywords: importedKeywords,
+      tables,
       citationCounts,
     });
   }
@@ -2334,9 +2350,13 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
       setDoc(newDoc);
       setAbstractText(importPreview.abstractText ?? '');
       setKeywords(importPreview.keywords ?? []);
+      setManuscriptTables(importPreview.tables ?? []);
     } else {
       setRefs((prev) => [...prev, ...newRefs]);
       setDoc((prev: any) => mergeTipTapDocs(prev, newDoc));
+      if (importPreview.tables?.length) {
+        setManuscriptTables((prev) => [...prev, ...importPreview.tables!]);
+      }
       if (!abstractText.trim() && importPreview.abstractText?.trim()) {
         setAbstractText(importPreview.abstractText);
       }
@@ -2423,9 +2443,9 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
   return (
     <div className="min-h-screen flex flex-col">
       <header className={`border-b border-border bg-surface sticky top-0 z-[80] ${focusMode ? 'hidden' : ''}`}>
-        <div className="w-full px-4 sm:px-6 py-3 flex items-start 2xl:items-center justify-between gap-3">
-          <div className="flex items-center gap-3 flex-1 min-w-0 overflow-hidden">
-            <div className="flex flex-col gap-1 items-start shrink-0 mr-2">
+        <div className="w-full px-4 sm:px-6 py-3 flex flex-wrap 2xl:flex-nowrap items-start 2xl:items-center justify-between gap-3">
+          <div className="flex items-center gap-3 flex-1 min-w-full 2xl:min-w-0">
+            <div className="flex flex-col gap-1 items-start min-w-0 flex-1 mr-2">
               <div className="flex items-center gap-2 flex-wrap text-xs border border-border px-2 py-1 rounded-lg bg-white shadow-xs">
                 <button
                   onClick={onExitToProjects || onExit}
@@ -2443,7 +2463,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
                   📁 {t('ws_title') || (lang === 'tr' ? 'Çalışma Alanı' : 'Workspace')}
                 </button>
               </div>
-              <div className="flex items-center gap-1.5 flex-wrap">
+              <div className="flex items-center gap-1.5 max-w-full flex-wrap">
                 <StickyNote />
                 <span className="text-muted/30 self-center">|</span>
                 <button
@@ -2579,7 +2599,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
                 : `Son kayıt ${new Date(savedAt).toLocaleTimeString('tr-TR')}`}
             </span>
           </div>
-          <div className="flex gap-1 items-center justify-end text-xs shrink-0 flex-wrap max-w-[56vw]">
+          <div className="flex gap-1 items-center justify-end text-xs shrink-0 flex-wrap w-full 2xl:w-auto max-w-full 2xl:max-w-[56vw] ml-auto">
 
             <HeaderDropdown label={`📥 ${t('ed_import')} ▾`}>
               <DropItem
@@ -3174,9 +3194,11 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
       )}
 
       {tablesOpen && editorInstance.current && (
-        <div className="fixed right-4 top-24 bottom-4 w-[380px] z-40 shadow-2xl">
+        <div className="fixed right-4 top-24 bottom-4 w-[760px] max-w-[calc(100vw-2rem)] z-40 shadow-2xl">
           <TablePanel
             editor={editorInstance.current}
+            storedTables={manuscriptTables}
+            onStoredTablesChange={setManuscriptTables}
             onClose={() => setTablesOpen(false)}
             t={t}
             initialView={tablePanelView}

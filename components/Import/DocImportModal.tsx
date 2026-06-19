@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import type { RefObject } from 'react';
-import type { Ref } from '@/store/types';
+import type { ProjectTable, Ref } from '@/store/types';
 import type { ImportParagraph } from '@/lib/editor/import-rich';
 import { useLang } from '@/lib/i18n/hooks';
 
@@ -13,6 +13,7 @@ export type ImportPreview = {
   markerCount: number;
   abstractText?: string;
   keywords?: string[];
+  tables?: ProjectTable[];
   /** Number of in-text citations for each reference (index 0 = reference #1). */
   citationCounts: number[];
 } | null;

@@ -1,8 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { ProjectTable } from '@/store/types';
 import { parseTable, tiptapTableToRows, rowsToTiptapTable, type ParsedTable } from '@/lib/tables/parse-table';
 import { parseDocxTables } from '@/lib/tables/import-docx';
+import { projectTableFromParsed } from '@/lib/tables/project-tables';
 import {
   styledTableHtml,
   tableToLatex,
@@ -27,6 +29,8 @@ interface TableEntry {
 
 interface TablePanelProps {
   editor: any;
+  storedTables: ProjectTable[];
+  onStoredTablesChange: (tables: ProjectTable[]) => void;
   onClose: () => void;
   t: (k: string) => string;
   initialView?: ViewMode;
@@ -64,10 +68,20 @@ function rowsToPlainText(rows: string[][]): string {
   return rows.map((r) => r.join('\t')).join('\n');
 }
 
+function tableSignature(table: Pick<ProjectTable, 'rows' | 'title' | 'footnote'>): string {
+  return JSON.stringify({
+    title: table.title ?? '',
+    footnote: table.footnote ?? '',
+    rows: table.rows,
+  });
+}
+
 // ─── Main Panel ─────────────────────────────────────────────
 
 export function TablePanel({
   editor,
+  storedTables,
+  onStoredTablesChange,
   onClose,
   t,
   initialView = 'list',
@@ -90,6 +104,23 @@ export function TablePanel({
   const [editFootnote, setEditFootnote] = useState('');
   const [copyMsg, setCopyMsg] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const appendStoredTables = useCallback((items: ProjectTable[]) => {
+    if (items.length === 0) return;
+    const seen = new Set(storedTables.map(tableSignature));
+    const next = [...storedTables];
+    for (const item of items) {
+      const signature = tableSignature(item);
+      if (seen.has(signature)) continue;
+      seen.add(signature);
+      next.push(item);
+    }
+    onStoredTablesChange(next);
+  }, [onStoredTablesChange, storedTables]);
+
+  const removeStoredTable = useCallback((id: string) => {
+    onStoredTablesChange(storedTables.filter((table) => table.id !== id));
+  }, [onStoredTablesChange, storedTables]);
 
   // Refresh table list on editor changes
   useEffect(() => {
@@ -152,9 +183,9 @@ export function TablePanel({
           return;
         }
         setWordTables(tables);
-        setImportPreview(tables[0]);
-        setImportTitle(tables[0].title ?? '');
-        setImportFootnote(tables[0].footnote ?? '');
+        setImportPreview(null);
+        setImportTitle('');
+        setImportFootnote('');
         setImportText('');
         return;
       }
@@ -176,15 +207,6 @@ export function TablePanel({
     }
   }, [t]);
 
-  const selectWordTable = useCallback((index: number) => {
-    const table = wordTables[index];
-    if (!table) return;
-    setWordTableIndex(index);
-    setImportPreview(table);
-    setImportTitle(table.title ?? '');
-    setImportFootnote(table.footnote ?? '');
-  }, [wordTables]);
-
   const toggleImportHeader = useCallback((hasHeader: boolean) => {
     setImportPreview((current) => current ? { ...current, hasHeader } : current);
     setWordTables((current) =>
@@ -194,49 +216,53 @@ export function TablePanel({
     );
   }, [wordTableIndex]);
 
-  const insertImportedTable = useCallback(() => {
-    if (!importPreview || !editor) return;
-    const tableJson = rowsToTiptapTable(importPreview.rows, importPreview.hasHeader, {
+  const updateWordTable = useCallback((index: number, patch: Partial<ParsedTable>) => {
+    setWordTables((current) =>
+      current.map((table, tableIndex) =>
+        tableIndex === index ? { ...table, ...patch } : table,
+      ),
+    );
+  }, []);
+
+  const storeImportedTable = useCallback(() => {
+    if (!importPreview) return;
+    appendStoredTables([projectTableFromParsed({
+      ...importPreview,
       title: importTitle,
       footnote: importFootnote,
+    })]);
+    setView('list');
+    setImportText('');
+    setImportPreview(null);
+    setImportTitle('');
+    setImportFootnote('');
+    setWordTables([]);
+    setWordTableIndex(0);
+    setImportError('');
+  }, [appendStoredTables, importPreview, importTitle, importFootnote]);
+
+  const storeAllImportedTables = useCallback(() => {
+    if (wordTables.length === 0) return;
+    appendStoredTables(wordTables.map((table) => projectTableFromParsed(table)));
+    setView('list');
+    setImportText('');
+    setImportPreview(null);
+    setImportTitle('');
+    setImportFootnote('');
+    setWordTables([]);
+    setWordTableIndex(0);
+    setImportError('');
+  }, [appendStoredTables, wordTables]);
+
+  const insertStoredTable = useCallback((table: ProjectTable) => {
+    if (!editor) return;
+    const tableJson = rowsToTiptapTable(table.rows, table.hasHeader, {
+      title: table.title,
+      footnote: table.footnote,
     });
     if (!tableJson) return;
     editor.chain().focus().insertContent(tableJson).run();
-    setView('list');
-    setImportText('');
-    setImportPreview(null);
-    setImportTitle('');
-    setImportFootnote('');
-    setWordTables([]);
-    setWordTableIndex(0);
-    setImportError('');
-  }, [importPreview, importTitle, importFootnote, editor]);
-
-  const insertAllImportedTables = useCallback(() => {
-    if (wordTables.length === 0 || !editor) return;
-    let chain = editor.chain().focus();
-    wordTables.forEach((table, index) => {
-      const tableJson = rowsToTiptapTable(table.rows, table.hasHeader, {
-        title: index === wordTableIndex ? importTitle : (table.title ?? ''),
-        footnote: index === wordTableIndex ? importFootnote : (table.footnote ?? ''),
-      });
-      if (tableJson) {
-        chain = chain.insertContent(tableJson);
-        if (index < wordTables.length - 1) {
-          chain = chain.insertContent({ type: 'paragraph' });
-        }
-      }
-    });
-    chain.run();
-    setView('list');
-    setImportText('');
-    setImportPreview(null);
-    setImportTitle('');
-    setImportFootnote('');
-    setWordTables([]);
-    setWordTableIndex(0);
-    setImportError('');
-  }, [wordTables, wordTableIndex, importTitle, importFootnote, editor]);
+  }, [editor]);
 
   const createBlankTablePreview = useCallback(() => {
     const rows = Math.min(Math.max(blankRows, 1), 50);
@@ -421,9 +447,32 @@ export function TablePanel({
       {/* List View */}
       {view === 'list' && (
         <div className="flex-1 overflow-auto">
+          {storedTables.length > 0 && (
+            <div className="border-b border-border">
+              <div className="px-3 py-2 bg-slate-50 border-b border-border">
+                <div className="text-xs font-semibold text-primary">{t('tbl_stored_tables')} ({storedTables.length})</div>
+                <div className="text-[10px] text-muted mt-0.5">{t('tbl_stored_hint')}</div>
+              </div>
+              <div className="p-3 grid grid-cols-1 xl:grid-cols-2 gap-3">
+                {storedTables.map((table, index) => (
+                  <StoredTableCard
+                    key={table.id}
+                    table={table}
+                    index={index + 1}
+                    t={t}
+                    onInsert={() => insertStoredTable(table)}
+                    onDelete={() => removeStoredTable(table.id)}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
           {tables.length === 0 ? (
             <div className="px-3 py-8 text-center">
-              <p className="text-xs text-muted mb-3">{t('tbl_empty')}</p>
+              <p className="text-xs text-muted mb-3">
+                {storedTables.length > 0 ? t('tbl_no_inserted_tables') : t('tbl_empty')}
+              </p>
               <button
                 onClick={() => setView('import')}
                 className="text-xs text-teal hover:underline"
@@ -432,62 +481,69 @@ export function TablePanel({
               </button>
             </div>
           ) : (
-            tables.map((tbl) => (
-              <div key={tbl.pos} className="border-b border-border">
-                {/* Table summary row */}
-                <div className="px-3 py-2 flex items-center justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-primary text-xs">
-                      Table {tbl.index}
-                      <span className="text-muted font-normal ml-2">
-                        {tbl.rows.length}×{tbl.rows[0]?.length ?? 0}
-                      </span>
-                    </div>
-                    {/* Preview first row */}
-                    {tbl.rows[0] && (
-                      <div className="text-[10px] text-muted mt-0.5 truncate">
-                        {tbl.rows[0].slice(0, 4).join(' | ')}
-                        {tbl.rows[0].length > 4 ? ' …' : ''}
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <button
-                      onClick={() => jumpToTable(tbl.pos)}
-                      className="text-[10px] text-teal hover:underline"
-                    >
-                      {t('tbl_jump')}
-                    </button>
-                    <button
-                      onClick={() => openTableEditor(tbl)}
-                      className="text-[10px] text-secondary hover:text-primary"
-                    >
-                      {t('tbl_export')}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Inline mini preview */}
-                <div className="px-3 pb-2 overflow-x-auto">
-                  <table className="text-[9px] border-collapse w-full">
-                    {tbl.rows.slice(0, 4).map((row, ri) => (
-                      <tr key={ri} className={ri === 0 && tbl.hasHeader ? 'font-semibold border-b border-border' : ''}>
-                        {row.map((cell, ci) => (
-                          <td key={ci} className="px-1 py-0.5 text-muted truncate max-w-[80px]">{cell}</td>
-                        ))}
-                      </tr>
-                    ))}
-                    {tbl.rows.length > 4 && (
-                      <tr>
-                        <td colSpan={tbl.rows[0]?.length} className="text-center text-muted italic px-1 py-0.5">
-                          +{tbl.rows.length - 4} {t('tbl_more_rows')}
-                        </td>
-                      </tr>
-                    )}
-                  </table>
-                </div>
+            <div>
+              <div className="px-3 py-2 bg-slate-50 border-b border-border text-xs font-semibold text-primary">
+                {t('tbl_inserted_tables')} ({tables.length})
               </div>
-            ))
+              {tables.map((tbl) => (
+                <div key={tbl.pos} className="border-b border-border">
+                  {/* Table summary row */}
+                  <div className="px-3 py-2 flex items-center justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-primary text-xs">
+                        Table {tbl.index}
+                        <span className="text-muted font-normal ml-2">
+                          {tbl.rows.length}×{tbl.rows[0]?.length ?? 0}
+                        </span>
+                      </div>
+                      {/* Preview first row */}
+                      {tbl.rows[0] && (
+                        <div className="text-[10px] text-muted mt-0.5 truncate">
+                          {tbl.rows[0].slice(0, 4).join(' | ')}
+                          {tbl.rows[0].length > 4 ? ' …' : ''}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        onClick={() => jumpToTable(tbl.pos)}
+                        className="text-[10px] text-teal hover:underline"
+                      >
+                        {t('tbl_jump')}
+                      </button>
+                      <button
+                        onClick={() => openTableEditor(tbl)}
+                        className="text-[10px] text-secondary hover:text-primary"
+                      >
+                        {t('tbl_export')}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Inline mini preview */}
+                  <div className="px-3 pb-2 overflow-x-auto">
+                    <table className="text-[9px] border-collapse w-full">
+                      <tbody>
+                        {tbl.rows.slice(0, 4).map((row, ri) => (
+                          <tr key={ri} className={ri === 0 && tbl.hasHeader ? 'font-semibold border-b border-border' : ''}>
+                            {row.map((cell, ci) => (
+                              <td key={ci} className="px-1 py-0.5 text-muted truncate max-w-[80px]">{cell}</td>
+                            ))}
+                          </tr>
+                        ))}
+                        {tbl.rows.length > 4 && (
+                          <tr>
+                            <td colSpan={tbl.rows[0]?.length} className="text-center text-muted italic px-1 py-0.5">
+                              +{tbl.rows.length - 4} {t('tbl_more_rows')}
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
 
           {/* Convert selection to table */}
@@ -664,21 +720,39 @@ export function TablePanel({
               <p className="text-[10px] text-red">{importError}</p>
             )}
 
-            {wordTables.length > 1 && (
-              <label className="block text-[10px] text-muted">
-                {t('tbl_word_select')}
-                <select
-                  value={wordTableIndex}
-                  onChange={(e) => selectWordTable(Number(e.target.value))}
-                  className="mt-1 w-full text-xs px-2 py-1 border border-border rounded bg-white text-primary"
-                >
+            {wordTables.length > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-[10px] text-muted font-semibold">
+                    {t('tbl_word_tables_found').replace('{count}', String(wordTables.length))}
+                  </div>
+                  <button
+                    onClick={storeAllImportedTables}
+                    className="text-[10px] px-2 py-1 border border-teal text-teal hover:bg-teal-bg rounded font-semibold"
+                  >
+                    {t('tbl_save_all_tables')}
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
                   {wordTables.map((table, index) => (
-                    <option key={index} value={index}>
-                      {t('tbl_word_table')} {index + 1} ({table.rows.length}×{table.rows[0]?.length ?? 0})
-                    </option>
+                    <ImportTableCard
+                      key={index}
+                      table={table}
+                      index={index + 1}
+                      t={t}
+                      onChange={(patch) => updateWordTable(index, patch)}
+                      onSave={() => appendStoredTables([projectTableFromParsed(table)])}
+                      onInsert={() => {
+                        const tableJson = rowsToTiptapTable(table.rows, table.hasHeader, {
+                          title: table.title,
+                          footnote: table.footnote,
+                        });
+                        if (tableJson) editor.chain().focus().insertContent(tableJson).run();
+                      }}
+                    />
                   ))}
-                </select>
-              </label>
+                </div>
+              </div>
             )}
           </div>
 
@@ -731,19 +805,11 @@ export function TablePanel({
 
               <div className="flex gap-2 mt-2">
                 <button
-                  onClick={insertImportedTable}
+                  onClick={storeImportedTable}
                   className="flex-1 text-xs px-3 py-1.5 bg-teal text-white rounded hover:bg-teal-dark font-semibold"
                 >
-                  {t('tbl_insert_to_editor')}
+                  {t('tbl_save_to_memory')}
                 </button>
-                {wordTables.length > 1 && (
-                  <button
-                    onClick={insertAllImportedTables}
-                    className="flex-1 text-xs px-3 py-1.5 border border-teal text-teal hover:bg-teal-bg rounded font-semibold animate-pulse-subtle"
-                  >
-                    {t('tbl_import_all_tables')}
-                  </button>
-                )}
               </div>
             </div>
           )}
@@ -754,6 +820,137 @@ export function TablePanel({
 }
 
 // ─── Small components ───────────────────────────────────────
+
+function StoredTableCard({
+  table,
+  index,
+  t,
+  onInsert,
+  onDelete,
+}: {
+  table: ProjectTable;
+  index: number;
+  t: (k: string) => string;
+  onInsert: () => void;
+  onDelete: () => void;
+}): JSX.Element {
+  return (
+    <div className="border border-border rounded-lg overflow-hidden bg-white">
+      <div className="px-3 py-2 border-b border-border flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="text-xs font-semibold text-primary truncate">
+            {table.title || `${t('tbl_word_table')} ${index}`}
+          </div>
+          <div className="text-[10px] text-muted mt-0.5">
+            {table.rows.length}×{table.rows[0]?.length ?? 0}
+            {table.source ? ` · ${table.source}` : ''}
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0 text-[10px]">
+          <button onClick={onInsert} className="font-semibold text-teal hover:underline">
+            {t('tbl_insert_to_editor')} →
+          </button>
+          <button onClick={onDelete} className="text-red hover:underline">
+            {t('tbl_delete_stored')}
+          </button>
+        </div>
+      </div>
+      <TableRowsPreview rows={table.rows} hasHeader={table.hasHeader} />
+      {table.footnote && (
+        <div className="px-3 py-2 border-t border-border text-[10px] text-muted leading-relaxed">
+          {table.footnote}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ImportTableCard({
+  table,
+  index,
+  t,
+  onChange,
+  onSave,
+  onInsert,
+}: {
+  table: ParsedTable;
+  index: number;
+  t: (k: string) => string;
+  onChange: (patch: Partial<ParsedTable>) => void;
+  onSave: () => void;
+  onInsert: () => void;
+}): JSX.Element {
+  return (
+    <div className="border border-border rounded-lg overflow-hidden bg-white">
+      <div className="px-3 py-2 border-b border-border space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <div className="text-xs font-semibold text-primary">
+            {t('tbl_word_table')} {index} ({table.rows.length}×{table.rows[0]?.length ?? 0})
+          </div>
+          <label className="flex items-center gap-1.5 text-[10px] text-secondary">
+            <input
+              type="checkbox"
+              checked={table.hasHeader}
+              onChange={(e) => onChange({ hasHeader: e.target.checked })}
+            />
+            {t('tbl_first_row_header')}
+          </label>
+        </div>
+        <input
+          type="text"
+          value={table.title ?? ''}
+          onChange={(e) => onChange({ title: e.target.value })}
+          placeholder={t('tbl_title_placeholder')}
+          className="w-full text-xs px-2 py-1.5 border border-border rounded"
+        />
+        <textarea
+          value={table.footnote ?? ''}
+          onChange={(e) => onChange({ footnote: e.target.value })}
+          placeholder={t('tbl_footnote_placeholder')}
+          className="w-full min-h-12 resize-y text-xs px-2 py-1.5 border border-border rounded"
+        />
+      </div>
+      <TableRowsPreview rows={table.rows} hasHeader={table.hasHeader} />
+      <div className="px-3 py-2 border-t border-border flex justify-end gap-2">
+        <button onClick={onSave} className="text-xs px-2 py-1 border border-teal text-teal hover:bg-teal-bg rounded font-semibold">
+          {t('tbl_save_to_memory')}
+        </button>
+        <button onClick={onInsert} className="text-xs px-2 py-1 bg-teal text-white rounded hover:bg-teal-dark font-semibold">
+          {t('tbl_insert_to_editor')}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function TableRowsPreview({
+  rows,
+  hasHeader,
+}: {
+  rows: string[][];
+  hasHeader: boolean;
+}): JSX.Element {
+  return (
+    <div className="overflow-auto max-h-72">
+      <table className="text-[10px] border-collapse w-full">
+        <tbody>
+          {rows.map((row, ri) => (
+            <tr
+              key={ri}
+              className={ri === 0 && hasHeader ? 'font-semibold bg-slate-50 border-b border-border' : ''}
+            >
+              {row.map((cell, ci) => (
+                <td key={ci} className="px-2 py-1 border-b border-border/50 align-top">
+                  {cell}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
 
 function ExBtn({ onClick, label }: { onClick: () => void; label: string }) {
   return (

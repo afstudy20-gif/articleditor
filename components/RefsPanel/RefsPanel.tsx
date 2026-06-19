@@ -41,6 +41,8 @@ type Props = {
   onJumpToRefCitation?: (refId: string, direction: 1 | -1) => void;
 };
 
+type LibrarySort = 'record' | 'title';
+
 export function RefsPanel({
   refs,
   refOrder,
@@ -73,6 +75,8 @@ export function RefsPanel({
   const { t } = useLang();
   const [tab, setTab] = useState<'list' | 'add' | 'history'>('list');
   const [libMenu, setLibMenu] = useState<{ x: number; y: number } | null>(null);
+  const [libraryQuery, setLibraryQuery] = useState('');
+  const [librarySort, setLibrarySort] = useState<LibrarySort>('record');
   const [internalSelectedIds, setInternalSelectedIds] = useState<Set<string>>(new Set());
   const selectedIds = extSelectedIds ?? internalSelectedIds;
   const setSelectedIds = (next: Set<string>): void => {
@@ -109,6 +113,41 @@ export function RefsPanel({
     if (onBulkDelete) onBulkDelete(ids);
     clearSelection();
   }
+
+  const libraryNoById = useMemo(
+    () => new Map(refs.map((ref, index) => [ref.id, index + 1])),
+    [refs],
+  );
+  const visibleRefs = useMemo(() => {
+    const q = libraryQuery.trim().toLowerCase();
+    const filtered = q
+      ? refs.filter((r) => {
+          const libraryNo = libraryNoById.get(r.id) ?? '';
+          const hay = [
+            libraryNo,
+            r.title,
+            r.authors[0]?.family,
+            r.authors[0]?.literal,
+            r.year,
+            r.containerTitle,
+            r.doi,
+            r.pmid,
+          ]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase();
+          return hay.includes(q);
+        })
+      : refs;
+
+    if (librarySort === 'title') {
+      return [...filtered].sort((a, b) =>
+        (a.title || a.raw || '').localeCompare(b.title || b.raw || '', undefined, { sensitivity: 'base' }),
+      );
+    }
+
+    return [...filtered].sort((a, b) => (libraryNoById.get(a.id) ?? 0) - (libraryNoById.get(b.id) ?? 0));
+  }, [libraryNoById, libraryQuery, librarySort, refs]);
 
   return (
     <div className="card flex flex-col h-full">
@@ -156,66 +195,113 @@ export function RefsPanel({
       />
 
       {tab === 'list' && refs.length > 0 && (
-        <div className="px-2 py-1 border-b border-border flex items-center justify-between gap-2 text-[10px]">
-          <div className="flex items-center gap-2 min-w-0">
-            <label className="flex items-center gap-1 cursor-pointer text-muted hover:text-primary shrink-0">
-              <input
-                type="checkbox"
-                checked={selectedIds.size === refs.length}
-                ref={(el) => {
-                  if (el) el.indeterminate = selectedIds.size > 0 && selectedIds.size < refs.length;
-                }}
-                onChange={toggleAll}
-              />
-              {t('rp_select_all')}
-            </label>
-            {onLookupAll && (
-              <span className="text-muted truncate">
-                {refs.filter((r) => r.doi).length}/{refs.length} {t('rp_doi_with_count')} · {refs.filter((r) => r.abstract).length}{' '}
-                {t('rp_abstract_count')}
-              </span>
-            )}
+        <div className="px-2 py-1.5 border-b border-border space-y-1.5 text-[10px]">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <label className="flex items-center gap-1 cursor-pointer text-muted hover:text-primary shrink-0">
+                <input
+                  type="checkbox"
+                  checked={selectedIds.size === refs.length}
+                  ref={(el) => {
+                    if (el) el.indeterminate = selectedIds.size > 0 && selectedIds.size < refs.length;
+                  }}
+                  onChange={toggleAll}
+                />
+                {t('rp_select_all')}
+              </label>
+              {onLookupAll && (
+                <span className="text-muted truncate">
+                  {refs.filter((r) => r.doi).length}/{refs.length} {t('rp_doi_with_count')} · {refs.filter((r) => r.abstract).length}{' '}
+                  {t('rp_abstract_count')}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              {selectedIds.size > 0 && (
+                <button
+                  onClick={bulkDelete}
+                  className="font-medium text-rose-600 hover:underline"
+                >
+                  {t('rp_delete_selected').replace('{n}', String(selectedIds.size))}
+                </button>
+              )}
+              {onLookupAll && (
+                <button
+                  onClick={onLookupAll}
+                  disabled={lookupAllBusy}
+                  className="btn-secondary text-[10px] px-1.5 py-0.5 leading-tight"
+                >
+                  {lookupAllBusy ? t('rp_scanning') : t('rp_scan_all')}
+                </button>
+              )}
+            </div>
           </div>
-          <div className="flex items-center gap-1.5 shrink-0">
-            {selectedIds.size > 0 && (
+          <div className="flex items-center gap-1.5">
+            <input
+              value={libraryQuery}
+              onChange={(e) => setLibraryQuery(e.target.value)}
+              placeholder={t('rp_library_search_placeholder')}
+              className="min-w-0 flex-1 border border-border rounded-md px-2 py-1 text-xs focus:outline-none focus:border-teal"
+            />
+            <div className="flex shrink-0 overflow-hidden rounded-md border border-border">
               <button
-                onClick={bulkDelete}
-                className="font-medium text-rose-600 hover:underline"
+                onClick={() => setLibrarySort('record')}
+                className={`px-2 py-1 font-semibold ${librarySort === 'record' ? 'bg-teal text-white' : 'bg-white text-muted hover:text-primary'}`}
+                title={t('rp_library_sort_record')}
               >
-                {t('rp_delete_selected').replace('{n}', String(selectedIds.size))}
+                No
               </button>
-            )}
-            {onLookupAll && (
               <button
-                onClick={onLookupAll}
-                disabled={lookupAllBusy}
-                className="btn-secondary text-[10px] px-1.5 py-0.5 leading-tight"
+                onClick={() => setLibrarySort('title')}
+                className={`px-2 py-1 font-semibold border-l border-border ${librarySort === 'title' ? 'bg-teal text-white' : 'bg-white text-muted hover:text-primary'}`}
+                title={t('rp_library_sort_title')}
               >
-                {lookupAllBusy ? t('rp_scanning') : t('rp_scan_all')}
+                A-Z
               </button>
-            )}
+            </div>
           </div>
         </div>
       )}
 
       <div className="flex-1 overflow-auto p-3">
         {tab === 'list' ? (
-          <RefList
-            refs={refs}
-            refOrder={refOrder}
-            onInsert={onInsertCitation}
-            onUpdate={onUpdateRef}
-            onDelete={onDeleteRef}
-            onLookup={onLookupRef}
-            onExtractAspects={onExtractAspects}
-            lookupBusyId={lookupBusyId}
-            selectedIds={selectedIds}
-            onToggleSelect={toggleSelect}
-            highlightedId={selectedId}
-            onHighlight={onSelectRef}
-            onInsertText={onInsertText}
-            t={t}
-          />
+          refs.length === 0 ? (
+            <RefList
+              refs={refs}
+              libraryNoById={libraryNoById}
+              onInsert={onInsertCitation}
+              onUpdate={onUpdateRef}
+              onDelete={onDeleteRef}
+              onLookup={onLookupRef}
+              onExtractAspects={onExtractAspects}
+              lookupBusyId={lookupBusyId}
+              selectedIds={selectedIds}
+              onToggleSelect={toggleSelect}
+              highlightedId={selectedId}
+              onHighlight={onSelectRef}
+              onInsertText={onInsertText}
+              t={t}
+            />
+          ) : visibleRefs.length > 0 ? (
+            <RefList
+              refs={visibleRefs}
+              libraryNoById={libraryNoById}
+              onInsert={onInsertCitation}
+              onUpdate={onUpdateRef}
+              onDelete={onDeleteRef}
+              onLookup={onLookupRef}
+              onExtractAspects={onExtractAspects}
+              lookupBusyId={lookupBusyId}
+              selectedIds={selectedIds}
+              onToggleSelect={toggleSelect}
+              highlightedId={selectedId}
+              onHighlight={onSelectRef}
+              onInsertText={onInsertText}
+              t={t}
+            />
+          ) : (
+            <p className="text-sm text-muted text-center py-8">{t('rp_library_no_match')}</p>
+          )
         ) : tab === 'add' ? (
           <AddPanel onAddByDoi={onAddByDoi} onLookupDoi={onLookupDoi} onSearch={onSearch} onAddRef={onAddRef} onEnrichRefs={onEnrichRefs} t={t} />
         ) : (
@@ -411,7 +497,7 @@ function CitedRefsSection({
 
 function RefList({
   refs,
-  refOrder,
+  libraryNoById,
   onInsert,
   onDelete,
   onLookup,
@@ -426,7 +512,7 @@ function RefList({
   t,
 }: {
   refs: Ref[];
-  refOrder: Map<string, number>;
+  libraryNoById: Map<string, number>;
   onInsert: (id: string) => void;
   onUpdate: (id: string, patch: Partial<Ref>) => void;
   onDelete: (id: string) => void;
@@ -469,7 +555,7 @@ function RefList({
   return (
     <ol className="space-y-2">
       {refs.map((r) => {
-        const n = refOrder.get(r.id) ?? 0;
+        const libraryNo = libraryNoById.get(r.id) ?? 0;
         const expanded = expandedId === r.id;
         const isSelected = selectedIds?.has(r.id) ?? false;
         const isHighlighted = useExternalHighlight && highlightedId === r.id;
@@ -496,11 +582,10 @@ function RefList({
                 />
               )}
               <span
-                className={`shrink-0 w-7 h-7 rounded-md text-xs font-bold flex items-center justify-center ${
-                  n > 0 ? 'bg-teal text-white' : 'bg-slate-100 text-muted'
-                }`}
+                className="shrink-0 w-7 h-7 rounded-md text-xs font-bold flex items-center justify-center bg-teal text-white"
+                title={t('rp_library_record_no')}
               >
-                {n > 0 ? n : '—'}
+                {libraryNo > 0 ? libraryNo : '—'}
               </span>
               <div className="flex-1 min-w-0">
                 <div

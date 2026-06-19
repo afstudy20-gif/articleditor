@@ -2,7 +2,7 @@
 
 import Dexie, { type EntityTable } from 'dexie';
 import { newId } from '@/lib/id';
-import type { PhraseCategory, Project, ProjectNote, Snapshot, Ref, UserPhrasebank } from './types';
+import type { PhraseCategory, Project, ProjectNote, ProjectTable, Snapshot, Ref, UserPhrasebank } from './types';
 
 /** Generic local key/value row. Never synced — used for browser-bound objects
  *  like File System Access directory handles. */
@@ -65,7 +65,7 @@ const MAX_SNAPSHOTS_PER_PROJECT = 30;
 
 export async function createSnapshot(
   projectId: string,
-  data: { label: string; doc?: unknown; refs: Ref[]; auto?: boolean; wordCount?: number; supplementary?: string; abstractText?: string; keywords?: string[] },
+  data: { label: string; doc?: unknown; refs: Ref[]; auto?: boolean; wordCount?: number; supplementary?: string; abstractText?: string; keywords?: string[]; tables?: ProjectTable[] },
 ): Promise<Snapshot> {
   const db = getDb();
   const snap: Snapshot = {
@@ -80,6 +80,7 @@ export async function createSnapshot(
     supplementary: data.supplementary,
     abstractText: data.abstractText,
     keywords: data.keywords,
+    tables: data.tables,
   };
   await db.snapshots.put(snap);
   // Prune oldest beyond the cap to bound storage.
@@ -117,6 +118,7 @@ export function createProject(partial: Partial<Project> = {}): Project {
     bodyText: partial.bodyText,
     abstractText: partial.abstractText,
     keywords: partial.keywords,
+    tables: partial.tables ?? [],
     settings: partial.settings ?? { style: 'vancouver' },
   };
 }

@@ -31,6 +31,7 @@ import {
   parseHtmlToParagraphs,
   type ImportParagraph,
 } from '@/lib/editor/import-rich';
+import { extractProjectTables } from '@/lib/tables/project-tables';
 import { splitAbstractMetadataFromParagraphs } from '@/lib/editor/abstract';
 import { DocImportModal, type ImportPreview } from '@/components/Import/DocImportModal';
 
@@ -206,18 +207,20 @@ function EditPageInner() {
         .filter((paragraph) => paragraph.trim().length > 0)
         .map((paragraph) => ({ text: paragraph }));
     const { bodyParagraphs, abstractText, keywords } = splitAbstractMetadataFromParagraphs(rawBodyParagraphs);
-    const bodyText = bodyParagraphs.map((paragraph) => paragraph.text).join('\n');
+    const { paragraphs: manuscriptParagraphs, tables } = extractProjectTables(bodyParagraphs, defaultTitle);
+    const bodyText = manuscriptParagraphs.map((paragraph) => paragraph.text).join('\n');
     const markers = detectMarkers(bodyText);
     const citationCounts = countCitationsPerRef(parsedRefs.length, markers);
 
     setConversionTitle(defaultTitle);
     setConversionPreview({
-      paragraphs: bodyParagraphs,
+      paragraphs: manuscriptParagraphs,
       bodyText,
       refs: parsedRefs,
       markerCount: markers.length,
       abstractText,
       keywords,
+      tables,
       citationCounts,
     });
   }
@@ -247,6 +250,7 @@ function EditPageInner() {
       bodyText: conversionPreview.bodyText,
       abstractText: conversionPreview.abstractText ?? '',
       keywords: conversionPreview.keywords ?? [],
+      tables: conversionPreview.tables ?? [],
     });
     await saveProject(p);
     gdrive.markDirty(p.id);

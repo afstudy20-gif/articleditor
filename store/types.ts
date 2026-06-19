@@ -61,6 +61,17 @@ export type Citation = {
   refIds: string[];
 };
 
+export type ProjectTable = {
+  id: string;
+  rows: string[][];
+  hasHeader: boolean;
+  title?: string;
+  footnote?: string;
+  format?: 'html' | 'csv' | 'tsv' | 'text' | 'docx';
+  source?: string;
+  createdAt: number;
+};
+
 /**
  * A passage captured from the PDF reader to reuse while writing. Stored on the
  * owning project so notes follow the article through sync/snapshots.
@@ -95,6 +106,7 @@ export type Project = {
   bodyText?: string;
   abstractText?: string;
   keywords?: string[];
+  tables?: ProjectTable[];
   settings?: {
     // Built-in citation style id or a 'custom:<id>' style.
     style?: string;
@@ -123,6 +135,7 @@ export type Snapshot = {
   supplementary?: string;
   abstractText?: string;
   keywords?: string[];
+  tables?: ProjectTable[];
 };
 
 export type Phrase = {
