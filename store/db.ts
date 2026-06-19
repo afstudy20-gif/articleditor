@@ -265,6 +265,7 @@ export async function createPhrasebank(data: {
   categories: PhraseCategory[];
   sourceFileName?: string;
   active?: boolean;
+  mergedWithBuiltin?: boolean;
 }): Promise<UserPhrasebank> {
   const db = getDb();
   const now = Date.now();
@@ -277,6 +278,7 @@ export async function createPhrasebank(data: {
     active: shouldActivate,
     categories: data.categories,
     sourceFileName: data.sourceFileName,
+    mergedWithBuiltin: data.mergedWithBuiltin,
   };
   await db.transaction('rw', db.phrasebanks, async () => {
     if (shouldActivate) {

@@ -159,6 +159,8 @@ export type UserPhrasebank = {
   active: boolean;
   categories: PhraseCategory[];
   sourceFileName?: string;
+  /** True when this bank merges the built-in Academic Phrasebank with a user upload. */
+  mergedWithBuiltin?: boolean;
 };
 
 export type ParsedDocument = {
