@@ -2457,7 +2457,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
                   📁 {t('ws_title') || (lang === 'tr' ? 'Çalışma Alanı' : 'Workspace')}
                 </button>
               </div>
-              <div className="flex items-center gap-1.5 max-w-full flex-wrap">
+              <div className="flex items-center gap-1.5 max-w-full flex-nowrap overflow-x-auto min-w-0 [scrollbar-width:thin]">
                 <StickyNote />
                 <span className="text-muted/30 self-center">|</span>
                 <button
