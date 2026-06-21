@@ -76,6 +76,7 @@ import { LettersPanel } from '@/components/Letters/LettersPanel';
 import { PhrasebankPanel } from '@/components/Phrasebank/PhrasebankPanel';
 import { SupplementaryPanel } from '@/components/Supplementary/SupplementaryPanel';
 import { AbbreviationsPanel } from '@/components/Abbreviations/AbbreviationsPanel';
+import { SpellcheckPanel } from '@/components/Spellcheck/SpellcheckPanel';
 import { StickyNote } from '@/components/StickyNote';
 import { AbstractPanel } from '@/components/Abstract/AbstractPanel';
 import { DocImportModal, type ImportPreview } from '@/components/Import/DocImportModal';
@@ -281,6 +282,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
   const [abstractText, setAbstractText] = useState<string>(project.abstractText ?? '');
   const [suppOpen, setSuppOpen] = useState(false);
   const [abbrOpen, setAbbrOpen] = useState(false);
+  const [spellcheckOpen, setSpellcheckOpen] = useState(false);
   const [phrasebankSection, setPhrasebankSection] = useState<string | null>(null);
   const [wordGoal, setWordGoal] = useState(0);
 
@@ -2648,6 +2650,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
             </HeaderDropdown>
             <HeaderIcon onClick={() => setPaletteOpen(true)} title={`${t('cmd_open')} (⌘K)`} label="⌘K" caption={t('hdr_palette')} />
             <HeaderIcon onClick={openPhrasebank} title={t('pb_title')} label="§" caption={t('hdr_phrasebank')} />
+            <HeaderIcon onClick={() => setSpellcheckOpen(true)} title={t('sc_title')} label="✓️" caption={t('hdr_spellcheck')} />
             <HeaderIcon onClick={() => setStatsOpen(true)} title={t('ed_stats')} label="📊" caption={t('hdr_stats')} />
             <HeaderIcon onClick={() => setSnapshotsOpen(true)} title={t('ed_snapshots')} label="🕓" caption={t('hdr_versions')} />
             <HeaderIcon onClick={() => setJournalOpen(true)} title={t('ed_journal_check')} label="📋" caption={t('hdr_journal')} />
@@ -3229,6 +3232,16 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
           <AbbreviationsPanel
             editor={editorInstance.current}
             onClose={() => setAbbrOpen(false)}
+            lang={lang}
+          />
+        </div>
+      )}
+
+      {spellcheckOpen && editorInstance.current && (
+        <div className="fixed right-4 top-24 bottom-4 w-[360px] z-40 shadow-2xl">
+          <SpellcheckPanel
+            editor={editorInstance.current}
+            onClose={() => setSpellcheckOpen(false)}
             lang={lang}
           />
         </div>
