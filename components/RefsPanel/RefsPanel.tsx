@@ -6,6 +6,7 @@ import { newId } from '@/lib/id';
 import { useLang } from '@/lib/i18n/hooks';
 import { importByAutoDetect, importByExtension, FORMAT_LABELS, type ImportFormat } from '@/lib/refs/import-auto';
 import { parseEns, looksLikeEns } from '@/lib/refs/ens';
+import { refsToFullAuthorJournalList, refsToOrderedDoiList } from '@/lib/refs/export-library';
 import {
   HISTORY_LABELS,
   formatHistoryTime,
@@ -107,6 +108,18 @@ export function RefsPanel({
     if (onBulkDelete) onBulkDelete(refs.map((r) => r.id));
     clearSelection();
   }
+  function exportDoiList(): void {
+    const text = refsToOrderedDoiList(refs);
+    setLibMenu(null);
+    if (!text) return;
+    downloadText(text, 'citation-library-dois.txt');
+  }
+  function exportFullAuthorList(): void {
+    const text = refsToFullAuthorJournalList(refs);
+    setLibMenu(null);
+    if (!text) return;
+    downloadText(text, 'citation-library-full-journal.txt');
+  }
   function bulkDelete(): void {
     if (selectedIds.size === 0) return;
     const ids = Array.from(selectedIds);
@@ -173,7 +186,7 @@ export function RefsPanel({
             setTab('list');
             setLibMenu({ x: e.clientX, y: e.clientY });
           }}
-          title={t('rp_clear_library_hint')}
+          title={t('rp_library_menu_hint')}
         >
           {t('rp_tab_library')} ({refs.length})
         </button>
@@ -335,9 +348,24 @@ export function RefsPanel({
         <>
           <div className="fixed inset-0 z-40" onClick={() => setLibMenu(null)} onContextMenu={(e) => { e.preventDefault(); setLibMenu(null); }} />
           <div
-            className="fixed z-50 min-w-[160px] rounded-lg border border-border bg-white py-1 shadow-xl"
+            className="fixed z-50 min-w-[230px] rounded-lg border border-border bg-white py-1 shadow-xl"
             style={{ left: libMenu.x, top: libMenu.y }}
           >
+            <button
+              onClick={exportDoiList}
+              disabled={!refs.some((ref) => ref.doi)}
+              className="block w-full px-3 py-1.5 text-left text-xs font-medium text-secondary hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {t('rp_export_doi_list')} ({refs.filter((ref) => ref.doi).length})
+            </button>
+            <button
+              onClick={exportFullAuthorList}
+              disabled={refs.length === 0}
+              className="block w-full px-3 py-1.5 text-left text-xs font-medium text-secondary hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {t('rp_export_full_journal')} ({refs.length})
+            </button>
+            <div className="my-1 border-t border-border" />
             <button
               onClick={clearLibrary}
               disabled={refs.length === 0}
@@ -358,6 +386,16 @@ type ContextMenuState = {
   x: number;
   y: number;
 };
+
+function downloadText(text: string, filename: string): void {
+  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
 
 /* ─── Cited Refs Section (in-text citations summary) ─── */
 function CitedRefsSection({
