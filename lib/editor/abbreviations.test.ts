@@ -199,3 +199,60 @@ describe('analyzeBlocks', () => {
     assert.equal(main.suggestions.length, 0);
   });
 });
+
+describe('extractAbbreviations — Turkish letters and cross-lingual acronyms', () => {
+  it('extracts Turkish-letter acronyms and their Turkish definitions', () => {
+    // Regression: the ASCII-only regex dropped Ç/İ/Ö/Ş entirely.
+    const text =
+      'Bu çalışmada çıplak metal stent (ÇMS) ve ilaç salınımlı stent (İSS) karşılaştırıldı. ' +
+      'Ölüm Bildirim Sistemi (ÖBS) üzerinden veriler toplandı.';
+    const list = extractAbbreviations(text);
+    const byAcr = new Map(list.map((a) => [a.acronym, a]));
+    assert.ok(byAcr.has('ÇMS'), 'ÇMS missing');
+    assert.ok(byAcr.has('İSS'), 'İSS missing');
+    assert.ok(byAcr.has('ÖBS'), 'ÖBS missing');
+    assert.match(byAcr.get('ÇMS')!.definition, /çıplak metal stent/);
+    assert.match(byAcr.get('İSS')!.definition, /ilaç salınımlı stent/);
+  });
+
+  it('counts occurrences with typographic apostrophes (ÇMS’ye, İSS’nin)', () => {
+    // Regression: \b word boundary does not treat Ç as a word char in JS, so
+    // "ÇMS’ye" was not counted at all.
+    const text =
+      'Bu çalışmada çıplak metal stent (ÇMS) ve ilaç salınımlı stent (İSS) kullanıldı. ' +
+      "İSS, ÇMS'ye kıyasla üstün. ÇMS’lerin sonuçları ve İSS’nin etkinliği.";
+    const list = extractAbbreviations(text);
+    const byAcr = new Map(list.map((a) => [a.acronym, a.count]));
+    assert.ok((byAcr.get('ÇMS') ?? 0) >= 3, `expected ÇMS count >= 3, got ${byAcr.get('ÇMS')}`);
+    assert.ok((byAcr.get('İSS') ?? 0) >= 3, `expected İSS count >= 3, got ${byAcr.get('İSS')}`);
+  });
+
+  it('falls back to preceding words for English acronyms in a Turkish text', () => {
+    // Regression: "kararsız anjina pektoris (USAP)" was dropped because the
+    // initial letters (K-A-P) don't spell USAP. The fallback takes the
+    // preceding words as the definition instead of dropping the acronym.
+    const text = 'Hastalara stabil anjina pektoris (SAP), kararsız anjina pektoris (USAP) tanısı kondu.';
+    const list = extractAbbreviations(text);
+    const usap = list.find((a) => a.acronym === 'USAP');
+    assert.ok(usap, 'USAP missing');
+    assert.match(usap!.definition, /kararsız anjina pektoris/);
+  });
+
+  it('handles composite acronyms (NSTEMI) with fewer words than letters', () => {
+    const text =
+      'ST yükselmesiz miyokard enfarktüsü (NSTEMI) ve ST yükselmeli miyokard enfarktüsü (STEMI) ayrıldı.';
+    const list = extractAbbreviations(text);
+    const nstemi = list.find((a) => a.acronym === 'NSTEMI');
+    const stemi = list.find((a) => a.acronym === 'STEMI');
+    assert.ok(nstemi, 'NSTEMI missing');
+    assert.ok(stemi, 'STEMI missing');
+    assert.match(nstemi!.definition, /yükselmesiz miyokard enfarktüsü/);
+    assert.match(stemi!.definition, /yükselmeli miyokard enfarktüsü/);
+  });
+
+  it('isAcronymMatch recognizes Turkish initials', () => {
+    assert.ok(isAcronymMatch('ÇMS', 'çıplak metal stent'));
+    assert.ok(isAcronymMatch('İSS', 'ilaç salınımlı stent'));
+    assert.ok(isAcronymMatch('KAH', 'koroner arter hastalığı'));
+  });
+});
