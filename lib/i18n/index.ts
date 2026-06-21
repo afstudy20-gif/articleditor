@@ -399,6 +399,9 @@ const tr: Dict = {
   pb_delete_bank_confirm: '"{name}" ifade bankası silinsin mi?',
   pb_delete_category_confirm: '"{name}" kategorisi ve içindeki ifadeler silinsin mi?',
   pb_rename_category: 'Kategori adı',
+
+  // Spellcheck
+  sc_title: 'Yazım Kontrolü',
   // Journal compliance
   jc_title: 'Dergi Uyum Kontrolü',
   jc_passed: 'kontrol geçti',
@@ -746,6 +749,7 @@ const tr: Dict = {
   hdr_phrasebank: 'İfade',
   hdr_stats: 'İstatistik',
   hdr_versions: 'Sürüm',
+  hdr_spellcheck: 'Yazım',
   hdr_figures: 'Şekil',
   hdr_journal: 'Dergi',
   hdr_checklist: 'Liste',
@@ -1202,6 +1206,9 @@ const en: Dict = {
   pb_delete_bank_confirm: 'Delete phrasebank "{name}"?',
   pb_delete_category_confirm: 'Delete category "{name}" and all phrases inside it?',
   pb_rename_category: 'Category name',
+
+  // Spellcheck
+  sc_title: 'Spell Check',
   // Journal compliance
   jc_title: 'Journal Compliance Check',
   jc_passed: 'checks passed',
@@ -1549,6 +1556,7 @@ const en: Dict = {
   hdr_phrasebank: 'Phrases',
   hdr_stats: 'Stats',
   hdr_versions: 'Versions',
+  hdr_spellcheck: 'Spell',
   hdr_figures: 'Figures',
   hdr_journal: 'Journal',
   hdr_checklist: 'Checklist',
