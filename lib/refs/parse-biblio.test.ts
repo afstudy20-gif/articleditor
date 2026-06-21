@@ -248,4 +248,26 @@ describe('splitBodyAndBiblio', () => {
     assert.equal(split.refLines.length, 3);
     assert.ok(!split.refLines.some((l) => l.includes('Group A') || l.includes('Age, years')));
   });
+
+  it('detects appendix-prefixed Turkish bibliography headings and stops at the next appendix', () => {
+    const text = [
+      'Proje gövdesinde atıflar yer alır [1,2].',
+      '',
+      'EK-1: KAYNAKLAR',
+      'Devabhaktuni S, Mercedes A, Diep J, Ahsan C. Coronary Artery Ectasia-A Review of Current Literature. Curr Cardiol Rev. 2016;12(4):318-323.',
+      'Markis JE, Joffe CD, Cohn PF, et al. Clinical significance of coronary arterial ectasia. Am J Cardiol. 1976;37(2):217-222.',
+      'Ye J, Wang M, Xu Y, et al. Sestrins increase in patients with coronary artery disease and associate with the severity of coronary stenosis. Clin Chim Acta. 2017;472:51-57.',
+      '',
+      'EK-2: BÜTÇE VE GEREKÇESİ',
+      'Sarf Giderleri 31.500 TL',
+    ].join('\n');
+
+    const split = splitBodyAndBiblio(text);
+    const parsed = parseBiblioLines(split.refLines);
+
+    assert.equal(split.headingFound, 'EK-1: KAYNAKLAR');
+    assert.equal(split.refLines.length, 3);
+    assert.equal(parsed.refs.length, 3);
+    assert.ok(!split.refLines.some((line) => line.includes('BÜTÇE') || line.includes('Sarf Giderleri')));
+  });
 });

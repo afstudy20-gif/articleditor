@@ -37,6 +37,20 @@ const BIBLIO_HEADINGS = [
   'works cited',
 ];
 
+export function isBibliographyHeadingText(text: string): boolean {
+  const trimmed = text.trim();
+  if (trimmed.length === 0 || trimmed.length > 120) return false;
+
+  const lower = trimmed.toLowerCase();
+  const withoutTrailingPunctuation = lower.replace(/[:.\s]+$/, '');
+  const candidate = withoutTrailingPunctuation
+    .replace(/^(?:ek|appendix|annex)\s*[-–—.]?\s*\d+[a-z]?\s*[:.)-]\s*/i, '')
+    .replace(/^\d+(?:\.\d+)*\s*[:.)-]\s*/, '')
+    .trim();
+
+  return BIBLIO_HEADINGS.includes(candidate);
+}
+
 export type BibSplit = {
   bodyText: string;
   refLines: string[];
@@ -53,9 +67,8 @@ export function splitBodyAndBiblio(fullText: string): BibSplit {
   let headingText = '';
   for (let i = lines.length - 1; i >= 0; i--) {
     const t = lines[i].trim().toLowerCase();
-    if (t.length === 0 || t.length > 60) continue;
-    const stripped = t.replace(/[:.\s]+$/, '');
-    if (BIBLIO_HEADINGS.includes(stripped)) {
+    if (t.length === 0 || t.length > 120) continue;
+    if (isBibliographyHeadingText(lines[i])) {
       headingIdx = i;
       headingText = lines[i].trim();
       break;
@@ -76,6 +89,7 @@ export function splitBodyAndBiblio(fullText: string): BibSplit {
   const refsRawAll: string[] = [];
   const stopPatterns = [
     /^\s*(?:Table|Tablo|Figure|Fig|Şekil|Resim)\s+\d+/i,
+    /^\s*(?:Ek|Appendix|Annex)\s*[-–—.]?\s*\d+[a-z]?\b/i,
     /^\s*(?:Author Contributions|Conflict of Interest|Funding|Acknowledgments|Acknowledgements|Appendix)\b/i,
     // Common table header / statistical output rows that appear after references
     // when supplementary tables are placed at the end of the document.

@@ -55,6 +55,9 @@ export function DocImportModal({
       preview.citationCounts.forEach((count, idx) => {
         if (count > 0) defaults.add(idx);
       });
+      if (defaults.size === 0 && preview.refs.length > 0) {
+        preview.refs.forEach((_, idx) => defaults.add(idx));
+      }
       setSelectedRefs(defaults);
     } else {
       setSelectedRefs(new Set());

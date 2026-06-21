@@ -24,7 +24,7 @@ import { useLang } from '@/lib/i18n/hooks';
 import { DRTR_TOOLS } from '@/lib/i18n';
 import { newId } from '@/lib/id';
 import { parseDocx } from '@/lib/docx/parse';
-import { splitBodyAndBiblio, parseBiblioLines } from '@/lib/refs/parse-biblio';
+import { splitBodyAndBiblio, parseBiblioLines, isBibliographyHeadingText } from '@/lib/refs/parse-biblio';
 import { detectMarkers } from '@/lib/markers/detect';
 import {
   buildDocWithCitations,
@@ -210,14 +210,15 @@ function EditPageInner() {
     const { paragraphs: manuscriptParagraphs, tables } = extractProjectTables(bodyParagraphs, defaultTitle);
     const bodyText = manuscriptParagraphs.map((paragraph) => paragraph.text).join('\n');
     const markers = detectMarkers(bodyText);
-    const citationCounts = countCitationsPerRef(parsedRefs.length, markers);
+    const validMarkers = markersWithinRefCount(markers, parsedRefs.length);
+    const citationCounts = countCitationsPerRef(parsedRefs.length, validMarkers);
 
     setConversionTitle(defaultTitle);
     setConversionPreview({
       paragraphs: manuscriptParagraphs,
       bodyText,
       refs: parsedRefs,
-      markerCount: markers.length,
+      markerCount: validMarkers.length,
       abstractText,
       keywords,
       tables,
@@ -286,6 +287,10 @@ function EditPageInner() {
       }
     }
     return counts;
+  }
+
+  function markersWithinRefCount(markers: MarkerOccurrence[], refCount: number): MarkerOccurrence[] {
+    return markers.filter((marker) => marker.refNumbers.some((n) => n >= 1 && n <= refCount));
   }
 
   if (!loaded) {
@@ -745,9 +750,7 @@ function EditPageInner() {
 }
 
 function isBibliographyHeading(text: string): boolean {
-  return /^(references|bibliography|kaynakça|kaynaklar|referanslar|literatür)\s*:?\s*$/i.test(
-    text.trim(),
-  );
+  return isBibliographyHeadingText(text);
 }
 
 export default function EditPage() {

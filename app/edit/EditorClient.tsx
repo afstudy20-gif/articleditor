@@ -17,7 +17,7 @@ import {
 } from '@/lib/export/print-html';
 import { refsToRis } from '@/lib/refs/ris';
 import { parseDocx } from '@/lib/docx/parse';
-import { splitBodyAndBiblio, parseBiblioLines } from '@/lib/refs/parse-biblio';
+import { splitBodyAndBiblio, parseBiblioLines, isBibliographyHeadingText } from '@/lib/refs/parse-biblio';
 import { detectMarkers } from '@/lib/markers/detect';
 import type { MarkerOccurrence } from '@/store/types';
 import { newId } from '@/lib/id';
@@ -2225,8 +2225,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
 
       let referencesStartIndex = paragraphs.length;
       for (let i = 0; i < paragraphs.length; i++) {
-        const lower = paragraphs[i].text.trim().toLowerCase();
-        if (lower === 'references' || lower === 'kaynaklar' || lower === 'bibliography' || lower === 'literatür') {
+        if (isBibliographyHeadingText(paragraphs[i].text)) {
           referencesStartIndex = i;
           break;
         }
@@ -2238,13 +2237,14 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
       const { paragraphs: manuscriptParagraphs, tables } = extractProjectTables(bodyParagraphs, file.name);
       const bodyText = manuscriptParagraphs.map((p) => p.text).join('\n');
       const markers = detectMarkers(bodyText);
-      const citationCounts = countCitationsPerRef(parsedRefs.length, markers);
+      const validMarkers = markersWithinRefCount(markers, parsedRefs.length);
+      const citationCounts = countCitationsPerRef(parsedRefs.length, validMarkers);
 
       setImportPreview({
         paragraphs: manuscriptParagraphs,
         bodyText,
         refs: parsedRefs,
-        markerCount: markers.length,
+        markerCount: validMarkers.length,
         abstractText: importedAbstract,
         keywords: importedKeywords,
         tables,
@@ -2263,13 +2263,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
     if (pastedHtmlParagraphs && pastedPlainReference && text.trim() === pastedPlainReference.trim()) {
       let referencesStartIndex = pastedHtmlParagraphs.length;
       for (let i = 0; i < pastedHtmlParagraphs.length; i++) {
-        const lower = pastedHtmlParagraphs[i].text.trim().toLowerCase();
-        if (
-          lower === 'references' ||
-          lower === 'kaynaklar' ||
-          lower === 'bibliography' ||
-          lower === 'literatür'
-        ) {
+        if (isBibliographyHeadingText(pastedHtmlParagraphs[i].text)) {
           referencesStartIndex = i;
           break;
         }
@@ -2281,13 +2275,14 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
       const { paragraphs: manuscriptParagraphs, tables } = extractProjectTables(bodyParagraphs, 'pasted-html');
       const bodyText = manuscriptParagraphs.map((p) => p.text).join('\n');
       const markers = detectMarkers(bodyText);
-      const citationCounts = countCitationsPerRef(parsedRefs.length, markers);
+      const validMarkers = markersWithinRefCount(markers, parsedRefs.length);
+      const citationCounts = countCitationsPerRef(parsedRefs.length, validMarkers);
 
       setImportPreview({
         paragraphs: manuscriptParagraphs,
         bodyText,
         refs: parsedRefs,
-        markerCount: markers.length,
+        markerCount: validMarkers.length,
         abstractText: importedAbstract,
         keywords: importedKeywords,
         tables,
@@ -2309,12 +2304,13 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
     const { paragraphs: manuscriptParagraphs, tables } = extractProjectTables(bodyParagraphs, 'pasted-text');
     const bodyText = manuscriptParagraphs.map((p) => p.text).join('\n');
     const markers = detectMarkers(bodyText);
-    const citationCounts = countCitationsPerRef(parsedRefs.length, markers);
+    const validMarkers = markersWithinRefCount(markers, parsedRefs.length);
+    const citationCounts = countCitationsPerRef(parsedRefs.length, validMarkers);
     setImportPreview({
       paragraphs: manuscriptParagraphs,
       bodyText,
       refs: parsedRefs,
-      markerCount: markers.length,
+      markerCount: validMarkers.length,
       abstractText: importedAbstract,
       keywords: importedKeywords,
       tables,
@@ -2390,6 +2386,10 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
       }
     }
     return counts;
+  }
+
+  function markersWithinRefCount(markers: MarkerOccurrence[], refCount: number): MarkerOccurrence[] {
+    return markers.filter((marker) => marker.refNumbers.some((n) => n >= 1 && n <= refCount));
   }
 
   const aiOff = aiConfigured === false;
