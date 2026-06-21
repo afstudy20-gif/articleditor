@@ -64,7 +64,9 @@ export function scanMedicalStatistics(text: string): MedicalStatisticIssue[] {
     text,
     /\bp\s*=\s*\.\d+\b/gi,
     (match, start) => {
-      const value = match.replace(/\s/g, '').replace('p=', '');
+      // Insert a leading zero before the decimal: "P = .005" → "P = 0.005".
+      // Preserve the original letter case and the exact spacing around "=".
+      const replacement = match.replace(/\.\d/, '0$&');
       return {
         code: 'p-leading-zero',
         severity: 'low',
@@ -75,7 +77,7 @@ export function scanMedicalStatistics(text: string): MedicalStatisticIssue[] {
           tr: 'Dergi stili aksini istemiyorsa p değerinde baştaki sıfırı kullanın.',
           en: 'Use a leading zero for the p value unless the journal style specifies otherwise.',
         },
-        replacement: `p = 0${value}`,
+        replacement,
       };
     },
   );

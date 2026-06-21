@@ -45,3 +45,20 @@ test('accepts p = 1 but flags values above 1', () => {
   assert.equal(rangeIssues.length, 1);
   assert.equal(rangeIssues[0]?.quote, 'p = 1.2');
 });
+
+test('flags missing leading zero in p values with a clean replacement', () => {
+  // Regression: the replacement used to be garbage ("p = 0P=.005") because the
+  // letter-case "P" wasn't stripped and a literal "p = 0" was prepended.
+  const cases: Array<[string, string, string]> = [
+    ['P = .005', 'P = .005', 'P = 0.005'],
+    ['p = .04', 'p = .04', 'p = 0.04'],
+    ['p=.34', 'p=.34', 'p=0.34'],
+  ];
+  for (const [text, quote, expectedReplacement] of cases) {
+    const issues = scanMedicalStatistics(text);
+    const issue = issues.find((item) => item.code === 'p-leading-zero');
+    assert.ok(issue, `expected p-leading-zero issue for "${text}"`);
+    assert.equal(issue?.quote, quote);
+    assert.equal(issue?.replacement, expectedReplacement);
+  }
+});
