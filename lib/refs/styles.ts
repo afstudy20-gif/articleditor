@@ -138,7 +138,10 @@ function formatSageNumericWithOpts(numbers: number[], opts?: CiteOptions): strin
   flush();
   let out = parts.join(',');
   if (!opts) return out;
-  if (opts.locator) out = `${out} p ${opts.locator}`;
+  // SAGE Vancouver is superscript numeric; the locator follows the number in
+  // parentheses, never prefixed with a literal "p" (the locator itself carries
+  // any prefix like "p. 12"). "5" + locator "p. 12" → "5 (p. 12)".
+  if (opts.locator) out = `${out} (${opts.locator})`;
   if (opts.prefix) out = `${opts.prefix} ${out}`;
   if (opts.suffix) out = `${out} ${opts.suffix}`;
   return out;
