@@ -131,7 +131,7 @@ function offsetToPos(map: Array<{ start: number; len: number; pos: number }>, of
 
 function findOccurrences(text: string, map: ReturnType<typeof assembleSegment>['map'], acronym: string): AbbrOccurrence[] {
   const occurrences: AbbrOccurrence[] = [];
-  const regex = new RegExp(`\\b${escapeRegExp(acronym)}\\b`, 'g');
+  const regex = buildAcronymRegex(acronym);
   let match;
   while ((match = regex.exec(text)) !== null) {
     const from = offsetToPos(map, match.index);
@@ -202,6 +202,58 @@ export function analyzeAbbreviations(editor: Editor): AbbreviationScope[] {
 }
 
 /**
+ * Lowercase a string for case-insensitive comparison while handling Turkish
+ * dotted/dotless i (İ→i, I→ı) so that "İSS" and "iss" compare equal to the
+ * initial letters of "ilaç salınımlı stent".
+ */
+function toLowerTurkish(s: string): string {
+  return s
+    .replace(/İ/g, 'i')
+    .replace(/I/g, 'ı')
+    .replace(/Ş/g, 'ş')
+    .replace(/Ğ/g, 'ğ')
+    .replace(/Ü/g, 'ü')
+    .replace(/Ö/g, 'ö')
+    .replace(/Ç/g, 'ç')
+    .toLowerCase();
+}
+
+/**
+ * Normalize Turkish letters to their ASCII base letter so that acronym-to-word
+ * matching works across scripts: "ÇMS" → "CMS", "çıplak" → "ciplak". This lets
+ * the initial-letter heuristics treat "Ç" as the initial of "çıplak".
+ */
+function normalizeTurkish(s: string): string {
+  return s
+    .replace(/[İIı]/g, 'i')
+    .replace(/ş/g, 's').replace(/Ş/g, 'S')
+    .replace(/ğ/g, 'g').replace(/Ğ/g, 'G')
+    .replace(/ü/g, 'u').replace(/Ü/g, 'U')
+    .replace(/ö/g, 'o').replace(/Ö/g, 'O')
+    .replace(/ç/g, 'c').replace(/Ç/g, 'C');
+}
+
+/**
+ * Word-boundary fragments that treat Turkish letters as word characters.
+ * Plain `\b` does not recognize Ç/İ/Ş/ü etc. as word chars in JS, so a
+ * lookaround against this set is used instead.
+ */
+const WORD_BOUNDARY_LOOKAROUND = {
+  before: '(?<![A-Za-zÀ-ÿÇĞİÖŞÜçğıöşü0-9])',
+  after: '(?![A-Za-zÀ-ÿÇĞİÖŞÜçğıöşü0-9])',
+};
+
+/**
+ * Build a regex that matches the acronym with Unicode-aware word boundaries so
+ * Turkish letters (Ç, İ, Ş, …) and typographic apostrophes ('') don't defeat
+ * detection of occurrences like "ÇMS'ye" or "İSS'nin".
+ */
+function buildAcronymRegex(acronym: string, flags = 'g'): RegExp {
+  const esc = escapeRegExp(acronym);
+  return new RegExp(`${WORD_BOUNDARY_LOOKAROUND.before}${esc}${WORD_BOUNDARY_LOOKAROUND.after}`, flags);
+}
+
+/**
  * Escapes characters for safe regular expression matching
  */
 function escapeRegExp(str: string): string {
@@ -215,13 +267,13 @@ function escapeRegExp(str: string): string {
  * 3. In-order letter mapping inside a single word (syllables match).
  */
 export function isAcronymMatch(acronym: string, definition: string): boolean {
-  const cleanAcronym = acronym.replace(/[^A-Za-z0-9]/g, '').toLowerCase();
+  const cleanAcronym = toLowerTurkish(normalizeTurkish(acronym.replace(/[^A-Za-zÀ-ÿÇĞİÖŞÜçğıöşü0-9]/g, '')));
   if (!cleanAcronym) return false;
 
   // Split definition into words
   const words = definition
     .split(/[\s,-]+/)
-    .map((w) => w.replace(/[^A-Za-z0-9]/g, '').toLowerCase())
+    .map((w) => toLowerTurkish(normalizeTurkish(w.replace(/[^A-Za-zÀ-ÿÇĞİÖŞÜçğıöşü0-9]/g, ''))))
     .filter(Boolean);
 
   if (words.length === 0) return false;
@@ -274,19 +326,19 @@ export function isAcronymMatch(acronym: string, definition: string): boolean {
  * Finds the exact matching words for the acronym definition in the preceding text by walking backwards.
  */
 export function findExactDefinition(acronym: string, precedingText: string): string | null {
-  const cleanAcronym = acronym.replace(/[^A-Za-z0-9]/g, '').toLowerCase();
+  const cleanAcronym = toLowerTurkish(normalizeTurkish(acronym.replace(/[^A-Za-zÀ-ÿÇĞİÖŞÜçğıöşü0-9]/g, '')));
   if (!cleanAcronym) return null;
 
   const rawWords = precedingText.trim().split(/\s+/);
   if (rawWords.length > 0) {
     const lastWord = rawWords[rawWords.length - 1];
-    const cleanLastWord = lastWord.replace(/[^A-Za-z0-9-]/g, '');
+    const cleanLastWord = lastWord.replace(/[^A-Za-zÀ-ÿÇĞİÖŞÜçğıöşü0-9-]/g, '');
     if (isAcronymMatch(acronym, cleanLastWord)) {
       return cleanLastWord;
     }
   }
 
-  const cleanWords = rawWords.map((w) => w.replace(/[^A-Za-z0-9]/g, '').toLowerCase());
+  const cleanWords = rawWords.map((w) => toLowerTurkish(normalizeTurkish(w.replace(/[^A-Za-zÀ-ÿÇĞİÖŞÜçğıöşü0-9]/g, ''))));
 
   let acronymIdx = cleanAcronym.length - 1;
   let wordIdx = cleanWords.length - 1;
@@ -345,8 +397,10 @@ export function extractAbbreviations(text: string): Abbreviation[] {
   const list: Abbreviation[] = [];
   const seenAcronyms = new Set<string>();
 
-  // Look for preceding text + (ACRONYM)
-  const definitionRegex = /([A-Za-z0-9\s,-]{2,100})\s+\(([A-Za-z0-9-]{2,10})\)/g;
+  // Look for preceding text + (ACRONYM). The character classes include Turkish
+  // letters (çğıöşüÇĞİÖŞÜ) so definitions like "çıplak metal stent (ÇMS)" and
+  // acronyms like "ÇMS"/"İSS"/"ÖBS" are captured, not just ASCII.
+  const definitionRegex = /([A-Za-zÀ-ÿÇĞİÖŞÜçğıöşü0-9\s,-]{2,100})\s+\(([A-Za-zÀ-ÿÇĞİÖŞÜçğıöşü0-9-]{2,10})\)/g;
   let match;
 
   while ((match = definitionRegex.exec(text)) !== null) {
@@ -354,11 +408,37 @@ export function extractAbbreviations(text: string): Abbreviation[] {
     const acronym = match[2];
 
     // Filter out values without uppercase letters or starting with symbols
-    if (!/[A-Z]/.test(acronym) || !/^[A-Za-z0-9]/.test(acronym)) {
+    if (!/[A-ZÇĞİÖŞÜ]/.test(acronym) || !/^[A-Za-zÀ-ÿÇĞİÖŞÜçğıöşü0-9]/.test(acronym)) {
       continue;
     }
 
-    const definition = findExactDefinition(acronym, preceding);
+    let definition = findExactDefinition(acronym, preceding);
+
+    // Fallback: if no exact definition could be matched (common when the
+    // acronym is English but the surrounding text is another language — e.g.
+    // "kararsız anjina pektoris (USAP)"), trust the parenthetical signal: the
+    // user wrote the acronym in parentheses right after its definition, so take
+    // the last N content words preceding it (N = acronym letter count) as the
+    // definition. This avoids dropping the abbreviation entirely.
+    if (!definition) {
+      const cleanLen = acronym.replace(/[^A-Za-zÀ-ÿÇĞİÖŞÜçğıöşü0-9]/g, '').length;
+      // Strip earlier parenthetical tokens and list punctuation so a run of
+      // "X (A), Y (B), Z (C)" yields "Z" only as the fallback definition window.
+      const window = preceding
+        .replace(/\([^)]*\)/g, ' ')
+        .replace(/[;,]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      const words = window.split(' ').filter(Boolean);
+      if (cleanLen >= 2 && cleanLen <= 6 && words.length >= 2) {
+        // Take up to cleanLen words, but never more than are available. Composite
+        // acronyms like NSTEMI (Non-ST-Elevation MI) often map to fewer words
+        // than letters, so clamp rather than reject.
+        const take = Math.min(cleanLen, words.length);
+        definition = words.slice(-take).join(' ');
+      }
+    }
+
     if (definition && !seenAcronyms.has(acronym.toUpperCase())) {
       seenAcronyms.add(acronym.toUpperCase());
       list.push({
@@ -369,10 +449,10 @@ export function extractAbbreviations(text: string): Abbreviation[] {
     }
   }
 
-  // Count acronym occurrences in text (case-sensitive)
+  // Count acronym occurrences in text (case-sensitive), with Unicode-aware
+  // word boundaries so Turkish letters and typographic apostrophes are handled.
   for (const item of list) {
-    const escAcronym = escapeRegExp(item.acronym);
-    const regex = new RegExp(`\\b${escAcronym}\\b`, 'g');
+    const regex = buildAcronymRegex(item.acronym);
     const matches = text.match(regex);
     item.count = matches ? matches.length : 0;
   }
