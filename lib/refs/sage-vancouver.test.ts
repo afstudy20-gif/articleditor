@@ -40,6 +40,26 @@ describe('SAGE Vancouver style', () => {
     assert.equal(formatInTextCitation('sage-vancouver', [], [1, 2, 3, 5]), '1–3,5');
   });
 
+  it('places the locator in parentheses without a duplicate "p" prefix', () => {
+    // Regression: locator "p. 12" used to produce "5 p p. 12" because the
+    // function prepended a literal "p" to the already-prefixed locator.
+    assert.equal(
+      formatInTextCitation('sage-vancouver', [], [5], { locator: 'p. 12' }),
+      '5 (p. 12)',
+    );
+    assert.equal(
+      formatInTextCitation('sage-vancouver', [], [3], { locator: '12' }),
+      '3 (12)',
+    );
+  });
+
+  it('wraps prefix and suffix around the number when a locator is present', () => {
+    assert.equal(
+      formatInTextCitation('sage-vancouver', [], [5], { prefix: 'see', suffix: 'passim' }),
+      'see 5 passim',
+    );
+  });
+
   it('lists the first three authors followed by et al.', () => {
     assert.equal(
       formatBibEntry('sage-vancouver', ref, 1),
