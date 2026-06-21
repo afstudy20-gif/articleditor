@@ -2437,8 +2437,8 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
   return (
     <div className="min-h-screen flex flex-col">
       <header className={`border-b border-border bg-surface sticky top-0 z-[80] ${focusMode ? 'hidden' : ''}`}>
-        <div className="w-full px-4 sm:px-6 py-3 flex flex-wrap 2xl:flex-nowrap items-start 2xl:items-center justify-between gap-3">
-          <div className="flex items-center gap-3 flex-1 min-w-full 2xl:min-w-0">
+        <div className="w-full px-4 sm:px-6 py-3 flex flex-wrap lg:flex-nowrap items-start lg:items-center justify-between gap-3">
+          <div className="flex items-center gap-3 flex-1 min-w-0 lg:min-w-0">
             <div className="flex flex-col gap-1 items-start min-w-0 flex-1 mr-2">
               <div className="flex items-center gap-2 flex-wrap text-xs border border-border px-2 py-1 rounded-lg bg-white shadow-xs">
                 <button
@@ -2593,7 +2593,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
                 : `Son kayıt ${new Date(savedAt).toLocaleTimeString('tr-TR')}`}
             </span>
           </div>
-          <div className="flex gap-1 items-center justify-end text-xs shrink-0 flex-wrap w-full 2xl:w-auto max-w-full 2xl:max-w-[56vw] ml-auto">
+          <div className="flex gap-1 items-center justify-end text-xs shrink-0 flex-nowrap overflow-x-auto scrollbar-none max-w-full ml-auto">
 
             <HeaderDropdown label={`📥 ${t('ed_import')} ▾`}>
               <DropItem
@@ -3419,7 +3419,7 @@ function HeaderIcon({
     <button
       onClick={onClick}
       title={title}
-      className={`flex flex-col items-center justify-center leading-none px-1.5 py-1 rounded border min-w-[2.6rem] transition ${
+      className={`flex flex-col items-center justify-center leading-none px-1.5 py-1 rounded border min-w-[2.25rem] shrink-0 transition ${
         accent ? 'border-teal text-teal' : 'border-border text-secondary'
       } hover:bg-slate-50 hover:text-primary`}
     >
@@ -3427,7 +3427,7 @@ function HeaderIcon({
         {label}
         {badge && <span className="ml-0.5 inline-block w-1.5 h-1.5 rounded-full bg-red-500 align-middle" />}
       </span>
-      {caption && <span className="mt-0.5 hidden xl:inline text-[9px] text-muted">{caption}</span>}
+      {caption && <span className="mt-0.5 hidden 2xl:inline text-[9px] text-muted">{caption}</span>}
     </button>
   );
 }
