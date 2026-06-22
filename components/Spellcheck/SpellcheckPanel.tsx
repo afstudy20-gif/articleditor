@@ -27,7 +27,8 @@ const localizations = {
     occurrences: 'kullanım',
     loadFailed: 'Sözlük yüklenemedi.',
     langLabel: 'Dil',
-    langEn: 'İngilizce (ABD)',
+    langEnUs: 'İngilizce (ABD)',
+    langEnGb: 'İngilizce (BK)',
     langTr: 'Türkçe',
     hint: 'Yanlış yazılmış kelimeler listelenir. Öneriye tıklayarak düzeltin veya yoksayın.',
   },
@@ -41,7 +42,8 @@ const localizations = {
     occurrences: 'occurrences',
     loadFailed: 'Could not load dictionary.',
     langLabel: 'Language',
-    langEn: 'English (US)',
+    langEnUs: 'English (US)',
+    langEnGb: 'English (UK)',
     langTr: 'Turkish',
     hint: 'Misspelled words are listed. Click a suggestion to fix it, or ignore it.',
   },
@@ -78,7 +80,7 @@ function groupIssues(issues: SpellIssue[]): GroupedIssue[] {
 }
 
 export function SpellcheckPanel({ editor, onClose, lang }: SpellcheckPanelProps): JSX.Element {
-  const [spellLang, setSpellLang] = useState<SpellLang>(lang === 'tr' ? 'tr' : 'en');
+  const [spellLang, setSpellLang] = useState<SpellLang>(lang === 'tr' ? 'tr' : 'en-us');
   const t = localizations[lang] || localizations.en;
   const [checker, setChecker] = useState<SpellChecker | null>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
@@ -174,18 +176,29 @@ export function SpellcheckPanel({ editor, onClose, lang }: SpellcheckPanelProps)
         <span className="text-muted font-semibold">{t.langLabel}:</span>
         <div className="flex gap-1 bg-white p-0.5 rounded-md border border-border">
           <button
-            onClick={() => setSpellLang('en')}
+            onClick={() => setSpellLang('en-us')}
             className={`px-2 py-0.5 rounded font-semibold transition ${
-              spellLang === 'en' ? 'bg-teal text-white' : 'text-secondary hover:bg-slate-50'
+              spellLang === 'en-us' ? 'bg-teal text-white' : 'text-secondary hover:bg-slate-50'
             }`}
+            title={t.langEnUs}
           >
-            EN
+            EN-US
+          </button>
+          <button
+            onClick={() => setSpellLang('en-gb')}
+            className={`px-2 py-0.5 rounded font-semibold transition ${
+              spellLang === 'en-gb' ? 'bg-teal text-white' : 'text-secondary hover:bg-slate-50'
+            }`}
+            title={t.langEnGb}
+          >
+            EN-UK
           </button>
           <button
             onClick={() => setSpellLang('tr')}
             className={`px-2 py-0.5 rounded font-semibold transition ${
               spellLang === 'tr' ? 'bg-teal text-white' : 'text-secondary hover:bg-slate-50'
             }`}
+            title={t.langTr}
           >
             TR
           </button>

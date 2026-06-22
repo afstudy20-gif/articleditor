@@ -8,10 +8,13 @@ import { tokenize, createCheckerFromBuffers, SpellChecker } from './spellcheck';
 const PUBLIC = resolve(process.cwd(), 'public/dictionaries');
 const enAff = readFileSync(`${PUBLIC}/en-US.aff`, 'utf-8');
 const enDic = readFileSync(`${PUBLIC}/en-US.dic`, 'utf-8');
+const enGbAff = readFileSync(`${PUBLIC}/en-GB.aff`, 'utf-8');
+const enGbDic = readFileSync(`${PUBLIC}/en-GB.dic`, 'utf-8');
 const trAff = readFileSync(`${PUBLIC}/tr.aff`, 'utf-8');
 const trDic = readFileSync(`${PUBLIC}/tr.dic`, 'utf-8');
 
 const enChecker = createCheckerFromBuffers(enAff, enDic);
+const enGbChecker = createCheckerFromBuffers(enGbAff, enGbDic);
 const trChecker = createCheckerFromBuffers(trAff, trDic);
 
 describe('tokenize', () => {
@@ -82,6 +85,16 @@ describe('SpellChecker (English)', () => {
     enChecker.ignore('supercalifragilistic');
     const issues = enChecker.check('supercalifragilistic is a word');
     assert.ok(!issues.some((i) => i.quote === 'supercalifragilistic'));
+  });
+});
+
+describe('SpellChecker (English variants)', () => {
+  it('keeps American and British spelling variants separate', () => {
+    assert.equal(enChecker.check('color analyze center behavior').length, 0);
+    assert.equal(enGbChecker.check('colour analyse centre behaviour').length, 0);
+
+    assert.ok(enChecker.check('colour analyse centre behaviour').some((issue) => issue.quote === 'colour'));
+    assert.ok(enGbChecker.check('color analyze center behavior').some((issue) => issue.quote === 'color'));
   });
 });
 

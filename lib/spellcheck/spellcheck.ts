@@ -1,7 +1,7 @@
 import nspell from 'nspell';
 import type { Editor } from '@tiptap/react';
 
-export type SpellLang = 'en' | 'tr';
+export type SpellLang = 'en-us' | 'en-gb' | 'tr';
 
 export type SpellIssueCode = 'misspelling';
 
@@ -23,7 +23,8 @@ export interface Token {
 
 /** Map logical language to the bundled dictionary file names in /public/dictionaries. */
 const DICT_FILES: Record<SpellLang, { aff: string; dic: string }> = {
-  en: { aff: '/dictionaries/en-US.aff', dic: '/dictionaries/en-US.dic' },
+  'en-us': { aff: '/dictionaries/en-US.aff', dic: '/dictionaries/en-US.dic' },
+  'en-gb': { aff: '/dictionaries/en-GB.aff', dic: '/dictionaries/en-GB.dic' },
   tr: { aff: '/dictionaries/tr.aff', dic: '/dictionaries/tr.dic' },
 };
 
