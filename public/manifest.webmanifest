@@ -13,14 +13,6 @@
       "sizes": "any"
     }
   ],
-  "file_handlers": [
-    {
-      "action": "/reader",
-      "accept": {
-        "application/pdf": [".pdf"]
-      }
-    }
-  ],
   "shortcuts": [
     {
       "name": "Editor",

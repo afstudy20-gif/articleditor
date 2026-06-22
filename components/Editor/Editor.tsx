@@ -300,7 +300,7 @@ export function ArticleEditor({
       className="card flex flex-col h-full"
       style={{ '--editor-font-family': fontFamily } as React.CSSProperties}
     >
-      <div className="flex items-center gap-1 border-b border-border p-2 flex-wrap text-sm">
+      <div className="flex items-center gap-0.5 border-b border-border px-2 py-1.5 flex-wrap text-sm">
         <ToolbarButton
           onClick={() => editor.chain().focus().undo().run()}
           title={t('ed_undo')}
@@ -318,7 +318,7 @@ export function ArticleEditor({
           value={fontFamily}
           onChange={(e) => onFontFamilyChange?.(e.target.value)}
           className="border border-border rounded px-1.5 py-0.5 text-xs bg-white text-primary font-medium hover:border-teal focus:outline-none cursor-pointer"
-          style={{ width: '130px' }}
+          style={{ width: '126px' }}
           title={lang === 'tr' ? 'Yazı Tipi' : 'Font Family'}
         >
           <option value="Times New Roman">Times New Roman</option>
@@ -466,7 +466,7 @@ export function ArticleEditor({
         <button
           ref={insertBtnRef}
           onClick={() => onInsertRequest?.()}
-          className="px-3 py-1 rounded-md bg-teal text-white text-xs font-semibold hover:bg-teal-dark"
+          className="px-2.5 py-0.5 rounded-md bg-teal text-white text-xs font-semibold hover:bg-teal-dark whitespace-nowrap"
           title={t('ed_insert_citation_hint')}
         >
           {t('ed_insert_citation')}
@@ -498,7 +498,7 @@ export function ArticleEditor({
                 <select
                   value={styleId}
                   onChange={(e) => onStyleChange(e.target.value)}
-                  className="border border-border/80 rounded px-1.5 py-0.5 text-[11px] font-medium bg-white focus:outline-none focus:border-teal min-w-[80px]"
+                  className="border border-border/80 rounded px-1.5 py-0.5 text-[11px] font-medium bg-white focus:outline-none focus:border-teal w-[120px]"
                   title={lang === 'tr' ? 'Atıf ve kaynakça stili' : 'Citation & bibliography style'}
                 >
                   {styleOptions.map((s) => (
@@ -635,7 +635,7 @@ function EnhanceMenu({
       <button
         onClick={() => setOpen((v) => !v)}
         disabled={disabled}
-        className="px-3 py-1 rounded-md bg-violet-500 text-white text-xs font-semibold hover:bg-violet-600 disabled:opacity-40 disabled:cursor-not-allowed"
+        className="px-2 py-0.5 rounded-md bg-violet-500 text-white text-xs font-semibold hover:bg-violet-600 disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
         title={disabled ? t('ed_ai_disabled') : t('ed_ai_enhance')}
       >
         ✏️ {t('ed_ai_enhance')} ▾
@@ -704,7 +704,7 @@ function AIMenu({
       <button
         onClick={() => setOpen((v) => !v)}
         disabled={disabled}
-        className="px-2.5 py-1 rounded-md bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white text-xs font-semibold hover:from-violet-600 hover:to-fuchsia-600 disabled:opacity-40 disabled:cursor-not-allowed"
+        className="px-2 py-0.5 rounded-md bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white text-xs font-semibold hover:from-violet-600 hover:to-fuchsia-600 disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
         title={disabled ? t('ed_ai_disabled') : 'AI'}
       >
         ✨ AI ▾
@@ -818,7 +818,7 @@ function SectionInserter({ editor }: { editor: any }): JSX.Element {
     <div className="relative">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="px-2.5 py-1 rounded-md text-xs font-semibold text-secondary hover:bg-slate-100"
+        className="px-2 py-0.5 rounded-md text-xs font-semibold text-secondary hover:bg-slate-100 whitespace-nowrap"
       >
         + {lang === 'tr' ? 'Bölüm' : 'Section'} ▾
       </button>
@@ -868,7 +868,7 @@ function ToolbarButton({
     <button
       onClick={onClick}
       title={title}
-      className={`px-2.5 py-1 rounded-md text-xs font-semibold transition ${
+      className={`min-w-7 px-1.5 py-0.5 rounded-md text-xs font-semibold transition whitespace-nowrap ${
         active ? 'bg-teal text-white' : 'text-secondary hover:bg-slate-100'
       }`}
     >
@@ -955,7 +955,7 @@ function ColorPicker({ editor, t }: { editor: any; t: (k: string) => string }): 
       <button
         onClick={() => setOpen((v) => !v)}
         title={t('ed_text_color')}
-        className="px-2 py-1 rounded-md text-xs font-semibold text-secondary hover:bg-slate-100 transition flex flex-col items-center leading-none"
+        className="min-w-7 px-1.5 py-0.5 rounded-md text-xs font-semibold text-secondary hover:bg-slate-100 transition flex flex-col items-center leading-none"
       >
         <span style={{ color: current ?? 'inherit' }}>A</span>
         <span className="block w-4 h-1 rounded-sm mt-0.5" style={{ background: current ?? '#94a3b8' }} />
@@ -1005,7 +1005,7 @@ function HighlightPicker({ editor, t }: { editor: any; t: (k: string) => string 
       <button
         onClick={() => setOpen((v) => !v)}
         title={t('ed_highlight')}
-        className={`px-2 py-1 rounded-md text-xs font-semibold transition flex items-center gap-1 ${
+        className={`min-w-7 px-1.5 py-0.5 rounded-md text-xs font-semibold transition flex items-center justify-center gap-0.5 ${
           active ? 'bg-teal text-white' : 'text-secondary hover:bg-slate-100'
         }`}
       >
@@ -1099,7 +1099,7 @@ function TableMenu({
             setOpen((v) => !v);
           }
         }}
-        className={`px-2.5 py-1 rounded-md text-xs font-semibold transition ${
+        className={`min-w-7 px-1.5 py-0.5 rounded-md text-xs font-semibold transition ${
           inTable ? 'bg-teal text-white' : 'text-secondary hover:bg-slate-100'
         }`}
         title={inTable ? t('ed_insert_table') : t('ed_insert_table')}
@@ -1182,7 +1182,7 @@ function EquationButton({ editor, t }: { editor: any; t: (k: string) => string }
         const latex = prompt(t('eq_prompt'), '');
         if (latex) editor.chain().focus().insertEquation(latex).run();
       }}
-      className="px-2.5 py-1 rounded-md text-xs font-semibold text-secondary hover:bg-slate-100 transition"
+      className="min-w-7 px-1.5 py-0.5 rounded-md text-xs font-semibold text-secondary hover:bg-slate-100 transition"
       title={t('eq_insert')}
     >
       Σ
@@ -1191,7 +1191,7 @@ function EquationButton({ editor, t }: { editor: any; t: (k: string) => string }
 }
 
 function Sep() {
-  return <span className="w-px h-5 bg-border mx-1" />;
+  return <span className="w-px h-5 bg-border mx-0.5" />;
 }
 
 export function tiptapToPlainTextWithMarkers(json: any, refOrder: Map<string, number>): string {
@@ -1481,7 +1481,7 @@ function SymbolPool({ editor, t }: { editor: any; t: (k: string) => string }): J
     <div className="relative">
       <button
         onClick={() => setOpen(!open)}
-        className="px-2.5 py-1 rounded-md text-xs font-semibold text-secondary hover:bg-slate-100 flex items-center gap-1 transition"
+        className="min-w-7 px-1.5 py-0.5 rounded-md text-xs font-semibold text-secondary hover:bg-slate-100 flex items-center justify-center gap-0.5 transition"
         title={t('sym_pool_title')}
       >
         Ω⁺
@@ -1643,7 +1643,7 @@ function NumberingMenu({ editor, t }: { editor: any; t: (k: string) => string })
     <div className="relative">
       <button
         onClick={open ? () => setOpen(false) : handleOpen}
-        className="px-2.5 py-1 rounded-md text-xs font-semibold text-secondary hover:bg-slate-100 flex items-center gap-1"
+        className="px-2 py-0.5 rounded-md text-xs font-semibold text-secondary hover:bg-slate-100 flex items-center gap-0.5 whitespace-nowrap"
         title={t('ed_numbering_help')}
       >
         🔢 {t('ed_numbering')} ▾
