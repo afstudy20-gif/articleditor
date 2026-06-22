@@ -2439,155 +2439,29 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
   return (
     <div className="min-h-screen flex flex-col">
       <header className={`border-b border-border bg-surface sticky top-0 z-[80] ${focusMode ? 'hidden' : ''}`}>
-        <div className="w-full px-4 sm:px-6 py-3 flex flex-wrap lg:flex-nowrap items-start lg:items-center justify-between gap-3">
-          <div className="flex items-center gap-3 flex-1 min-w-0 lg:min-w-0">
-            <div className="flex flex-col gap-1 items-start min-w-0 flex-1 mr-2">
-              <div className="flex items-center gap-2 flex-wrap text-xs border border-border px-2 py-1 rounded-lg bg-white shadow-xs">
-                <button
-                  onClick={onExitToProjects || onExit}
-                  className="text-secondary hover:text-primary font-bold flex items-center gap-1 transition"
-                  title="Ana Proje Listesi"
-                >
-                  🏠 {lang === 'tr' ? 'Projelerim' : 'Projects'}
-                </button>
-                <span className="text-muted/30">|</span>
-                <button
-                  onClick={onExit}
-                  className="text-secondary hover:text-primary font-bold flex items-center gap-1 transition"
-                  title={lang === 'tr' ? 'Proje Çalışma Alanı' : 'Project Workspace'}
-                >
-                  📁 {t('ws_title') || (lang === 'tr' ? 'Çalışma Alanı' : 'Workspace')}
-                </button>
-              </div>
-              <div className="flex items-center gap-1.5 max-w-full flex-nowrap overflow-x-auto min-w-0 [scrollbar-width:thin]">
-                <StickyNote />
-                <span className="text-muted/30 self-center">|</span>
-                <button
-                  onClick={() => {
-                    setTablesOpen(false);
-                    setFiguresOpen(false);
-                    setSuppOpen(false);
-                    setLettersOpen(false);
-                    setAbstractOpen(false);
-                    setAbbrOpen(false);
-                  }}
-                  className={`px-1.5 py-0.5 rounded text-[11px] font-semibold transition flex items-center gap-1 shrink-0 ${
-                    (!tablesOpen && !figuresOpen && !suppOpen && !lettersOpen && !abstractOpen && !abbrOpen)
-                      ? 'bg-teal text-white shadow-sm'
-                      : 'text-secondary hover:text-primary hover:bg-slate-100'
-                  }`}
-                >
-                  📝 {lang === 'tr' ? 'Ana Yazı' : 'Main Text'}
-                </button>
-                <button
-                  onClick={() => {
-                    setTablesOpen(false);
-                    setFiguresOpen(false);
-                    setSuppOpen(false);
-                    setLettersOpen(false);
-                    setAbstractOpen(false);
-                    setAbbrOpen(false);
-                    setAbstractOpen(true);
-                  }}
-                  className={`px-1.5 py-0.5 rounded text-[11px] font-semibold transition flex items-center gap-1 shrink-0 ${
-                    abstractOpen
-                      ? 'bg-teal text-white shadow-sm'
-                      : 'text-secondary hover:text-primary hover:bg-slate-100'
-                  }`}
-                >
-                  A {lang === 'tr' ? 'Abstract' : 'Abstract'}
-                </button>
-                <button
-                  onClick={() => {
-                    setTablesOpen(false);
-                    setFiguresOpen(false);
-                    setSuppOpen(false);
-                    setAbbrOpen(false);
-                    setAbstractOpen(false);
-                    setLettersOpen(true);
-                  }}
-                  className={`px-1.5 py-0.5 rounded text-[11px] font-semibold transition flex items-center gap-1 shrink-0 ${
-                    lettersOpen
-                      ? 'bg-teal text-white shadow-sm'
-                      : 'text-secondary hover:text-primary hover:bg-slate-100'
-                  }`}
-                >
-                  📂 {t('ed_letters')}
-                </button>
-                <button
-                  onClick={() => {
-                    setFiguresOpen(true);
-                    setTablesOpen(false);
-                    setSuppOpen(false);
-                    setLettersOpen(false);
-                    setAbstractOpen(false);
-                    setAbbrOpen(false);
-                  }}
-                  className={`px-1.5 py-0.5 rounded text-[11px] font-semibold transition flex items-center gap-1 shrink-0 ${
-                    figuresOpen
-                      ? 'bg-teal text-white shadow-sm'
-                      : 'text-secondary hover:text-primary hover:bg-slate-100'
-                  }`}
-                >
-                  🖼️ Figure Legends
-                </button>
-                <button
-                  onClick={() => {
-                    setTablePanelView('list');
-                    setTablesOpen(true);
-                    setFiguresOpen(false);
-                    setSuppOpen(false);
-                    setLettersOpen(false);
-                    setAbbrOpen(false);
-                  }}
-                  className={`px-1.5 py-0.5 rounded text-[11px] font-semibold transition flex items-center gap-1 shrink-0 ${
-                    tablesOpen
-                      ? 'bg-teal text-white shadow-sm'
-                      : 'text-secondary hover:text-primary hover:bg-slate-100'
-                  }`}
-                >
-                  ⊞ {lang === 'tr' ? 'Tablolar' : 'Tables'}
-                </button>
-                <button
-                  onClick={() => {
-                    setSuppOpen(true);
-                    setTablesOpen(false);
-                    setFiguresOpen(false);
-                    setLettersOpen(false);
-                    setAbstractOpen(false);
-                    setAbbrOpen(false);
-                  }}
-                  className={`px-1.5 py-0.5 rounded text-[11px] font-semibold transition flex items-center gap-1 shrink-0 ${
-                    suppOpen
-                      ? 'bg-teal text-white shadow-sm'
-                      : 'text-secondary hover:text-primary hover:bg-slate-100'
-                  }`}
-                >
-                  📎 {lang === 'tr' ? 'Ek Materyaller' : 'Supplementary'}
-                </button>
-                <button
-                  onClick={() => {
-                    setAbbrOpen(true);
-                    setSuppOpen(false);
-                    setTablesOpen(false);
-                    setFiguresOpen(false);
-                    setLettersOpen(false);
-                    setAbstractOpen(false);
-                  }}
-                  className={`px-1.5 py-0.5 rounded text-[11px] font-semibold transition flex items-center gap-1 shrink-0 ${
-                    abbrOpen
-                      ? 'bg-teal text-white shadow-sm'
-                      : 'text-secondary hover:text-primary hover:bg-slate-100'
-                  }`}
-                >
-                  🔤 {lang === 'tr' ? 'Kısaltmalar' : 'Abbreviations'}
-                </button>
-              </div>
+        <div className="w-full px-4 sm:px-6 py-2 grid grid-cols-[minmax(0,1fr)_auto] grid-rows-[auto_auto] items-center gap-x-3 gap-y-1">
+          <div className="row-start-1 col-start-1 flex items-center gap-3 min-w-0">
+            <div className="flex items-center gap-2 flex-nowrap text-xs border border-border px-2 py-1 rounded-lg bg-white shadow-xs shrink-0">
+              <button
+                onClick={onExitToProjects || onExit}
+                className="text-secondary hover:text-primary font-bold flex items-center gap-1 transition whitespace-nowrap"
+                title="Ana Proje Listesi"
+              >
+                🏠 {lang === 'tr' ? 'Projelerim' : 'Projects'}
+              </button>
+              <span className="text-muted/30">|</span>
+              <button
+                onClick={onExit}
+                className="text-secondary hover:text-primary font-bold flex items-center gap-1 transition whitespace-nowrap"
+                title={lang === 'tr' ? 'Proje Çalışma Alanı' : 'Project Workspace'}
+              >
+                📁 {t('ws_title') || (lang === 'tr' ? 'Çalışma Alanı' : 'Workspace')}
+              </button>
             </div>
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="text-base font-bold text-primary bg-transparent outline-none border-b border-transparent focus:border-teal min-w-0 flex-1 2xl:flex-none 2xl:w-[22rem] max-w-xs 2xl:max-w-[22rem] truncate"
+              className="text-base font-bold text-primary bg-transparent outline-none border-b border-transparent focus:border-teal min-w-[8rem] flex-1 max-w-[32rem] truncate"
             />
             <span className="hidden 2xl:inline-block text-xs text-faint shrink-0 w-[8.75rem] text-right tabular-nums whitespace-nowrap">
               {savingState === 'saving'
@@ -2595,7 +2469,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
                 : `Son kayıt ${new Date(savedAt).toLocaleTimeString('tr-TR')}`}
             </span>
           </div>
-          <div className="flex gap-1 items-center justify-end text-xs shrink-0 flex-nowrap overflow-x-auto scrollbar-none max-w-full ml-auto">
+          <div className="row-start-1 col-start-2 flex gap-1 items-center justify-end text-xs shrink-0 flex-nowrap overflow-x-auto scrollbar-none max-w-[55vw] ml-auto">
 
             <HeaderDropdown label={`📥 ${t('ed_import')} ▾`}>
               <DropItem
@@ -2664,6 +2538,130 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
               accent={!!aiConfigured}
               badge={aiConfigured === false}
             />
+          </div>
+          <div className="row-start-2 col-span-2 flex items-center gap-1.5 max-w-full flex-nowrap overflow-x-auto min-w-0 [scrollbar-width:thin]">
+            <StickyNote />
+            <span className="text-muted/30 self-center">|</span>
+            <button
+              onClick={() => {
+                setTablesOpen(false);
+                setFiguresOpen(false);
+                setSuppOpen(false);
+                setLettersOpen(false);
+                setAbstractOpen(false);
+                setAbbrOpen(false);
+              }}
+              className={`px-1.5 py-0.5 rounded text-[11px] font-semibold transition flex items-center gap-1 shrink-0 ${
+                (!tablesOpen && !figuresOpen && !suppOpen && !lettersOpen && !abstractOpen && !abbrOpen)
+                  ? 'bg-teal text-white shadow-sm'
+                  : 'text-secondary hover:text-primary hover:bg-slate-100'
+              }`}
+            >
+              📝 {lang === 'tr' ? 'Ana Yazı' : 'Main Text'}
+            </button>
+            <button
+              onClick={() => {
+                setTablesOpen(false);
+                setFiguresOpen(false);
+                setSuppOpen(false);
+                setLettersOpen(false);
+                setAbstractOpen(false);
+                setAbbrOpen(false);
+                setAbstractOpen(true);
+              }}
+              className={`px-1.5 py-0.5 rounded text-[11px] font-semibold transition flex items-center gap-1 shrink-0 ${
+                abstractOpen
+                  ? 'bg-teal text-white shadow-sm'
+                  : 'text-secondary hover:text-primary hover:bg-slate-100'
+              }`}
+            >
+              A {lang === 'tr' ? 'Abstract' : 'Abstract'}
+            </button>
+            <button
+              onClick={() => {
+                setTablesOpen(false);
+                setFiguresOpen(false);
+                setSuppOpen(false);
+                setAbbrOpen(false);
+                setAbstractOpen(false);
+                setLettersOpen(true);
+              }}
+              className={`px-1.5 py-0.5 rounded text-[11px] font-semibold transition flex items-center gap-1 shrink-0 ${
+                lettersOpen
+                  ? 'bg-teal text-white shadow-sm'
+                  : 'text-secondary hover:text-primary hover:bg-slate-100'
+              }`}
+            >
+              📂 {t('ed_letters')}
+            </button>
+            <button
+              onClick={() => {
+                setFiguresOpen(true);
+                setTablesOpen(false);
+                setSuppOpen(false);
+                setLettersOpen(false);
+                setAbstractOpen(false);
+                setAbbrOpen(false);
+              }}
+              className={`px-1.5 py-0.5 rounded text-[11px] font-semibold transition flex items-center gap-1 shrink-0 ${
+                figuresOpen
+                  ? 'bg-teal text-white shadow-sm'
+                  : 'text-secondary hover:text-primary hover:bg-slate-100'
+              }`}
+            >
+              🖼️ Figure Legends
+            </button>
+            <button
+              onClick={() => {
+                setTablePanelView('list');
+                setTablesOpen(true);
+                setFiguresOpen(false);
+                setSuppOpen(false);
+                setLettersOpen(false);
+                setAbbrOpen(false);
+              }}
+              className={`px-1.5 py-0.5 rounded text-[11px] font-semibold transition flex items-center gap-1 shrink-0 ${
+                tablesOpen
+                  ? 'bg-teal text-white shadow-sm'
+                  : 'text-secondary hover:text-primary hover:bg-slate-100'
+              }`}
+            >
+              ⊞ {lang === 'tr' ? 'Tablolar' : 'Tables'}
+            </button>
+            <button
+              onClick={() => {
+                setSuppOpen(true);
+                setTablesOpen(false);
+                setFiguresOpen(false);
+                setLettersOpen(false);
+                setAbstractOpen(false);
+                setAbbrOpen(false);
+              }}
+              className={`px-1.5 py-0.5 rounded text-[11px] font-semibold transition flex items-center gap-1 shrink-0 ${
+                suppOpen
+                  ? 'bg-teal text-white shadow-sm'
+                  : 'text-secondary hover:text-primary hover:bg-slate-100'
+              }`}
+            >
+              📎 {lang === 'tr' ? 'Ek Materyaller' : 'Supplementary'}
+            </button>
+            <button
+              onClick={() => {
+                setAbbrOpen(true);
+                setSuppOpen(false);
+                setTablesOpen(false);
+                setFiguresOpen(false);
+                setLettersOpen(false);
+                setAbstractOpen(false);
+              }}
+              className={`px-1.5 py-0.5 rounded text-[11px] font-semibold transition flex items-center gap-1 shrink-0 ${
+                abbrOpen
+                  ? 'bg-teal text-white shadow-sm'
+                  : 'text-secondary hover:text-primary hover:bg-slate-100'
+              }`}
+            >
+              🔤 {lang === 'tr' ? 'Kısaltmalar' : 'Abbreviations'}
+            </button>
           </div>
         </div>
 
