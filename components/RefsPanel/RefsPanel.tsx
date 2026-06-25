@@ -141,6 +141,14 @@ export function RefsPanel({
     () => new Map(refs.map((ref, index) => [ref.id, index + 1])),
     [refs],
   );
+  const citationStats = useMemo(() => {
+    let cited = 0;
+    for (const ref of refs) {
+      const count = getRefCitationCount?.(ref.id) ?? (refOrder.has(ref.id) ? 1 : 0);
+      if (count > 0) cited += 1;
+    }
+    return { cited, uncited: Math.max(0, refs.length - cited) };
+  }, [getRefCitationCount, refOrder, refs]);
   const visibleRefs = useMemo(() => {
     const q = libraryQuery.trim().toLowerCase();
     const filtered = q
@@ -208,16 +216,6 @@ export function RefsPanel({
         </button>
       </div>
 
-      {/* Cited References Section */}
-      <CitedRefsSection
-        refs={refs}
-        refOrder={refOrder}
-        onSelectRef={onSelectRef}
-        getRefCitationCount={getRefCitationCount}
-        onJumpToRefCitation={onJumpToRefCitation}
-        t={t}
-      />
-
       {tab === 'list' && refs.length > 0 && (
         <div className="px-2 py-1.5 border-b border-border space-y-1.5 text-[10px]">
           <div className="flex items-center justify-between gap-2">
@@ -235,8 +233,9 @@ export function RefsPanel({
               </label>
               {onLookupAll && (
                 <span className="text-muted truncate">
-                  {refs.filter((r) => r.doi).length}/{refs.length} {t('rp_doi_with_count')} · {refs.filter((r) => r.abstract).length}{' '}
-                  {t('rp_abstract_count')}
+                  {citationStats.cited} {t('rp_cited_short')} · {citationStats.uncited} {t('rp_not_cited_short')} ·{' '}
+                  {refs.filter((r) => r.doi).length}/{refs.length} {t('rp_doi_with_count')} ·{' '}
+                  {refs.filter((r) => r.abstract).length} {t('rp_abstract_count')}
                 </span>
               )}
             </div>
@@ -310,6 +309,8 @@ export function RefsPanel({
               highlightedId={selectedId}
               onHighlight={onSelectRef}
               onInsertText={onInsertText}
+              getRefCitationCount={getRefCitationCount}
+              onJumpToRefCitation={onJumpToRefCitation}
               t={t}
             />
           ) : visibleRefs.length > 0 ? (
@@ -327,6 +328,8 @@ export function RefsPanel({
               highlightedId={selectedId}
               onHighlight={onSelectRef}
               onInsertText={onInsertText}
+              getRefCitationCount={getRefCitationCount}
+              onJumpToRefCitation={onJumpToRefCitation}
               t={t}
             />
           ) : (
@@ -564,6 +567,8 @@ function RefList({
   onHighlight,
   onUpdate,
   onInsertText,
+  getRefCitationCount,
+  onJumpToRefCitation,
   t,
 }: {
   refs: Ref[];
@@ -579,6 +584,8 @@ function RefList({
   highlightedId?: string | null;
   onHighlight?: (id: string) => void;
   onInsertText?: (text: string) => void;
+  getRefCitationCount?: (refId: string) => number;
+  onJumpToRefCitation?: (refId: string, direction: 1 | -1) => void;
   t: (k: string) => string;
 }): JSX.Element {
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -614,6 +621,7 @@ function RefList({
         const expanded = expandedId === r.id;
         const isSelected = selectedIds?.has(r.id) ?? false;
         const isHighlighted = useExternalHighlight && highlightedId === r.id;
+        const citationCount = getRefCitationCount?.(r.id) ?? 0;
         return (
           <li
             key={r.id}
@@ -668,6 +676,45 @@ function RefList({
                     {r.doi}
                   </a>
                 )}
+                <div className="mt-1 flex items-center gap-1.5 flex-wrap text-[11px]">
+                  {citationCount > 0 ? (
+                    <>
+                      <span className="rounded-full bg-teal-bg px-2 py-0.5 font-semibold text-teal">
+                        {citationCount} {t('rp_cited_short')}
+                      </span>
+                      {onJumpToRefCitation && (
+                        <>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onJumpToRefCitation(r.id, -1);
+                            }}
+                            className="rounded border border-border px-1.5 py-0.5 text-muted hover:border-teal hover:text-teal disabled:opacity-40"
+                            disabled={citationCount < 1}
+                            title={t('rp_prev_citation')}
+                          >
+                            ↑
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onJumpToRefCitation(r.id, 1);
+                            }}
+                            className="rounded border border-border px-1.5 py-0.5 text-muted hover:border-teal hover:text-teal disabled:opacity-40"
+                            disabled={citationCount < 1}
+                            title={t('rp_next_citation')}
+                          >
+                            ↓
+                          </button>
+                        </>
+                      )}
+                    </>
+                  ) : (
+                    <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 font-semibold text-amber-700">
+                      {t('rp_not_cited')}
+                    </span>
+                  )}
+                </div>
                 <div className="text-xs mt-1 flex items-center gap-2 flex-wrap">
                   {r.doi && (
                     <a

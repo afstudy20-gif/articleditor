@@ -78,4 +78,27 @@ describe('buildDocWithCitations', () => {
     const textNodes = doc.content[0].content.filter((n: any) => n.type === 'text');
     assert.ok(textNodes.some((n: any) => n.text.includes('[2]')));
   });
+
+  it('keeps multiple unicode superscript citations aligned to the original text', () => {
+    const refs = [
+      { id: 'ref-1', raw: 'First reference' },
+      { id: 'ref-2', raw: 'Second reference' },
+    ] as any;
+    const doc = buildDocWithCitations([
+      {
+        text: 'STEMI remains a leading cause of death and disability¹. PCI is the strategy of choice ².',
+      },
+    ], refs) as any;
+
+    const citations = doc.content[0].content.filter((n: any) => n.type === 'citation');
+    assert.equal(citations.length, 2);
+    assert.deepEqual(citations[0].attrs.refIds, ['ref-1']);
+    assert.deepEqual(citations[1].attrs.refIds, ['ref-2']);
+    const text = doc.content[0].content
+      .filter((n: any) => n.type === 'text')
+      .map((n: any) => n.text)
+      .join('');
+    assert.ok(text.includes('disability.'));
+    assert.ok(text.includes('choice .'));
+  });
 });

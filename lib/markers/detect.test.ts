@@ -38,6 +38,14 @@ describe('detectMarkers', () => {
     assert.deepEqual(occ[0]?.refNumbers, [11]);
   });
 
+  it('keeps original indexes when multiple superscript citations are normalized', () => {
+    const text = 'death and disability¹. Because PCI is preferred ².';
+    const occ = detectMarkers(text);
+    assert.deepEqual(occ.map((o) => o.refNumbers), [[1], [2]]);
+    assert.equal(text.slice(occ[0].startIndex, occ[0].endIndex), '¹');
+    assert.equal(text.slice(occ[1].startIndex, occ[1].endIndex), '²');
+  });
+
   it('does not treat the m² unit as a citation', () => {
     assert.equal(detectMarkers('eGFR 1.73 m² at baseline').length, 0);
   });

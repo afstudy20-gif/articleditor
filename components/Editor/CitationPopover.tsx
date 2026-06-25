@@ -99,6 +99,23 @@ export function CitationPopover({
     onReplace(pos, remaining);
   }
 
+  function authorList(r: Ref): string {
+    const names = (r.authors ?? [])
+      .map((a) => a.literal || [a.family, a.given].filter(Boolean).join(', '))
+      .filter(Boolean);
+    return names.length > 0 ? names.join('; ') : '—';
+  }
+
+  function journalLine(r: Ref): string {
+    const volumeIssue = [r.volume, r.issue ? `(${r.issue})` : ''].filter(Boolean).join('');
+    const parts = [
+      r.containerTitle,
+      volumeIssue,
+      r.pages,
+    ].filter(Boolean);
+    return parts.length > 0 ? parts.join(', ') : '—';
+  }
+
   return (
     <>
       <div className="fixed inset-0 z-40 bg-black/10" onClick={onClose} />
@@ -118,24 +135,51 @@ export function CitationPopover({
               <ul className="space-y-2">
                 {cited.map((r) => (
                   <li key={r.id} className="border border-border rounded-lg p-2.5 text-sm">
-                    <div className="font-semibold text-primary leading-snug line-clamp-2">
+                    <div className="font-semibold text-primary leading-snug">
                       {r.title || (tr ? '(Başlıksız)' : '(Untitled)')}
                     </div>
-                    <div className="text-xs text-muted mt-0.5">
-                      {r.authors[0]?.family || '—'}
-                      {r.authors.length > 1 ? ' et al.' : ''} · {r.year ?? '?'} · {r.containerTitle ?? '—'}
+                    <div className="mt-1 grid grid-cols-[72px_1fr] gap-x-2 gap-y-0.5 text-xs text-muted">
+                      <span className="font-semibold text-secondary">{tr ? 'Yazar' : 'Authors'}</span>
+                      <span>{authorList(r)}</span>
+                      <span className="font-semibold text-secondary">{tr ? 'Yıl' : 'Year'}</span>
+                      <span>{r.year ?? '—'}</span>
+                      <span className="font-semibold text-secondary">{tr ? 'Dergi' : 'Journal'}</span>
+                      <span>{journalLine(r)}</span>
+                      {r.doi && (
+                        <>
+                          <span className="font-semibold text-secondary">DOI</span>
+                          <a
+                            href={`https://doi.org/${r.doi}`}
+                            target="_blank"
+                            rel="noopener"
+                            className="text-teal hover:underline break-all"
+                          >
+                            {r.doi}
+                          </a>
+                        </>
+                      )}
+                      {r.pmid && (
+                        <>
+                          <span className="font-semibold text-secondary">PMID</span>
+                          <span>{r.pmid}</span>
+                        </>
+                      )}
+                      {r.url && !r.doi && (
+                        <>
+                          <span className="font-semibold text-secondary">URL</span>
+                          <a href={r.url} target="_blank" rel="noopener" className="text-teal hover:underline break-all">
+                            {r.url}
+                          </a>
+                        </>
+                      )}
+                      {r.raw && (
+                        <>
+                          <span className="font-semibold text-secondary">{tr ? 'Ham' : 'Raw'}</span>
+                          <span className="break-words">{r.raw}</span>
+                        </>
+                      )}
                     </div>
                     <div className="text-xs mt-1.5 flex items-center gap-2">
-                      {r.doi && (
-                        <a
-                          href={`https://doi.org/${r.doi}`}
-                          target="_blank"
-                          rel="noopener"
-                          className="bg-teal-bg text-teal px-1.5 py-0.5 rounded hover:underline"
-                        >
-                          DOI
-                        </a>
-                      )}
                       <div className="flex items-center gap-2 ml-auto">
                         <button
                           onClick={() => {

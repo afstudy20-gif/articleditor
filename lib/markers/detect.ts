@@ -14,17 +14,44 @@ const SUPERSCRIPT_DIGITS: Record<string, string> = {
 };
 
 export function normalizeSuperscripts(s: string): string {
-  return s.replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹]+/g, (m, offset: number) => {
-    const before = s[offset - 1] ?? '';
-    const digits = [...m].map((c) => SUPERSCRIPT_DIGITS[c] ?? c).join('');
-    // Exponent / scientific notation (e.g. 10⁹/L, 2³) — preceded by a digit.
-    if (/\d/.test(before)) return m;
-    // Unit (e.g. m², cm³, mm²) — a lone ²/³ stuck directly to a unit letter.
-    if (m.length === 1 && /[a-zA-Z]/.test(before) && (digits === '2' || digits === '3')) {
-      return m;
+  return normalizeSuperscriptsWithMap(s).text;
+}
+
+type IndexMapEntry = { start: number; end: number };
+
+function normalizeSuperscriptsWithMap(s: string): { text: string; map: IndexMapEntry[] } {
+  let text = '';
+  const map: IndexMapEntry[] = [];
+  let index = 0;
+
+  const push = (chunk: string, start: number, end: number): void => {
+    for (const char of chunk) {
+      text += char;
+      map.push({ start, end });
     }
-    return `[${digits}]`;
-  });
+  };
+
+  while (index < s.length) {
+    const rest = s.slice(index);
+    const match = rest.match(/^[⁰¹²³⁴⁵⁶⁷⁸⁹]+/);
+    if (!match) {
+      const char = s[index];
+      push(char, index, index + char.length);
+      index += char.length;
+      continue;
+    }
+
+    const raw = match[0];
+    const before = s[index - 1] ?? '';
+    const digits = [...raw].map((c) => SUPERSCRIPT_DIGITS[c] ?? c).join('');
+    const rawEnd = index + raw.length;
+    const isExponent = /\d/.test(before);
+    const isUnit = raw.length === 1 && /[a-zA-Z]/.test(before) && (digits === '2' || digits === '3');
+    push(isExponent || isUnit ? raw : `[${digits}]`, index, rawEnd);
+    index = rawEnd;
+  }
+
+  return { text, map };
 }
 
 const RANGE_RE =
@@ -32,7 +59,7 @@ const RANGE_RE =
 
 export function detectMarkers(text: string): MarkerOccurrence[] {
   const out: MarkerOccurrence[] = [];
-  const normalized = normalizeSuperscripts(text);
+  const { text: normalized, map } = normalizeSuperscriptsWithMap(text);
   // Critical: reset lastIndex because RANGE_RE is module-level with /g flag.
   // Without this, repeated calls in the same tick skip earlier matches.
   RANGE_RE.lastIndex = 0;
@@ -42,10 +69,13 @@ export function detectMarkers(text: string): MarkerOccurrence[] {
     const inner = m[1] ?? m[2];
     const refNumbers = expandRange(inner);
     if (refNumbers.length === 0) continue;
+    const start = map[m.index]?.start ?? m.index;
+    const last = map[m.index + raw.length - 1];
+    const end = last?.end ?? (m.index + raw.length);
     out.push({
-      startIndex: m.index,
-      endIndex: m.index + raw.length,
-      raw,
+      startIndex: start,
+      endIndex: end,
+      raw: text.slice(start, end),
       refNumbers,
     });
   }
