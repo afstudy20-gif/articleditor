@@ -46,7 +46,19 @@ describe('detectMarkers', () => {
     assert.equal(text.slice(occ[1].startIndex, occ[1].endIndex), '²');
   });
 
+  it('detects numeric superscripts flattened to baseline text', () => {
+    const text = 'PCI has become the reperfusion strategy of choice 2.';
+    const occ = detectMarkers(text);
+    assert.deepEqual(occ.map((o) => o.refNumbers), [[2]]);
+    assert.equal(text.slice(occ[0].startIndex, occ[0].endIndex), '2');
+  });
+
   it('does not treat the m² unit as a citation', () => {
     assert.equal(detectMarkers('eGFR 1.73 m² at baseline').length, 0);
+  });
+
+  it('does not treat common statistics as flattened citations', () => {
+    const text = 'OR 1.033, 95% CI 1.021-1.045, P < 0.001; no-reflow developed in 72 of 884 patients.';
+    assert.equal(detectMarkers(text).length, 0);
   });
 });

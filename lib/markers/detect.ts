@@ -57,6 +57,10 @@ function normalizeSuperscriptsWithMap(s: string): { text: string; map: IndexMapE
 const RANGE_RE =
   /(?:\[\s*((?:\d+\s*[,;–—\-]?\s*)+)\s*\]|\(\s*((?:\d+\s*[,;–—\-]?\s*)+)\s*\))/g;
 
+const LOOSE_MARKER_RE = /\s(\d{1,3}(?:\s*[,;]\s*\d{1,3})*)(?=[\.,;:](?:\s|$))/g;
+const LOOSE_REJECT_BEFORE_RE =
+  /(?:\b(?:or|rr|hr|ci|auc|sd|se|iqr|p|n|no|table|fig|figure|group|grade|class|type|day|month|year|years?|week|weeks?)|[%=<>±+\-/:])\s*$/i;
+
 export function detectMarkers(text: string): MarkerOccurrence[] {
   const out: MarkerOccurrence[] = [];
   const { text: normalized, map } = normalizeSuperscriptsWithMap(text);
@@ -80,7 +84,57 @@ export function detectMarkers(text: string): MarkerOccurrence[] {
     });
   }
   RANGE_RE.lastIndex = 0;
-  return out;
+  appendLooseNumericMarkers(text, out);
+  return out.sort((a, b) => a.startIndex - b.startIndex);
+}
+
+function appendLooseNumericMarkers(text: string, out: MarkerOccurrence[]): void {
+  LOOSE_MARKER_RE.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = LOOSE_MARKER_RE.exec(text))) {
+    const raw = m[1];
+    const start = m.index + m[0].indexOf(raw);
+    const end = start + raw.length;
+    if (overlapsExistingMarker(start, end, out)) continue;
+    if (!looksLikeFlattenedSuperscriptCitation(text, start, end)) continue;
+    const refNumbers = expandRange(raw);
+    if (refNumbers.length === 0) continue;
+    out.push({
+      startIndex: start,
+      endIndex: end,
+      raw,
+      refNumbers,
+    });
+  }
+  LOOSE_MARKER_RE.lastIndex = 0;
+}
+
+function overlapsExistingMarker(start: number, end: number, out: MarkerOccurrence[]): boolean {
+  return out.some((marker) => start < marker.endIndex && end > marker.startIndex);
+}
+
+function looksLikeFlattenedSuperscriptCitation(text: string, start: number, end: number): boolean {
+  const before = text.slice(0, start);
+  const afterPunctuation = text[end] ?? '';
+  const afterNext = text[end + 1] ?? '';
+  const previousChar = previousNonSpace(before);
+  if (!previousChar || !/[A-Za-zÇĞİÖŞÜçğıöşü\)]/.test(previousChar)) return false;
+  if (afterPunctuation === '.' && /\d/.test(afterNext)) return false;
+
+  const beforeWindow = before.slice(-32);
+  if (LOOSE_REJECT_BEFORE_RE.test(beforeWindow)) return false;
+
+  const numberText = text.slice(start, end).trim();
+  if (/^\d+$/.test(numberText)) {
+    const n = Number(numberText);
+    if (!Number.isInteger(n) || n <= 0 || n > 300) return false;
+  }
+  return true;
+}
+
+function previousNonSpace(text: string): string {
+  const match = text.match(/\S\s*$/);
+  return match ? match[0].trim().slice(-1) : '';
 }
 
 export function expandRange(inner: string): number[] {

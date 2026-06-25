@@ -101,4 +101,20 @@ describe('buildDocWithCitations', () => {
     assert.ok(text.includes('disability.'));
     assert.ok(text.includes('choice .'));
   });
+
+  it('turns flattened baseline numeric citations into citation nodes', () => {
+    const refs = [
+      { id: 'ref-1', raw: 'First reference' },
+      { id: 'ref-2', raw: 'Second reference' },
+    ] as any;
+    const doc = buildDocWithCitations([
+      {
+        text: 'Because PCI is preferred, it is the strategy of choice 2.',
+      },
+    ], refs) as any;
+
+    const citations = doc.content[0].content.filter((n: any) => n.type === 'citation');
+    assert.equal(citations.length, 1);
+    assert.deepEqual(citations[0].attrs.refIds, ['ref-2']);
+  });
 });

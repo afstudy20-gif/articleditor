@@ -173,6 +173,7 @@ export function DocImportModal({
                 <ol className="max-h-[240px] overflow-auto border border-border rounded-lg p-2 space-y-1">
                   {preview.refs.map((r, i) => {
                     const refId = `import-ref-${i}`;
+                    const citationCount = preview.citationCounts[i] || 0;
                     return (
                       <li key={i} className="flex gap-2 items-start">
                         <input
@@ -193,8 +194,13 @@ export function DocImportModal({
                             {r.raw || r.title || (lang === 'tr' ? '(boş)' : '(empty)')}
                           </span>
                           <span className="ml-2 text-[10px] text-muted">
-                            {preview.citationCounts[i] || 0} {lang === 'tr' ? 'atıf' : 'cites'}
+                            {citationCount} {lang === 'tr' ? 'atıf' : 'cites'}
                           </span>
+                          {citationCount === 0 && selectedRefs.has(i) && (
+                            <span className="ml-2 rounded border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] text-amber-700">
+                              {lang === 'tr' ? 'metinde yok, kütüphaneye eklenir' : 'not cited, library only'}
+                            </span>
+                          )}
                         </label>
                       </li>
                     );

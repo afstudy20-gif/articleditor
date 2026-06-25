@@ -127,11 +127,27 @@ function detectHeadingFromRuns(text: string, runs?: ImportRun[]): string | undef
 }
 
 function parseElementToParagraph(element: Element): ImportParagraph {
-  const text = element.textContent ?? '';
   const tagName = element.tagName.toLowerCase();
   const headingMatch = /^h([1-6])$/.exec(tagName);
   let style = headingMatch ? `Heading${headingMatch[1]}` : undefined;
   const runs: ImportRun[] = [];
+  let parsedText = '';
+
+  const pushRun = (
+    runText: string,
+    bold?: boolean,
+    italic?: boolean,
+    underline?: boolean,
+  ): void => {
+    if (!runText) return;
+    runs.push({
+      text: runText,
+      bold: bold || undefined,
+      italic: italic || undefined,
+      underline: underline || undefined,
+    });
+    parsedText += runText;
+  };
 
   const traverse = (
     node: Node,
@@ -141,14 +157,7 @@ function parseElementToParagraph(element: Element): ImportParagraph {
   ): void => {
     if (node.nodeType === 3) {
       const runText = node.textContent ?? '';
-      if (runText) {
-        runs.push({
-          text: runText,
-          bold: boldActive || undefined,
-          italic: italicActive || undefined,
-          underline: underlineActive || undefined,
-        });
-      }
+      pushRun(runText, boldActive, italicActive, underlineActive);
       return;
     }
     if (node.nodeType !== 1) return;
@@ -167,14 +176,42 @@ function parseElementToParagraph(element: Element): ImportParagraph {
     const underline = underlineActive
       || childTag === 'u'
       || inlineStyle.includes('text-decoration:underline');
+    const isSuperscript = childTag === 'sup' || /vertical-align:(super|superscript)/.test(inlineStyle);
+
+    if (isSuperscript) {
+      const raw = child.textContent ?? '';
+      pushRun(
+        htmlCitationText(raw, lastMeaningfulChar(parsedText)),
+        bold,
+        italic,
+        underline,
+      );
+      return;
+    }
 
     child.childNodes.forEach((nested) => traverse(nested, bold, italic, underline));
   };
 
   element.childNodes.forEach((child) => traverse(child, false, false, false));
 
+  const text = parsedText || (element.textContent ?? '');
   if (!style) style = detectHeadingFromRuns(text, runs);
   return { text, style, runs };
+}
+
+const HTML_SUPERSCRIPT_CITATION_SHAPE = /^\s*\d+(?:\s*[,;–—-]\s*\d+)*\s*$/;
+
+function lastMeaningfulChar(s: string): string {
+  const trimmed = s.replace(/\s+$/, '');
+  return trimmed.slice(-1);
+}
+
+function htmlCitationText(text: string, prevChar: string): string {
+  if (!HTML_SUPERSCRIPT_CITATION_SHAPE.test(text)) return text;
+  const trimmed = text.trim();
+  if (/\d/.test(prevChar)) return text;
+  if (/^[23]$/.test(trimmed) && /[a-zA-Z]/.test(prevChar)) return text;
+  return `[${trimmed}]`;
 }
 
 function paragraphToCitationInlineRich(
