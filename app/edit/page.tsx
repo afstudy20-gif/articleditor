@@ -25,6 +25,7 @@ import { DRTR_TOOLS } from '@/lib/i18n';
 import { newId } from '@/lib/id';
 import { parseDocx } from '@/lib/docx/parse';
 import { splitBodyAndBiblio, parseBiblioLines, isBibliographyHeadingText } from '@/lib/refs/parse-biblio';
+import { findMatchingRef } from '@/lib/refs/dedupe';
 import { detectMarkers } from '@/lib/markers/detect';
 import {
   buildDocWithCitations,
@@ -232,14 +233,23 @@ function EditPageInner() {
       selectedIndices && selectedIndices.length > 0
         ? selectedIndices
         : conversionPreview.refs.map((_, i) => i);
-    const refsWithIds: Ref[] = indices.map((idx) => ({
-      ...conversionPreview.refs[idx],
-      id: newId('r'),
-    }));
+    const refsWithIds: Ref[] = [];
+    const refsForCitations: Ref[] = [];
+    for (const idx of indices) {
+      const incomingRef = conversionPreview.refs[idx];
+      const existing = findMatchingRef(refsWithIds, incomingRef);
+      if (existing) {
+        refsForCitations.push(existing);
+        continue;
+      }
+      const refWithId: Ref = { ...incomingRef, id: newId('r') };
+      refsWithIds.push(refWithId);
+      refsForCitations.push(refWithId);
+    }
     const selectedRefNumbers = indices.map((idx) => idx + 1);
     const tiptapDoc = buildDocWithCitations(
       conversionPreview.paragraphs,
-      refsWithIds,
+      refsForCitations,
       selectedRefNumbers,
     );
 

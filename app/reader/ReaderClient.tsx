@@ -17,6 +17,7 @@ import {
   writeProjectJson,
 } from '@/lib/fs/workspace';
 import { fetchPdfBytes, resolvePdfUrl } from '@/lib/pdf/client-source';
+import { findMatchingRef } from '@/lib/refs/dedupe';
 import {
   addNoteToProject,
   deleteNoteFromProject,
@@ -160,13 +161,7 @@ export function ReaderClient() {
         setToast('Project not found');
         return;
       }
-      const dup = p.refs.find(
-        (r) =>
-          (ref.doi && r.doi?.toLowerCase() === ref.doi.toLowerCase()) ||
-          (ref.pmid && r.pmid === ref.pmid) ||
-          (ref.title && r.title?.toLowerCase() === ref.title.toLowerCase()),
-      );
-      if (dup) {
+      if (findMatchingRef(p.refs, ref)) {
         setToast('Already in library');
         return;
       }

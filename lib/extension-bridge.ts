@@ -2,6 +2,7 @@
 
 import { getDb } from '@/store/db';
 import { newId } from '@/lib/id';
+import { findMatchingRef } from '@/lib/refs/dedupe';
 import type { Project, Ref, Author } from '@/store/types';
 
 // Type for external ref data coming from RefDown extension
@@ -58,16 +59,6 @@ function externalToRef(data: ExternalRefData): Ref {
   };
 }
 
-// Check if ref with same DOI/PMID/title already exists in project
-function isDuplicate(refs: Ref[], newRef: Ref): boolean {
-  return refs.some((r) => {
-    if (newRef.doi && r.doi && r.doi.toLowerCase() === newRef.doi.toLowerCase()) return true;
-    if (newRef.pmid && r.pmid && r.pmid === newRef.pmid) return true;
-    if (newRef.title && r.title && r.title.toLowerCase() === newRef.title.toLowerCase()) return true;
-    return false;
-  });
-}
-
 export function setupExtensionBridge(): void {
   if (typeof window === 'undefined') return;
 
@@ -103,7 +94,7 @@ export function setupExtensionBridge(): void {
       const newRef = externalToRef(refData);
 
       // Check duplicate
-      if (isDuplicate(project.refs, newRef)) {
+      if (findMatchingRef(project.refs, newRef)) {
         return { success: false, error: 'Reference already exists', duplicate: true };
       }
 

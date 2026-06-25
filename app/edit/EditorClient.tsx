@@ -16,6 +16,7 @@ import {
   PRINT_HOST_CLASS,
 } from '@/lib/export/print-html';
 import { refsToRis } from '@/lib/refs/ris';
+import { appendUniqueRefs, findMatchingRef } from '@/lib/refs/dedupe';
 import { parseDocx } from '@/lib/docx/parse';
 import { splitBodyAndBiblio, parseBiblioLines, isBibliographyHeadingText } from '@/lib/refs/parse-biblio';
 import { detectMarkers } from '@/lib/markers/detect';
@@ -789,8 +790,12 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
         return;
       }
       const enriched: Ref = (await callLookup(data.ref as Ref).catch(() => data.ref as Ref)) ?? (data.ref as Ref);
+      if (findMatchingRef(refs, enriched)) {
+        alert(t('ed_ref_duplicate'));
+        return;
+      }
       const r: Ref = { ...enriched, id: newRefId() };
-      setRefs((prev) => [...prev, r]);
+      setRefs((prev) => appendUniqueRefs(prev, [r]).refs);
       addHistory(
         'add-ref',
         t('ed_ref_added_doi').replace('{title}', truncate(r.title ?? r.doi ?? r.pmid ?? doi, 60)),
@@ -801,7 +806,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
     } catch (err) {
       alert(t('ed_lookup_error').replace('{msg}', err instanceof Error ? err.message : String(err)));
     }
-  }, [addHistory, t]);
+  }, [addHistory, refs, t]);
 
   const search = useCallback(async (
     query: string,
@@ -822,9 +827,14 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
   }, []);
 
   const addRef = useCallback(
-    (ref: Ref) => {
+    (ref: Ref): Ref | undefined => {
+      const duplicate = findMatchingRef(refs, ref);
+      if (duplicate) {
+        alert(t('ed_ref_duplicate'));
+        return duplicate;
+      }
       const r: Ref = { ...ref, id: newRefId() };
-      setRefs((prev) => [...prev, r]);
+      setRefs((prev) => appendUniqueRefs(prev, [r]).refs);
       addHistory(
         'add-ref',
         t('ed_ref_added').replace('{title}', truncate(r.title ?? r.raw ?? r.id, 60)),
@@ -832,8 +842,9 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
           setRefs((prev) => prev.filter((x) => x.id !== r.id));
         },
       );
+      return r;
     },
-    [addHistory, t],
+    [addHistory, refs, t],
   );
 
   const updateRef = useCallback(
@@ -2324,27 +2335,38 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
       selectedIndices && selectedIndices.length > 0
         ? selectedIndices
         : importPreview.refs.map((_, i) => i);
-    const newRefs: Ref[] = indices.map((idx) => ({
-      ...importPreview.refs[idx],
-      id: newRefId(),
-    }));
+    const pool: Ref[] = replace ? [] : [...refs];
+    const refsForCitations: Ref[] = [];
+    const refsToAdd: Ref[] = [];
+    for (const idx of indices) {
+      const incomingRef = importPreview.refs[idx];
+      const existing = findMatchingRef(pool, incomingRef);
+      if (existing) {
+        refsForCitations.push(existing);
+        continue;
+      }
+      const refWithId: Ref = { ...incomingRef, id: newRefId() };
+      pool.push(refWithId);
+      refsForCitations.push(refWithId);
+      refsToAdd.push(refWithId);
+    }
     // Build TipTap doc with citation nodes inserted at [N], [N,M], [N-M] marker positions.
     // Re-map citation markers so only selected references are cited and their
     // numbers are compressed to the new bibliography order.
     const selectedRefNumbers = indices.map((idx) => idx + 1);
     const newDoc = buildDocWithCitations(
       importPreview.paragraphs,
-      newRefs,
+      refsForCitations,
       selectedRefNumbers,
     );
     if (replace) {
-      setRefs(newRefs);
+      setRefs(refsToAdd);
       setDoc(newDoc);
       setAbstractText(importPreview.abstractText ?? '');
       setKeywords(importPreview.keywords ?? []);
       setManuscriptTables(importPreview.tables ?? []);
     } else {
-      setRefs((prev) => [...prev, ...newRefs]);
+      setRefs((prev) => appendUniqueRefs(prev, refsToAdd).refs);
       setDoc((prev: any) => mergeTipTapDocs(prev, newDoc));
       if (importPreview.tables?.length) {
         setManuscriptTables((prev) => [...prev, ...importPreview.tables!]);
@@ -3126,10 +3148,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
           <DeepResearchPanel
             initialAbstract={detectAbstract()}
             onClose={() => setResearchOpen(false)}
-            onAddRef={(r) => {
-              const newRef: Ref = { ...r, id: newRefId() };
-              setRefs((prev) => [...prev, newRef]);
-            }}
+            onAddRef={addRef}
           />
         </div>
       )}
