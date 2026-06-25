@@ -49,6 +49,30 @@ describe('splitAbstractMetadataFromParagraphs', () => {
     assert.deepEqual(out.bodyParagraphs.map((p) => p.text), ['Title', 'Introduction', 'Main body.']);
   });
 
+  it('keeps structured abstract subheadings inside the abstract', () => {
+    const out = splitAbstractMetadataFromParagraphs([
+      paragraph('Title', 'Heading1'),
+      paragraph('Abstract', 'Heading2'),
+      paragraph('Background: Primary PCI outcomes depend on rapid reperfusion.'),
+      paragraph('Results: No-reflow developed in 72 of 884 patients.'),
+      paragraph('Conclusion: MPV-based modification discriminated no-reflow.'),
+      paragraph('Keywords: no-reflow; STEMI'),
+      paragraph('Introduction'),
+      paragraph('Main body.'),
+    ]);
+
+    assert.equal(
+      out.abstractText,
+      [
+        'Background: Primary PCI outcomes depend on rapid reperfusion.',
+        'Results: No-reflow developed in 72 of 884 patients.',
+        'Conclusion: MPV-based modification discriminated no-reflow.',
+      ].join('\n\n'),
+    );
+    assert.deepEqual(out.keywords, ['no-reflow', 'STEMI']);
+    assert.deepEqual(out.bodyParagraphs.map((p) => p.text), ['Title', 'Introduction', 'Main body.']);
+  });
+
   it('extracts keyword-only metadata without an abstract section', () => {
     const out = splitAbstractMetadataFromParagraphs([
       paragraph('Keywords'),

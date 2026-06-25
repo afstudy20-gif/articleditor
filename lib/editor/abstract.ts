@@ -5,6 +5,8 @@ const ABSTRACT_HEADING_RE = /^(abstract|summary|öz|özet)\s*[:：]?\s*$/i;
 const KEYWORD_LABEL = String.raw`(?:key\s*words?|keywords?|anahtar\s+(?:kelimeler|sözcükler))`;
 const KEYWORD_INLINE_RE = new RegExp(`^${KEYWORD_LABEL}\\b\\s*(?:[:：\\-–—]\\s*|\\s+)(.+)$`, 'i');
 const KEYWORD_HEADING_RE = new RegExp(`^${KEYWORD_LABEL}\\b\\s*[:：]?\\s*$`, 'i');
+const STRUCTURED_ABSTRACT_INLINE_RE =
+  /^(background|objectives?|aims?|purpose|methods?|materials?(?:\s+and\s+methods)?|patients?(?:\s+and\s+methods)?|results?|findings?|conclusions?|arka\s+plan|ama[çc](?:lar)?|hedef(?:ler)?|y[öo]ntem(?:ler)?|materyal|hastalar|bulgular|sonu[çc](?:lar)?)\s*[:：]\s*\S/i;
 const SECTION_HEADING_RE =
   /^(introduction|background|methods?|materials?(?:\s+and\s+methods)?|patients?(?:\s+and\s+methods)?|results?|findings?|discussion|conclusions?|limitations?|references?|bibliography|keywords?|acknowledg(?:e)?ments?|funding|conflicts?\s+of\s+interest|ethics|giri[şs]|arka\s+plan|y[öo]ntem(?:ler)?|materyal|hastalar|bulgular|tart[ıi][şs]ma|sonu[çc](?:lar)?|k[ıi]s[ıi]tl[ıi]l[ıi]klar|kaynak(?:lar|ça|ca)?|anahtar\s+kelimeler|te[şs]ekkür|finansman|[çc][ıi]kar\s+[çc]at[ıi][şs]mas[ıi]|etik)\b/i;
 
@@ -90,6 +92,7 @@ function isAbstractBoundary(paragraph: ImportParagraph, hasAbstractText: boolean
   const style = paragraph.style?.toLowerCase() ?? '';
   const styledHeading = style.includes('heading') || style === 'title' || style === 'subtitle';
   if (styledHeading && hasAbstractText) return true;
+  if (STRUCTURED_ABSTRACT_INLINE_RE.test(text)) return false;
   return hasAbstractText && SECTION_HEADING_RE.test(text);
 }
 
