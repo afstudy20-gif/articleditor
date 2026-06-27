@@ -96,6 +96,17 @@ export type ProjectDocument = {
   updatedAt: number;
 };
 
+export type ProjectAsset = {
+  id: string;
+  name: string;
+  type: string;
+  size: number;
+  dataUrl: string;
+  createdAt: number;
+  updatedAt: number;
+  diskPath?: string;
+};
+
 export type Project = {
   id: string;
   title: string;
@@ -116,6 +127,7 @@ export type Project = {
   };
   deleted?: number | null;
   documents?: ProjectDocument[];
+  assets?: ProjectAsset[];
   supplementary?: string;
   /** Passages captured from the PDF reader for use while writing. */
   notes?: ProjectNote[];

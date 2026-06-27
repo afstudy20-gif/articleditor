@@ -102,6 +102,40 @@ export async function savePdfToProjectSources(
   return { path: `${projectDirName}/sources/${finalName}`, filename: finalName };
 }
 
+export async function saveFileToProjectAssets(
+  root: FileSystemDirectoryHandle,
+  projectName: string,
+  file: File,
+): Promise<{ path: string; filename: string }> {
+  const projectDirName = sanitizeName(projectName, 'project');
+  const projectDir = await root.getDirectoryHandle(projectDirName, { create: true });
+  const assetsDir = await projectDir.getDirectoryHandle('assets', { create: true });
+
+  const finalName = await uniqueName(assetsDir, sanitizeName(file.name || 'file', 'file'));
+  const fileHandle = await assetsDir.getFileHandle(finalName, { create: true });
+  const writable = await fileHandle.createWritable();
+  try {
+    await writable.write(file);
+  } finally {
+    await writable.close();
+  }
+  return { path: `${projectDirName}/assets/${finalName}`, filename: finalName };
+}
+
+export async function deleteWorkspacePath(
+  root: FileSystemDirectoryHandle,
+  relativePath: string,
+): Promise<void> {
+  const parts = relativePath.split('/').filter(Boolean);
+  if (parts.length < 2) return;
+
+  let dir = root;
+  for (const part of parts.slice(0, -1)) {
+    dir = await dir.getDirectoryHandle(part);
+  }
+  await dir.removeEntry(parts[parts.length - 1]);
+}
+
 /**
  * Write annotations for a saved PDF to `sources/<pdfStem>.annotations.json` so
  * the drawings travel with the document. `pdfFilename` is the actual name the

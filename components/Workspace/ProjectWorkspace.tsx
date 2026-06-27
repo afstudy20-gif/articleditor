@@ -23,6 +23,7 @@ import {
 import { parseTitlePageAuthors } from '@/lib/letters/parse-title-page-author';
 import { fillTemplateVars, hasTemplateVars } from '@/lib/letters/fill-template';
 import { t as tI18n } from '@/lib/i18n';
+import { ProjectAssetsPanel } from '@/components/Workspace/ProjectAssetsPanel';
 
 interface ProjectWorkspaceProps {
   project: Project;
@@ -1304,7 +1305,7 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
 
       {view === 'dashboard' ? (
         <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 w-full flex-1 flex flex-col gap-8">
-          <div className="grid md:grid-cols-2 gap-6 items-stretch">
+          <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-6 items-stretch">
             {/* Branch 1: Ana Yazı (Manuscript Editor) */}
             <div
               onClick={onOpenManuscript}
@@ -1412,6 +1413,8 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
                 </button>
               </div>
             </div>
+
+            <ProjectAssetsPanel project={project} onSaved={onSaved} />
           </div>
         </main>
       ) : (
