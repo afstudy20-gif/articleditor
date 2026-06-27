@@ -45,6 +45,13 @@ import { ProjectWorkspace } from '@/components/Workspace/ProjectWorkspace';
 import { LocalFolderCard } from '@/components/Workspace/LocalFolderCard';
 import { SiteHeader } from '@/components/SiteChrome';
 
+function formatAssetBytes(bytes: number): string {
+  if (!bytes) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  return `${(bytes / 1024 ** i).toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
+}
+
 function EditPageInner() {
   const { t, lang } = useLang();
   const searchParams = useSearchParams();
@@ -542,8 +549,8 @@ function EditPageInner() {
                     </button>
                   </div>
 
-                  {/* Card Body: The 2 Branches */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-1">
+                  {/* Card Body: Project branches */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-1">
                     {/* Branch 1: Ana Yazı */}
                     <div
                       onClick={() => {
@@ -578,6 +585,26 @@ function EditPageInner() {
                         </div>
                         <div className="text-[10px] text-muted leading-tight mt-0.5">
                           {p.documents ? p.documents.length : 0} {lang === 'tr' ? 'ek belge' : 'documents'}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Branch 3: Project file pool */}
+                    <div
+                      onClick={() => {
+                        setActiveId(p.id);
+                        setActiveSubView('workspace');
+                      }}
+                      className="border border-border rounded-lg p-2.5 bg-slate-50/30 hover:border-sky-500/40 hover:bg-sky-50/30 cursor-pointer text-left transition flex items-center gap-2.5 group"
+                    >
+                      <span className="text-lg group-hover:scale-110 transition shrink-0">📦</span>
+                      <div>
+                        <div className="text-xs font-bold text-primary leading-tight group-hover:text-sky-700 transition">
+                          Project Files
+                        </div>
+                        <div className="text-[10px] text-muted leading-tight mt-0.5">
+                          {p.assets ? p.assets.length : 0} {lang === 'tr' ? 'dosya' : 'files'} ·{' '}
+                          {formatAssetBytes((p.assets ?? []).reduce((sum, asset) => sum + asset.size, 0))}
                         </div>
                       </div>
                     </div>
