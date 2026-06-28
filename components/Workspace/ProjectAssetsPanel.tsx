@@ -42,6 +42,16 @@ function assetIcon(asset: ProjectAsset): string {
   return '📎';
 }
 
+function formatAddedAt(time: number): string {
+  return new Date(time).toLocaleString(undefined, {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 export function ProjectAssetsPanel({ project, onSaved }: Props) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [busy, setBusy] = useState(false);
@@ -190,7 +200,7 @@ export function ProjectAssetsPanel({ project, onSaved }: Props) {
                   <span className="min-w-0">
                     <span className="block text-xs font-bold text-primary leading-snug truncate">{asset.name}</span>
                     <span className="block text-[9px] text-muted truncate">
-                      {formatBytes(asset.size)}
+                      {formatBytes(asset.size)} · Eklendi: {formatAddedAt(asset.createdAt)}
                       {asset.diskPath ? ` · ${asset.diskPath}` : ''}
                     </span>
                   </span>
