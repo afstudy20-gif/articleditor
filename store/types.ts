@@ -105,6 +105,7 @@ export type ProjectAsset = {
   createdAt: number;
   updatedAt: number;
   diskPath?: string;
+  submissionIncluded?: boolean;
 };
 
 export type Project = {

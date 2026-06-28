@@ -34,6 +34,15 @@ declare global {
   }
 }
 
+function dataUrlToFile(dataUrl: string, name: string, type: string): File {
+  const [meta, base64] = dataUrl.split(',');
+  const mime = type || meta.match(/data:([^;]+)/)?.[1] || 'application/octet-stream';
+  const binary = atob(base64 ?? '');
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return new File([bytes], name, { type: mime });
+}
+
 export function ReaderClient() {
   const [source, setSource] = useState<File | string | null>(null);
   const [urlInput, setUrlInput] = useState('');
@@ -43,6 +52,7 @@ export function ReaderClient() {
   const [notes, setNotes] = useState<ProjectNote[]>([]);
   const [tab, setTab] = useState<'citations' | 'notes'>('citations');
   const [useArtedViewer, setUseArtedViewer] = useState(false);
+  const [autoScanCitations, setAutoScanCitations] = useState(false);
   const printFrameRef = useRef<HTMLIFrameElement | null>(null);
 
   useEffect(() => {
@@ -116,6 +126,26 @@ export function ReaderClient() {
 
   useEffect(() => {
     const params = new URL(window.location.href).searchParams;
+    setAutoScanCitations(params.get('scan') === '1');
+    const assetProjectId = params.get('projectId');
+    const assetId = params.get('assetId');
+    if (assetProjectId && assetId) {
+      setUseArtedViewer(params.get('viewer') === 'arted');
+      setProjectId(assetProjectId);
+      getProject(assetProjectId)
+        .then((project) => {
+          const asset = project?.assets?.find((item) => item.id === assetId);
+          if (!asset) {
+            setToast('PDF bulunamadı');
+            return;
+          }
+          setSource(dataUrlToFile(asset.dataUrl, asset.name, asset.type));
+        })
+        .catch(() => {
+          setToast('PDF açılamadı');
+        });
+      return;
+    }
     const url = params.get('url');
     setUseArtedViewer(params.get('viewer') === 'arted');
     if (!url) return;
@@ -330,7 +360,7 @@ export function ReaderClient() {
             </div>
             <div className="flex-1 overflow-auto">
               {tab === 'citations' ? (
-                <CitationPanel doc={doc} onAddRef={handleAddRef} />
+                <CitationPanel doc={doc} onAddRef={handleAddRef} autoScan={autoScanCitations} />
               ) : (
                 <NotesPanel notes={notes} hasProject={!!projectId} onDelete={handleDeleteNote} />
               )}

@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import JSZip from 'jszip';
 import type { Project, ProjectAsset } from '@/store/types';
 import { saveProject } from '@/store/db';
 import { newId } from '@/lib/id';
@@ -11,10 +12,16 @@ import {
   isFsAccessSupported,
   saveFileToProjectAssets,
 } from '@/lib/fs/workspace';
+import { queueProjectAssetAction, type ProjectAssetActionType } from '@/lib/assets/pending-action';
+import { buildRichDocx } from '@/lib/docx/build-rich';
+import { docxFilename, plainTextToTiptapDoc } from '@/lib/docx/plain-text';
+import { AcademicImageConverterModal } from '@/components/Workspace/AcademicImageConverterModal';
+import type { AcademicImageResult } from '@/lib/image/academic-converter';
 
 type Props = {
   project: Project;
   onSaved: (updatedProject: Project) => void;
+  onOpenManuscript: () => void;
 };
 
 function formatBytes(bytes: number): string {
@@ -31,6 +38,33 @@ function fileToDataUrl(file: File): Promise<string> {
     reader.onload = () => resolve(String(reader.result));
     reader.readAsDataURL(file);
   });
+}
+
+function dataUrlToBytes(dataUrl: string): Uint8Array {
+  const base64 = dataUrl.split(',')[1] ?? '';
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+function safeFilename(name: string, fallback = 'file'): string {
+  const clean = name
+    .normalize('NFKC')
+    .replace(/[<>:"/\\|?*\u0000-\u001f]/g, '-')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/[.\s]+$/g, '');
+  return clean || fallback;
+}
+
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
 }
 
 function assetIcon(asset: ProjectAsset): string {
@@ -52,11 +86,31 @@ function formatAddedAt(time: number): string {
   });
 }
 
-export function ProjectAssetsPanel({ project, onSaved }: Props) {
+function isDocx(asset: ProjectAsset): boolean {
+  return /\.docx$/i.test(asset.name) || asset.type.includes('wordprocessingml');
+}
+
+function isPdf(asset: ProjectAsset): boolean {
+  return /\.pdf$/i.test(asset.name) || asset.type.includes('pdf');
+}
+
+function isImage(asset: ProjectAsset): boolean {
+  return asset.type.startsWith('image/');
+}
+
+function isTableLike(asset: ProjectAsset): boolean {
+  return /\.(xlsx|csv|tsv|txt|html?)$/i.test(asset.name) || /text\/(csv|tab-separated-values|plain|html)/i.test(asset.type);
+}
+
+export function ProjectAssetsPanel({ project, onSaved, onOpenManuscript }: Props) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [busy, setBusy] = useState(false);
+  const [exportBusy, setExportBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [menuAssetId, setMenuAssetId] = useState<string | null>(null);
+  const [converterAsset, setConverterAsset] = useState<ProjectAsset | null>(null);
   const assets = project.assets ?? [];
+  const submissionAssets = assets.filter((asset) => asset.submissionIncluded);
   const totalSize = assets.reduce((sum, asset) => sum + asset.size, 0);
 
   const updateProject = async (nextAssets: ProjectAsset[]) => {
@@ -111,10 +165,7 @@ export function ProjectAssetsPanel({ project, onSaved }: Props) {
   };
 
   const downloadAsset = (asset: ProjectAsset) => {
-    const a = document.createElement('a');
-    a.href = asset.dataUrl;
-    a.download = asset.name;
-    a.click();
+    downloadBlob(new Blob([dataUrlToBytes(asset.dataUrl)], { type: asset.type }), asset.name);
   };
 
   const openAsset = (asset: ProjectAsset) => {
@@ -143,6 +194,138 @@ export function ProjectAssetsPanel({ project, onSaved }: Props) {
       setError('Dosya silinemedi');
     } finally {
       setBusy(false);
+    }
+  };
+
+  const runManuscriptAction = (asset: ProjectAsset, type: ProjectAssetActionType) => {
+    queueProjectAssetAction({ projectId: project.id, assetId: asset.id, type });
+    setMenuAssetId(null);
+    onOpenManuscript();
+  };
+
+  const openPdfReader = (asset: ProjectAsset, scan = false) => {
+    try {
+      const params = new URLSearchParams({
+        projectId: project.id,
+        assetId: asset.id,
+        viewer: 'arted',
+      });
+      if (scan) params.set('scan', '1');
+      window.open(`/reader?${params.toString()}`, '_blank', 'noopener,noreferrer');
+      setMenuAssetId(null);
+    } catch {
+      setError('PDF reader açılamadı');
+    }
+  };
+
+  const toggleSubmission = async (asset: ProjectAsset) => {
+    setMenuAssetId(null);
+    await updateProject(assets.map((item) => (
+      item.id === asset.id
+        ? { ...item, submissionIncluded: !item.submissionIncluded, updatedAt: Date.now() }
+        : item
+    )));
+  };
+
+  const saveConvertedImage = async (result: AcademicImageResult) => {
+    const file = new File([result.blob], result.filename, { type: result.blob.type || 'application/octet-stream' });
+    const now = Date.now();
+    let diskPath: string | undefined;
+    const root = isFsAccessSupported() ? await getWorkspaceRoot() : null;
+    if (root && (await ensureWritePermission(root.handle))) {
+      try {
+        diskPath = (await saveFileToProjectAssets(root.handle, project.title, file)).path;
+      } catch {
+        diskPath = undefined;
+      }
+    }
+    await updateProject([
+      ...assets,
+      {
+        id: newId('asset'),
+        name: result.filename,
+        type: file.type,
+        size: file.size,
+        dataUrl: await fileToDataUrl(file),
+        createdAt: now,
+        updatedAt: now,
+        diskPath,
+      },
+    ]);
+  };
+
+  const exportSubmissionPackage = async () => {
+    if (exportBusy) return;
+    setExportBusy(true);
+    setError(null);
+    try {
+      const zip = new JSZip();
+      const rootName = safeFilename(project.title, 'submission');
+      const refsById = new Map(project.refs.map((ref) => [ref.id, ref]));
+      const refOrder = new Map(project.refs.map((ref, index) => [ref.id, index + 1]));
+
+      if (project.doc) {
+        const manuscript = await buildRichDocx({
+          doc: project.doc,
+          refsById,
+          refOrder,
+          style: (project.settings?.style as any) ?? 'vancouver',
+          mode: 'plain',
+          title: project.title,
+          abstractText: project.abstractText,
+          keywords: project.keywords,
+          includeDocumentTitle: true,
+          includeBibliography: true,
+          figureCaptionPlacement: project.settings?.figureCaptionPlacement ?? 'inline',
+          fontFamily: project.settings?.fontFamily,
+        });
+        zip.file(`manuscript/${docxFilename(project.title)}`, await manuscript.arrayBuffer());
+      }
+
+      for (const document of project.documents ?? []) {
+        const blob = await buildRichDocx({
+          doc: plainTextToTiptapDoc(document.content),
+          refsById,
+          refOrder,
+          style: 'vancouver',
+          mode: 'plain',
+          title: document.title,
+          includeDocumentTitle: false,
+          includeBibliography: false,
+        });
+        zip.file(`documents/${docxFilename(document.title)}`, await blob.arrayBuffer());
+      }
+
+      for (const asset of submissionAssets) {
+        zip.file(`assets/${safeFilename(asset.name, 'asset')}`, dataUrlToBytes(asset.dataUrl));
+      }
+
+      zip.file('manifest.json', JSON.stringify({
+        projectId: project.id,
+        title: project.title,
+        exportedAt: new Date().toISOString(),
+        manuscriptIncluded: Boolean(project.doc),
+        documents: (project.documents ?? []).map((document) => ({
+          id: document.id,
+          title: document.title,
+          type: document.type,
+          updatedAt: document.updatedAt,
+        })),
+        assets: submissionAssets.map((asset) => ({
+          id: asset.id,
+          name: asset.name,
+          type: asset.type,
+          size: asset.size,
+          createdAt: asset.createdAt,
+        })),
+      }, null, 2));
+
+      const blob = await zip.generateAsync({ type: 'blob', mimeType: 'application/zip' });
+      downloadBlob(blob, `${rootName}-submission.zip`);
+    } catch {
+      setError('Submission paketi oluşturulamadı');
+    } finally {
+      setExportBusy(false);
     }
   };
 
@@ -198,14 +381,99 @@ export function ProjectAssetsPanel({ project, onSaved }: Props) {
                 >
                   <span className="text-base shrink-0">{assetIcon(asset)}</span>
                   <span className="min-w-0">
-                    <span className="block text-xs font-bold text-primary leading-snug truncate">{asset.name}</span>
+                    <span className="block text-xs font-bold text-primary leading-snug truncate">
+                      {asset.name}
+                      {asset.submissionIncluded && (
+                        <span className="ml-1 text-[9px] text-emerald-700 bg-emerald-50 border border-emerald-100 rounded px-1 py-0.5 align-middle">
+                          paket
+                        </span>
+                      )}
+                    </span>
                     <span className="block text-[9px] text-muted truncate">
                       {formatBytes(asset.size)} · Eklendi: {formatAddedAt(asset.createdAt)}
                       {asset.diskPath ? ` · ${asset.diskPath}` : ''}
                     </span>
                   </span>
                 </button>
-                <div className="flex items-center gap-1 shrink-0">
+                <div className="relative flex items-center gap-1 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setMenuAssetId((current) => current === asset.id ? null : asset.id)}
+                    className="text-[10px] font-bold text-sky-700 border border-sky-200 bg-sky-50 hover:bg-sky-100 rounded-md px-2 py-1 transition"
+                    title="Use"
+                  >
+                    Use
+                  </button>
+                  {menuAssetId === asset.id && (
+                    <>
+                      <button
+                        type="button"
+                        className="fixed inset-0 z-40 cursor-default"
+                        onClick={() => setMenuAssetId(null)}
+                        aria-label="Menüyü kapat"
+                      />
+                      <div className="absolute right-0 top-8 z-50 w-52 rounded-lg border border-border bg-white shadow-lg p-1 text-left">
+                        <button
+                          type="button"
+                          disabled={!isDocx(asset)}
+                          onClick={() => runManuscriptAction(asset, 'import-docx')}
+                          className="w-full text-left text-xs px-2.5 py-2 rounded-md hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          Editöre aktar
+                        </button>
+                        <button
+                          type="button"
+                          disabled={!isPdf(asset)}
+                          onClick={() => openPdfReader(asset)}
+                          className="w-full text-left text-xs px-2.5 py-2 rounded-md hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          PDF reader’da aç
+                        </button>
+                        <button
+                          type="button"
+                          disabled={!isPdf(asset)}
+                          onClick={() => openPdfReader(asset, true)}
+                          className="w-full text-left text-xs px-2.5 py-2 rounded-md hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          Atıf kütüphanesine aktar
+                        </button>
+                        <button
+                          type="button"
+                          disabled={!isImage(asset)}
+                          onClick={() => runManuscriptAction(asset, 'insert-figure')}
+                          className="w-full text-left text-xs px-2.5 py-2 rounded-md hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          Figure ekle
+                        </button>
+                        <button
+                          type="button"
+                          disabled={!isImage(asset)}
+                          onClick={() => {
+                            setConverterAsset(asset);
+                            setMenuAssetId(null);
+                          }}
+                          className="w-full text-left text-xs px-2.5 py-2 rounded-md hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          Akademik görsel dönüştür
+                        </button>
+                        <button
+                          type="button"
+                          disabled={!isTableLike(asset)}
+                          onClick={() => runManuscriptAction(asset, 'import-table')}
+                          className="w-full text-left text-xs px-2.5 py-2 rounded-md hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          Tabloya aktar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void toggleSubmission(asset)}
+                          className="w-full text-left text-xs px-2.5 py-2 rounded-md hover:bg-slate-50"
+                        >
+                          {asset.submissionIncluded ? 'Submission paketinden çıkar' : 'Submission paketine ekle'}
+                        </button>
+                      </div>
+                    </>
+                  )}
                   <button
                     type="button"
                     onClick={() => downloadAsset(asset)}
@@ -230,6 +498,16 @@ export function ProjectAssetsPanel({ project, onSaved }: Props) {
       </div>
 
       {error && <p className="text-[11px] text-red font-semibold mb-2">{error}</p>}
+      {submissionAssets.length > 0 && (
+        <button
+          type="button"
+          disabled={exportBusy}
+          onClick={() => void exportSubmissionPackage()}
+          className="btn-primary w-full py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 mb-2"
+        >
+          {exportBusy ? 'Paket hazırlanıyor...' : `Submission ZIP indir (${submissionAssets.length})`}
+        </button>
+      )}
       <button
         type="button"
         disabled={busy}
@@ -238,6 +516,13 @@ export function ProjectAssetsPanel({ project, onSaved }: Props) {
       >
         {busy ? 'Ekleniyor...' : '➕ Dosya Ekle'}
       </button>
+      {converterAsset && (
+        <AcademicImageConverterModal
+          asset={converterAsset}
+          onClose={() => setConverterAsset(null)}
+          onSave={saveConvertedImage}
+        />
+      )}
     </div>
   );
 }

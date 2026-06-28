@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import type { Ref } from '@/store/types';
 import { extractIds, getPdfMetadata, getPdfText } from '@/lib/pdf/extract';
@@ -10,6 +10,7 @@ import { newId } from '@/lib/id';
 type Props = {
   doc: PDFDocumentProxy | null;
   onAddRef?: (ref: Ref) => void;
+  autoScan?: boolean;
 };
 
 type Candidate = {
@@ -21,11 +22,12 @@ type Candidate = {
   err?: string;
 };
 
-export function CitationPanel({ doc, onAddRef }: Props) {
+export function CitationPanel({ doc, onAddRef, autoScan = false }: Props) {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [scanning, setScanning] = useState(false);
+  const scannedDoc = useRef<PDFDocumentProxy | null>(null);
 
-  async function scan() {
+  const scan = useCallback(async () => {
     if (!doc) return;
     setScanning(true);
     try {
@@ -72,7 +74,13 @@ export function CitationPanel({ doc, onAddRef }: Props) {
     } finally {
       setScanning(false);
     }
-  }
+  }, [doc]);
+
+  useEffect(() => {
+    if (!autoScan || !doc || scannedDoc.current === doc) return;
+    scannedDoc.current = doc;
+    void scan();
+  }, [autoScan, doc, scan]);
 
   return (
     <div className="flex h-full flex-col bg-white">

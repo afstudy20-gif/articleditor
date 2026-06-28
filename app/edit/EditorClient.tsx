@@ -92,6 +92,10 @@ import {
 } from '@/lib/editor/import-rich';
 import { splitAbstractMetadataFromParagraphs } from '@/lib/editor/abstract';
 import { extractProjectTables } from '@/lib/tables/project-tables';
+import { projectTableFromParsed } from '@/lib/tables/project-tables';
+import { parseTable, rowsToTiptapTable } from '@/lib/tables/parse-table';
+import { parseXlsxFirstSheet } from '@/lib/tables/xlsx';
+import { consumeProjectAssetAction } from '@/lib/assets/pending-action';
 import {
   encodeSelection,
   decodeToTipTapContent,
@@ -109,6 +113,19 @@ type Props = {
   onExitToProjects?: () => void;
   onGoToDocuments?: () => void;
 };
+
+function dataUrlToBytes(dataUrl: string): Uint8Array {
+  const base64 = dataUrl.split(',')[1] ?? '';
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+function dataUrlToText(dataUrl: string): string {
+  const bytes = dataUrlToBytes(dataUrl);
+  return new TextDecoder().decode(bytes);
+}
 
 export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoToDocuments }: Props) {
   const { t, lang } = useLang();
@@ -407,6 +424,85 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
   const projectImportRef = useRef<HTMLInputElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
   const dragMode = useRef<'topCol' | 'bottomCol' | 'row' | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const action = consumeProjectAssetAction(project.id);
+    if (!action) return undefined;
+
+    const waitForEditor = async (): Promise<any> => {
+      for (let i = 0; i < 40; i += 1) {
+        const ed = editorInstance.current;
+        if (ed && !ed.isDestroyed) return ed;
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+      return null;
+    };
+
+    const run = async (): Promise<void> => {
+      const asset = project.assets?.find((item) => item.id === action.assetId);
+      if (!asset) {
+        setImportError('Havuz dosyası bulunamadı');
+        return;
+      }
+
+      const ed = await waitForEditor();
+      if (cancelled) return;
+      if (!ed) {
+        setImportError('Editör hazır değil');
+        return;
+      }
+
+      try {
+        if (action.type === 'import-docx') {
+          const preview = await buildImportPreviewFromDocxAsset(asset);
+          if (!cancelled) applyImportPreviewData(preview, false);
+          return;
+        }
+
+        if (action.type === 'insert-figure') {
+          ed.commands.insertFigure({
+            src: asset.dataUrl,
+            caption: asset.name.replace(/\.[^.]+$/, ''),
+            kind: 'figure',
+          });
+          setDoc(ed.getJSON());
+          return;
+        }
+
+        if (action.type === 'import-table') {
+          const parsed = /\.xlsx$/i.test(asset.name)
+            ? await parseXlsxFirstSheet(dataUrlToBytes(asset.dataUrl))
+            : parseTable(dataUrlToText(asset.dataUrl));
+          if (!parsed) {
+            setImportError('Tablo algılanamadı');
+            return;
+          }
+          const tableJson = rowsToTiptapTable(parsed.rows, parsed.hasHeader, {
+            title: parsed.title ?? asset.name.replace(/\.[^.]+$/, ''),
+            footnote: parsed.footnote,
+          });
+          if (!tableJson) {
+            setImportError('Tablo içeri aktarılamadı');
+            return;
+          }
+          ed.chain().focus().insertContent(tableJson).run();
+          setDoc(ed.getJSON());
+          setManuscriptTables((prev) => [...prev, projectTableFromParsed(parsed, asset.name)]);
+        }
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        setImportError(`Havuz dosyası kullanılamadı: ${msg}`);
+      }
+    };
+
+    void run();
+    return () => {
+      cancelled = true;
+    };
+    // Consume a queued asset action once when the manuscript view opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project.id]);
 
   function startTopColDrag(e: React.MouseEvent): void {
     e.preventDefault();
@@ -2267,6 +2363,41 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
     }
   }
 
+  async function buildImportPreviewFromDocxAsset(
+    asset: NonNullable<Project['assets']>[number],
+  ): Promise<NonNullable<ImportPreview>> {
+    const { paragraphs, plainText } = await parseDocx(dataUrlToBytes(asset.dataUrl));
+    const split = splitBodyAndBiblio(plainText);
+    const { refs: parsedRefs } = parseBiblioLines(split.refLines);
+
+    let referencesStartIndex = paragraphs.length;
+    for (let i = 0; i < paragraphs.length; i += 1) {
+      if (isBibliographyHeadingText(paragraphs[i].text)) {
+        referencesStartIndex = i;
+        break;
+      }
+    }
+
+    const { bodyParagraphs, abstractText: importedAbstract, keywords: importedKeywords } =
+      splitAbstractMetadataFromParagraphs(paragraphs.slice(0, referencesStartIndex));
+    const { paragraphs: manuscriptParagraphs, tables } = extractProjectTables(bodyParagraphs, asset.name);
+    const bodyText = manuscriptParagraphs.map((p) => p.text).join('\n');
+    const markers = detectMarkers(bodyText);
+    const validMarkers = markersWithinRefCount(markers, parsedRefs.length);
+    const citationCounts = countCitationsPerRef(parsedRefs.length, validMarkers);
+
+    return {
+      paragraphs: manuscriptParagraphs,
+      bodyText,
+      refs: parsedRefs,
+      markerCount: validMarkers.length,
+      abstractText: importedAbstract,
+      keywords: importedKeywords,
+      tables,
+      citationCounts,
+    };
+  }
+
   function processImportText(text: string): void {
     const split = splitBodyAndBiblio(text);
     const { refs: parsedRefs } = parseBiblioLines(split.refLines);
@@ -2329,17 +2460,21 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
     });
   }
 
-  function applyImport(replace: boolean, selectedIndices?: number[]): void {
-    if (!importPreview) return;
+  function applyImportPreviewData(
+    preview: NonNullable<ImportPreview>,
+    replace: boolean,
+    selectedIndices?: number[],
+    closeModal = false,
+  ): void {
     const indices =
       selectedIndices && selectedIndices.length > 0
         ? selectedIndices
-        : importPreview.refs.map((_, i) => i);
+        : preview.refs.map((_, i) => i);
     const pool: Ref[] = replace ? [] : [...refs];
     const refsForCitations: Ref[] = [];
     const refsToAdd: Ref[] = [];
     for (const idx of indices) {
-      const incomingRef = importPreview.refs[idx];
+      const incomingRef = preview.refs[idx];
       const existing = findMatchingRef(pool, incomingRef);
       if (existing) {
         refsForCitations.push(existing);
@@ -2355,27 +2490,27 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
     // numbers are compressed to the new bibliography order.
     const selectedRefNumbers = indices.map((idx) => idx + 1);
     const newDoc = buildDocWithCitations(
-      importPreview.paragraphs,
+      preview.paragraphs,
       refsForCitations,
       selectedRefNumbers,
     );
     if (replace) {
       setRefs(refsToAdd);
       setDoc(newDoc);
-      setAbstractText(importPreview.abstractText ?? '');
-      setKeywords(importPreview.keywords ?? []);
-      setManuscriptTables(importPreview.tables ?? []);
+      setAbstractText(preview.abstractText ?? '');
+      setKeywords(preview.keywords ?? []);
+      setManuscriptTables(preview.tables ?? []);
     } else {
       setRefs((prev) => appendUniqueRefs(prev, refsToAdd).refs);
       setDoc((prev: any) => mergeTipTapDocs(prev, newDoc));
-      if (importPreview.tables?.length) {
-        setManuscriptTables((prev) => [...prev, ...importPreview.tables!]);
+      if (preview.tables?.length) {
+        setManuscriptTables((prev) => [...prev, ...preview.tables!]);
       }
-      if (!abstractText.trim() && importPreview.abstractText?.trim()) {
-        setAbstractText(importPreview.abstractText);
+      if (!abstractText.trim() && preview.abstractText?.trim()) {
+        setAbstractText(preview.abstractText);
       }
-      if (keywords.length === 0 && importPreview.keywords?.length) {
-        setKeywords(importPreview.keywords);
+      if (keywords.length === 0 && preview.keywords?.length) {
+        setKeywords(preview.keywords);
       }
     }
 
@@ -2391,11 +2526,18 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
       }
     });
 
-    setShowImportModal(false);
-    setImportPreview(null);
-    setImportPasteText('');
-    setPastedHtmlParagraphs(null);
-    setPastedPlainReference(null);
+    if (closeModal) {
+      setShowImportModal(false);
+      setImportPreview(null);
+      setImportPasteText('');
+      setPastedHtmlParagraphs(null);
+      setPastedPlainReference(null);
+    }
+  }
+
+  function applyImport(replace: boolean, selectedIndices?: number[]): void {
+    if (!importPreview) return;
+    applyImportPreviewData(importPreview, replace, selectedIndices, true);
   }
 
   function countCitationsPerRef(refCount: number, markers: MarkerOccurrence[]): number[] {

@@ -1414,7 +1414,7 @@ export function ProjectWorkspace({ project, onExit, onOpenManuscript, onSaved, i
               </div>
             </div>
 
-            <ProjectAssetsPanel project={project} onSaved={onSaved} />
+            <ProjectAssetsPanel project={project} onSaved={onSaved} onOpenManuscript={onOpenManuscript} />
           </div>
         </main>
       ) : (
