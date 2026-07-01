@@ -76,6 +76,13 @@ export function detectMarkers(text: string): MarkerOccurrence[] {
     const start = map[m.index]?.start ?? m.index;
     const last = map[m.index + raw.length - 1];
     const end = last?.end ?? (m.index + raw.length);
+    // Reject bracket ranges that are actually statistical value ranges
+    // (IQR / CI / measurement intervals), e.g. "median 61 [49–63]",
+    // "83 [71–92] mg/dL", "IQR [53–70]". Parenthetical ranges are kept —
+    // Vancouver-style citations "(4-6)" must still resolve.
+    if (raw[0] === '[' && looksLikeValueRange(normalized, m.index, m.index + raw.length)) {
+      continue;
+    }
     out.push({
       startIndex: start,
       endIndex: end,
@@ -86,6 +93,42 @@ export function detectMarkers(text: string): MarkerOccurrence[] {
   RANGE_RE.lastIndex = 0;
   appendLooseNumericMarkers(text, out);
   return out.sort((a, b) => a.startIndex - b.startIndex);
+}
+
+/**
+ * Heuristic: is the bracketed span [start, end) a statistical value range
+ * rather than a citation? Signals (any one is sufficient):
+ *  1. The token immediately before '[' is a number (e.g. "61 [49–63]").
+ *  2. A range/stats keyword precedes it within ~16 chars (IQR, median,
+ *     mean, range, CI, percentile, interquartile).
+ *  3. A unit follows ']' within ~12 chars (mg/dL, mmol/L, years, kg, %).
+ */
+function looksLikeValueRange(text: string, start: number, end: number): boolean {
+  // 1. Digit immediately before the opening bracket (ignoring spaces).
+  let i = start - 1;
+  while (i >= 0 && /\s/.test(text[i])) i -= 1;
+  if (i >= 0 && /\d/.test(text[i])) return true;
+
+  // 2. Stats/range keyword within the preceding ~16 characters.
+  const before = text.slice(Math.max(0, start - 24), start).toLowerCase();
+  if (
+    /(interquartile|\biqr\b|\bmedian\b|\bmean\b|\branges?\s+from|\branged\s+from|\brange\s+of|\bpercentile\b|\bci\b)/.test(
+      before,
+    )
+  ) {
+    return true;
+  }
+
+  // 3. A measurement unit follows the closing bracket.
+  const after = text.slice(end, end + 14).toLowerCase();
+  if (
+    /\s*(mg\/dl|mmol\/l|mg\/l|µg\/l|mcg\/l|g\/l|g\/dl|years?|year-old|months?|weeks?|days?|hours?|kg|mEq\/l|ml\/min|×10|cells?\/|u\/l|iu\/l|%)/.test(
+      after,
+    )
+  ) {
+    return true;
+  }
+  return false;
 }
 
 function appendLooseNumericMarkers(text: string, out: MarkerOccurrence[]): void {

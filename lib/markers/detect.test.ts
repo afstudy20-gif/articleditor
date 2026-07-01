@@ -61,4 +61,22 @@ describe('detectMarkers', () => {
     const text = 'OR 1.033, 95% CI 1.021-1.045, P < 0.001; no-reflow developed in 72 of 884 patients.';
     assert.equal(detectMarkers(text).length, 0);
   });
+
+  it('does not treat IQR / measurement bracket ranges as citations', () => {
+    // median age 61 [49–63] — value precedes the bracket range
+    const t1 = 'median age 61 [IQR 53–70] vs 55 [49–63] vs 54 [45–63] years; p<0.001';
+    assert.equal(detectMarkers(t1).length, 0, 'median + IQR ranges');
+
+    // 83 [71–92] mg/dL — unit follows the bracket range
+    const t2 = 'LDL-C was 83 [71–92] mg/dL in the first group [2].';
+    const m2 = detectMarkers(t2);
+    assert.equal(m2.length, 1, 'only the real citation kept');
+    assert.deepEqual(m2[0]?.refNumbers, [2]);
+
+    // "ranged from [40–50]" — range keyword
+    const t3 = 'Ages ranged from [40–50] in group one [3,4].';
+    const m3 = detectMarkers(t3);
+    assert.equal(m3.length, 1, 'only the real citation kept');
+    assert.deepEqual(m3[0]?.refNumbers, [3, 4]);
+  });
 });
