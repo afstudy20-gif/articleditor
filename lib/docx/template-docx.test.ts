@@ -59,9 +59,19 @@ describe('buildTemplateDocx (JCM/MDPI)', () => {
     // MDPI style mapping applied (doc has an H1, so the Title paragraph is
     // intentionally suppressed — covered by the dedicated test below)
     assert.ok(xml.includes('<w:pStyle w:val="MDPI21heading1"/>'), 'h1 style');
-    assert.ok(xml.includes('<w:pStyle w:val="MDPI22heading2"/>'), 'h2 style');
     assert.ok(xml.includes('<w:pStyle w:val="MDPI31text"/>'), 'body text style');
     assert.ok(xml.includes('<w:pStyle w:val="MDPI81references"/>'), 'references style');
+
+    // Sub-headings (level 2) render as bold MDPI31text, NOT MDPI22heading2
+    // (which is italic in the template). Find the "Sub Methods" paragraph:
+    // it should carry MDPI31text and its run should be bold.
+    assert.ok(!xml.includes('<w:pStyle w:val="MDPI22heading2"/>'), 'h2 not mapped to italic MDPI22heading2');
+    const subIdx = xml.indexOf('Sub Methods');
+    assert.ok(subIdx > -1, 'sub-heading text present');
+    const subParaStart = xml.lastIndexOf('<w:p>', subIdx);
+    const subParaSlice = xml.slice(subParaStart, subIdx);
+    assert.ok(subParaSlice.includes('<w:pStyle w:val="MDPI31text"/>'), 'sub-heading uses MDPI31text');
+    assert.ok(subParaSlice.includes('<w:r><w:rPr><w:b/></w:rPr>'), 'sub-heading run is bold');
 
     // Citation style forced to MDPI ACS; EndNote field present
     assert.ok(xml.includes('ADDIN EN.CITE'), 'active EndNote field');
@@ -111,5 +121,37 @@ describe('buildTemplateDocx (JCM/MDPI)', () => {
     const xml = await zip.file('word/document.xml')!.async('string');
     assert.ok(xml.includes('<w:pStyle w:val="MDPI12title"/>'), 'title style');
     assert.ok(xml.includes('Titled Paper'), 'title text');
+  });
+
+  it('renders abstract/keywords block with MDPI production styles', async () => {
+    const tpl = getDocxTemplate('jcm')!;
+    const bytes = readFileSync(TEMPLATE_PATH);
+    const blob = await buildTemplateDocx(bytes, tpl, {
+      doc: { type: 'doc', content: [{ type: 'heading', attrs: { level: 1 }, content: [{ type: 'text', text: 'Intro' }] }] },
+      refsById: new Map(),
+      refOrder: new Map(),
+      style: 'vancouver',
+      mode: 'plain',
+      title: 'Paper With Abstract',
+      abstractText: 'Background paragraph one.\n\nMethods paragraph two.',
+      keywords: ['lipid paradox', 'STEMI'],
+    });
+    const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+    const xml = await zip.file('word/document.xml')!.async('string');
+
+    // "Abstract" heading is plain body text (MDPI31text), not MDPI21heading1.
+    const absIdx = xml.indexOf('>Abstract<');
+    assert.ok(absIdx > -1, 'abstract heading text present');
+    const absPara = xml.slice(xml.lastIndexOf('<w:p>', absIdx), absIdx);
+    assert.ok(absPara.includes('<w:pStyle w:val="MDPI31text"/>'), 'abstract heading uses MDPI31text');
+
+    // Keywords paragraph uses the dedicated MDPI18keywords style.
+    const kwIdx = xml.indexOf('Keywords:');
+    assert.ok(kwIdx > -1, 'keywords label present');
+    const kwPara = xml.slice(xml.lastIndexOf('<w:p>', kwIdx), kwIdx);
+    assert.ok(kwPara.includes('<w:pStyle w:val="MDPI18keywords"/>'), 'keywords style');
+
+    // An MDPI19line ruled separator paragraph follows the abstract block.
+    assert.ok(xml.includes('<w:pStyle w:val="MDPI19line"/>'), 'abstract separator rule present');
   });
 });

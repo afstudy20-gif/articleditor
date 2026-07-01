@@ -44,7 +44,10 @@ export const DOCX_TEMPLATES: readonly DocxTemplateDef[] = [
       normal: 'MDPI31text',
       title: 'MDPI12title',
       heading1: 'MDPI21heading1',
-      heading2: 'MDPI22heading2',
+      // Sub-headings intentionally NOT mapped: MDPI22heading2 is italic in
+      // the template, but MDPI production output renders "2.1. ..." as bold
+      // MDPI31text. Leaving heading2 unset triggers the bold-body fallback
+      // in BuildCtx.blockToXml.
       heading3: 'MDPI23heading3',
       bibliography: 'MDPI81references',
       figureCaption: 'MDPI51figurecaption',
@@ -52,6 +55,12 @@ export const DOCX_TEMPLATES: readonly DocxTemplateDef[] = [
       tableBody: 'MDPI42tablebody',
       tableCaption: 'MDPI41tablecaption',
       table: 'MDPItable',
+      // MDPI production output renders the "Abstract" heading as plain body
+      // text (MDPI31text), keywords in the dedicated MDPI18keywords style,
+      // and separates them from the body with an MDPI19line ruled paragraph.
+      abstractHeading: 'MDPI31text',
+      keywords: 'MDPI18keywords',
+      abstractSeparator: 'MDPI19line',
       numIdBullet: TPL_NUM_BULLET,
       numIdOrdered: TPL_NUM_ORDERED,
     },

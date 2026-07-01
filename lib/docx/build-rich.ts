@@ -36,6 +36,13 @@ export type DocxStyleMap = {
   tableCaption?: string;
   /** Word table style (w:tblStyle) reference, e.g. MDPItable. */
   table?: string;
+  /** Style for the "Abstract" heading; falls back to heading1 when unset. */
+  abstractHeading?: string;
+  /** Style for the "Keywords:" paragraph; falls back to normal when unset. */
+  keywords?: string;
+  /** Optional separator paragraph style after the abstract/keywords block
+   *  (e.g. MDPI's MDPI19line, a bottom-bordered rule). */
+  abstractSeparator?: string;
   numIdBullet?: number;
   numIdOrdered?: number;
 };
@@ -219,6 +226,12 @@ ${this.rels.join('\n')}
     const h1Style = this.sid('heading1', 'Heading1');
     const bibStyle = this.sid('bibliography');
     const normalStyle = this.sid('normal');
+    // Abstract-block style overrides. When the template defines dedicated
+    // styles (e.g. MDPI's MDPI31text heading, MDPI18keywords, MDPI19line rule)
+    // use them; otherwise fall back to the generic heading1/normal behaviour.
+    const abstractHeadingStyle = this.sid('abstractHeading') ?? h1Style;
+    const keywordsStyle = this.sid('keywords') ?? normalStyle;
+    const abstractSeparatorStyle = this.sid('abstractSeparator');
     const content = Array.isArray(doc?.content) ? doc.content : [];
     const firstVisibleIndex = content.findIndex(hasVisibleBlockContent);
     const titleBlockIndex =
@@ -242,7 +255,7 @@ ${this.rels.join('\n')}
     const abstractText = this.input.abstractText?.trim() ?? '';
     const keywords = normalizeKeywords(this.input.keywords);
     if (abstractText || keywords.length > 0) {
-      paragraphs.push(`<w:p><w:pPr><w:pStyle w:val="${h1Style}"/></w:pPr>${textRun('Abstract')}</w:p>`);
+      paragraphs.push(`<w:p><w:pPr><w:pStyle w:val="${abstractHeadingStyle}"/></w:pPr>${textRun('Abstract')}</w:p>`);
       abstractText
         .split(/\n{2,}/)
         .map((part) => part.trim())
@@ -252,10 +265,15 @@ ${this.rels.join('\n')}
           paragraphs.push(`<w:p>${pPr}${textRun(part)}</w:p>`);
         });
       if (keywords.length > 0) {
-        const pPr = normalStyle ? `<w:pPr><w:pStyle w:val="${normalStyle}"/></w:pPr>` : '';
+        const pPr = keywordsStyle ? `<w:pPr><w:pStyle w:val="${keywordsStyle}"/></w:pPr>` : '';
         paragraphs.push(
           `<w:p>${pPr}<w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">Keywords: </w:t></w:r>${textRun(keywords.join('; '))}</w:p>`,
         );
+      }
+      // Optional separator rule under the abstract/keywords block
+      // (e.g. MDPI's MDPI19line — an empty paragraph with a bottom border).
+      if (abstractSeparatorStyle) {
+        paragraphs.push(`<w:p><w:pPr><w:pStyle w:val="${abstractSeparatorStyle}"/></w:pPr></w:p>`);
       }
     }
 
@@ -328,6 +346,19 @@ ${paragraphs.join('\n')}
       case 'heading': {
         const level = Math.min(Math.max(Number(n.attrs?.level ?? 1), 1), 3);
         const mapped = this.sid(`heading${level}` as keyof DocxStyleMap, `Heading${level}`);
+        // Some journal layouts (e.g. MDPI production output) render
+        // sub-headings (level 2) as plain bold body text rather than a
+        // dedicated italic heading style. When a template is in use
+        // (styleMap.normal set) but does NOT map heading2 to a specific
+        // style, fall back to the normal body style with an inline bold run.
+        // Standalone exports (no styleMap) keep the built-in Heading2 style.
+        const isLevel2Fallback =
+          level === 2
+          && !this.input.styleMap?.heading2
+          && Boolean(this.input.styleMap?.normal);
+        if (isLevel2Fallback) {
+          return [this.boldBodyParagraph(n, listCtx)];
+        }
         return [this.paragraph(n, listCtx, mapped)];
       }
       case 'bulletList':
@@ -422,13 +453,32 @@ ${paragraphs.join('\n')}
     return `<w:p>${pPrXml}${runs || textRun('')}</w:p>`;
   }
 
+  /**
+   * Sub-heading rendered as plain bold body text (normal style + a bold
+   * inline run). Used when a template intentionally does NOT map level-2
+   * headings to a dedicated style — matches MDPI production output where
+   * "2.1. Study Design..." appears as bold MDPI31text rather than the
+   * italic MDPI22heading2.
+   */
+  private boldBodyParagraph(n: Json, listCtx: { numId?: number; ilvl?: number }): string {
+    const pPr: string[] = [];
+    const normalStyle = this.sid('normal');
+    if (normalStyle) pPr.push(`<w:pStyle w:val="${normalStyle}"/>`);
+    if (listCtx.numId !== undefined) {
+      pPr.push(`<w:numPr><w:ilvl w:val="${listCtx.ilvl ?? 0}"/><w:numId w:val="${listCtx.numId}"/></w:numPr>`);
+    }
+    const runs = this.inlineRuns(n.content ?? [], true);
+    const pPrXml = pPr.length ? `<w:pPr>${pPr.join('')}</w:pPr>` : '';
+    return `<w:p>${pPrXml}${runs || textRun('')}</w:p>`;
+  }
+
   /** Convert inline nodes (text/citation/hardBreak/figureRef/image) to runs. */
-  private inlineRuns(content: Json[]): string {
+  private inlineRuns(content: Json[], forceBold = false): string {
     const runs: string[] = [];
     for (const c of content) {
       if (!c) continue;
       if (c.type === 'text') {
-        runs.push(this.textWithMarks(c));
+        runs.push(this.textWithMarks(c, forceBold));
       } else if (c.type === 'citation') {
         runs.push(this.citation(c));
       } else if (c.type === 'hardBreak') {
@@ -439,17 +489,18 @@ ${paragraphs.join('\n')}
         const drawing = this.imageRun(c.attrs?.src ?? '');
         if (drawing) runs.push(drawing);
       } else if (Array.isArray(c.content)) {
-        runs.push(this.inlineRuns(c.content));
+        runs.push(this.inlineRuns(c.content, forceBold));
       }
     }
     return runs.join('');
   }
 
-  private textWithMarks(n: Json): string {
+  private textWithMarks(n: Json, forceBold = false): string {
     const text: string = n.text ?? '';
     if (text === '') return '';
     const marks: Json[] = Array.isArray(n.marks) ? n.marks : [];
     const rPr: string[] = [];
+    if (forceBold) rPr.push('<w:b/>');
     let linkHref: string | null = null;
     for (const m of marks) {
       switch (m.type) {
