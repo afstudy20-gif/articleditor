@@ -117,4 +117,47 @@ describe('buildDocWithCitations', () => {
     assert.equal(citations.length, 1);
     assert.deepEqual(citations[0].attrs.refIds, ['ref-2']);
   });
+
+  it('does not treat author-byline affiliation superscripts as citations (style signal)', () => {
+    const refs = [
+      { id: 'ref-1', raw: 'First reference' },
+      { id: 'ref-2', raw: 'Second reference' },
+    ] as any;
+    const doc = buildDocWithCitations([
+      {
+        // MDPI author-names paragraph: superscript affiliation numbers.
+        style: 'MDPI13authornames',
+        text: 'Fatih Akkaya 1, Nihan Bahadır 1, Adnan Duha Cömert 2',
+      },
+    ], refs) as any;
+
+    const citations = doc.content[0].content.filter((n: any) => n.type === 'citation');
+    assert.equal(citations.length, 0, 'no citation nodes from byline superscripts');
+    const text = doc.content[0].content.map((n: any) => n.text ?? '').join('');
+    assert.ok(text.includes('Fatih Akkaya'), 'byline text preserved');
+    assert.ok(/1.*1.*2/.test(text), 'affiliation numbers kept as plain text');
+  });
+
+  it('does not treat multi-author byline affiliation digits as citations (structure signal)', () => {
+    const refs = [{ id: 'ref-1', raw: 'First reference' }] as any;
+    const doc = buildDocWithCitations([
+      {
+        // No style hint — must be detected from the "Name N, Name N" structure.
+        text: 'Fatih Akkaya 1, Nihan Bahadır 1, Mustafa Kamil Sağlam 1',
+      },
+    ], refs) as any;
+
+    const citations = doc.content[0].content.filter((n: any) => n.type === 'citation');
+    assert.equal(citations.length, 0, 'no citation nodes from byline structure');
+  });
+
+  it('does not treat an affiliation line as a citation', () => {
+    const refs = [{ id: 'ref-1', raw: 'First reference' }] as any;
+    const doc = buildDocWithCitations([
+      { text: '1 Cardiology, Ordu University, Ordu, Turkey' },
+    ], refs) as any;
+
+    const citations = doc.content[0].content.filter((n: any) => n.type === 'citation');
+    assert.equal(citations.length, 0, 'no citation from affiliation line');
+  });
 });

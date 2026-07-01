@@ -1,6 +1,7 @@
 import type { Ref } from '@/store/types';
 import type { ImportRun } from '@/lib/docx/parse';
 import { detectMarkers } from '@/lib/markers/detect';
+import { looksLikeAuthorByline } from '@/lib/markers/byline';
 import { rowsToTiptapTable } from '@/lib/tables/parse-table';
 
 export type ImportParagraph = {
@@ -46,7 +47,10 @@ export function buildDocWithCitations(
         type: 'listItem',
         content: [{
           type: 'paragraph',
-          content: paragraphToCitationInlineRich(paragraph.text, paragraph.runs, refs, selectedRefNumbers),
+          content: paragraphToCitationInlineRich(
+            paragraph.text, paragraph.runs, refs, selectedRefNumbers,
+            looksLikeAuthorByline(paragraph.text, paragraph.style),
+          ),
         }],
       };
       if (pendingList && pendingList.type === paragraph.list.type) {
@@ -66,7 +70,10 @@ export function buildDocWithCitations(
     }
 
     const headingLevel = headingLevelFromStyle(style);
-    const inline = paragraphToCitationInlineRich(paragraph.text, paragraph.runs, refs, selectedRefNumbers);
+    const inline = paragraphToCitationInlineRich(
+      paragraph.text, paragraph.runs, refs, selectedRefNumbers,
+      looksLikeAuthorByline(paragraph.text, paragraph.style),
+    );
     if (headingLevel !== null) {
       content.push({
         type: 'heading',
@@ -214,14 +221,23 @@ function htmlCitationText(text: string, prevChar: string): string {
   return `[${trimmed}]`;
 }
 
+/**
+ * Detects whether a paragraph is a manuscript author byline / affiliation
+ * block rather than body text. Re-exported from lib/markers/byline so the
+ * docx parser and this rich importer share one definition.
+ */
+
 function paragraphToCitationInlineRich(
   paragraphText: string,
   runs: ImportRun[] | undefined,
   refs: Ref[],
   selectedRefNumbers?: number[],
+  skipMarkerDetection = false,
 ): Array<Record<string, unknown>> {
   const activeRuns = runs && runs.length > 0 ? runs : [{ text: paragraphText }];
-  const markers = detectMarkers(paragraphText);
+  // When the paragraph is a manuscript front-matter byline/affiliation
+  // block, affiliation superscripts must not be parsed as citations.
+  const markers = skipMarkerDetection ? [] : detectMarkers(paragraphText);
   const characterStyles: Array<Pick<ImportRun, 'bold' | 'italic' | 'underline'>> = [];
 
   for (const run of activeRuns) {

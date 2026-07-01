@@ -1,5 +1,6 @@
 import JSZip from 'jszip';
 import { XMLParser } from 'fast-xml-parser';
+import { looksLikeAuthorByline } from '@/lib/markers/byline';
 
 export type DocxParseResult = {
   paragraphs: ParagraphNode[];
@@ -534,6 +535,11 @@ function citationText(run: RunContent, prevChar: string): string {
 function extractParagraphText(pNode: OOXMLValue): string {
   const parts: string[] = [];
   let prevChar = '';
+  // Resolve the paragraph's style once; when this is a manuscript
+  // author-byline / affiliation block, superscript affiliation numbers
+  // must be kept as plain text (not wrapped into "[N]" citation markers).
+  const style = extractStyle(pNode);
+  const isByline = looksLikeAuthorByline('', style);
   const push = (s: string) => {
     if (!s) return;
     parts.push(s);
@@ -548,7 +554,8 @@ function extractParagraphText(pNode: OOXMLValue): string {
     if (!isOOXMLNode(n)) return;
     for (const k of Object.keys(n)) {
       if (k === 'w:r') {
-        push(citationText(readRunContent(n[k]), prevChar));
+        const content = readRunContent(n[k]);
+        push(isByline ? content.text : citationText(content, prevChar));
       } else if (k === 'w:t') {
         // Stray text not wrapped in a run (rare).
         const t = n[k];
@@ -577,6 +584,10 @@ function extractParagraphText(pNode: OOXMLValue): string {
 function extractParagraphRuns(pNode: OOXMLValue): ImportRun[] {
   const runs: ImportRun[] = [];
   let prevChar = '';
+  // Same byline guard as extractParagraphText: keep affiliation
+  // superscripts as plain text in author-byline / affiliation blocks.
+  const style = extractStyle(pNode);
+  const isByline = looksLikeAuthorByline('', style);
 
   const recurse = (n: OOXMLValue) => {
     if (Array.isArray(n)) {
@@ -588,7 +599,7 @@ function extractParagraphRuns(pNode: OOXMLValue): ImportRun[] {
     for (const k of Object.keys(n)) {
       if (k === 'w:r') {
         const content = readRunContent(n[k]);
-        const text = citationText(content, prevChar);
+        const text = isByline ? content.text : citationText(content, prevChar);
         if (text.length > 0) {
           runs.push({
             text,
