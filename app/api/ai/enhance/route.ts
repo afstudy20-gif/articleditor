@@ -4,6 +4,7 @@ import { generateStructured, isAIConfigured, configFromHeaders } from '@/lib/ai/
 import { checkRateLimit, timeoutSignal, aiErrorResponse } from '@/lib/ai/guard';
 import { EnhanceMode, EnhanceResult } from '@/lib/ai/schemas';
 import { citationPreservationInstruction } from '@/lib/ai/citation-safety';
+import { MDPI_REWRITE_GUIDANCE } from '@/lib/ai/mdpi-editor-guidance';
 
 // Sentinels: client encodes citations with U+E000/E001; route forwards them
 // unchanged through the LLM and verifies they survived.
@@ -78,6 +79,7 @@ function buildPrompt(args: {
     : 'JSON schema: {"after":"rewritten text","rationale":"brief rationale"}';
   const parts: string[] = [
     modeInstr,
+    MDPI_REWRITE_GUIDANCE,
     schemaInstr,
     isTr ? 'METİN:' : 'TEXT:',
     encodedText,

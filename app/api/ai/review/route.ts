@@ -4,6 +4,7 @@ import { generateStructured, isAIConfigured, configFromHeaders } from '@/lib/ai/
 import { checkRateLimit, timeoutSignal, aiErrorResponse } from '@/lib/ai/guard';
 import { ReviewResult } from '@/lib/ai/schemas';
 import { encodeCitations, citationPreservationInstruction } from '@/lib/ai/citation-safety';
+import { MDPI_EDITOR_GUIDANCE } from '@/lib/ai/mdpi-editor-guidance';
 
 export const runtime = 'nodejs';
 
@@ -50,6 +51,7 @@ function buildPrompt(args: {
       '"comment":"brief issue description","suggestion":"concrete fix"}],"summary":"overall 1-2 sentence assessment"}\n' +
       'Comments in English. Return at most 12 issues.';
   const parts: string[] = [instr];
+  parts.push(MDPI_EDITOR_GUIDANCE);
   if (section) parts.push(`${labelSec}: ${section}`);
   if (context) parts.push(`${labelCtx}:\n${context}`);
   parts.push(`${labelText}:\n${encodedText}`);

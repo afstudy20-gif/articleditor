@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { AcademicReviewResult } from '@/lib/ai/schemas';
 import { generateStructured, isAIConfigured, configFromHeaders } from '@/lib/ai/provider';
 import { checkRateLimit, timeoutSignal, aiErrorResponse } from '@/lib/ai/guard';
+import { MDPI_EDITOR_GUIDANCE } from '@/lib/ai/mdpi-editor-guidance';
 
 export const runtime = 'nodejs';
 
@@ -52,6 +53,7 @@ function buildPrompt(body: z.infer<typeof BodySchema>): string {
     '- evidence: unsupported or overstated claims, missing qualification',
     '- statistics: incomplete or inconsistent medical/statistical reporting; do not recalculate results',
     '- consistency: terminology, abbreviations, tense, US/UK English, labels',
+    MDPI_EDITOR_GUIDANCE,
     `Write explanations in ${explanationLanguage}; replacements must use the manuscript's language.`,
     'The quote must be copied verbatim from one block and should not include citation markers.',
     'Use occurrence=0 for the first exact occurrence inside that block, 1 for the second, and so on.',
