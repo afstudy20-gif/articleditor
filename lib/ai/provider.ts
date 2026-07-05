@@ -1,9 +1,7 @@
 // Unified AI provider interface. Gemini default; Anthropic + OpenAI + DeepSeek + NVIDIA fallback.
 // DeepSeek + NVIDIA use the openai-sdk transport with a vendor-specific baseUrl.
 //
-// Configuration precedence per request:
-//   1. ProviderConfig parsed from X-AI-* request headers
-//   2. process.env (server-side fallback for self-hosted instances)
+// AI credentials are server-side only. Browser BYO-key headers are ignored.
 
 import { z } from 'zod';
 import { generateTextGemini, streamTextGemini, embedBatchGemini } from './gemini';
@@ -11,7 +9,6 @@ import { generateTextAnthropic, streamTextAnthropic } from './anthropic';
 import { generateTextOpenAI, streamTextOpenAI, embedBatchOpenAI } from './openai';
 import { PROVIDERS, getProviderMeta, type ProviderId } from './registry';
 import { isAbortError, isTransientError } from './errors';
-import { sanitizeBaseUrl } from './url-guard';
 
 export type ProviderName = ProviderId;
 
@@ -51,44 +48,8 @@ export class AIError extends Error {
   }
 }
 
-export function configFromHeaders(headers: Headers): ProviderConfig {
-  const get = (name: string): string | undefined => {
-    const v = headers.get(name);
-    return v && v.trim() ? v.trim() : undefined;
-  };
-  const preferredRaw = get('X-AI-Preferred-Provider');
-  const valid = PROVIDERS.map((p) => p.id);
-  const preferred = valid.includes(preferredRaw as ProviderId)
-    ? (preferredRaw as ProviderName)
-    : undefined;
-  return {
-    gemini: {
-      apiKey: get('X-AI-Gemini-Key'),
-      model: get('X-AI-Gemini-Model'),
-      embedModel: get('X-AI-Gemini-Embed-Model'),
-    },
-    anthropic: {
-      apiKey: get('X-AI-Anthropic-Key'),
-      model: get('X-AI-Anthropic-Model'),
-    },
-    openai: {
-      apiKey: get('X-AI-OpenAI-Key'),
-      // User-supplied base URLs are fetched SERVER-side — reject private/
-      // internal targets (SSRF) before they ever reach the OpenAI client.
-      baseUrl: sanitizeBaseUrl(get('X-AI-OpenAI-BaseURL')),
-      model: get('X-AI-OpenAI-Model'),
-      embedModel: get('X-AI-OpenAI-Embed-Model'),
-    },
-    deepseek: {
-      apiKey: get('X-AI-DeepSeek-Key'),
-      model: get('X-AI-DeepSeek-Model'),
-    },
-    nvidia: {
-      apiKey: get('X-AI-NVIDIA-Key'),
-      model: get('X-AI-NVIDIA-Model'),
-    },
-    preferred,
-  };
+export function configFromHeaders(_headers: Headers): ProviderConfig {
+  return {};
 }
 
 export type ResolvedConfig = {

@@ -1,5 +1,5 @@
 // Request protection for /api/ai/* routes:
-//   - in-memory rate limiting (per client IP + API-key fingerprint)
+//   - in-memory rate limiting (per client IP)
 //   - request timeout signal
 //   - error sanitization so internal/provider details never reach the client
 //
@@ -35,32 +35,6 @@ function clientIp(req: Request): string {
   return req.headers.get('x-real-ip')?.trim() || 'unknown';
 }
 
-// Non-reversible 32-bit fingerprint (FNV-1a) so BYO-key users get a separate
-// bucket without the raw key ever being stored.
-function hash32(s: string): string {
-  let h = 2166136261;
-  for (let i = 0; i < s.length; i += 1) {
-    h ^= s.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return (h >>> 0).toString(36);
-}
-
-function keyFingerprint(req: Request): string {
-  const headers = [
-    'X-AI-Gemini-Key',
-    'X-AI-Anthropic-Key',
-    'X-AI-OpenAI-Key',
-    'X-AI-DeepSeek-Key',
-    'X-AI-NVIDIA-Key',
-  ];
-  for (const h of headers) {
-    const v = req.headers.get(h);
-    if (v && v.trim()) return hash32(v.trim());
-  }
-  return 'env';
-}
-
 /**
  * Enforce the per-client request budget. Returns a 429 response when the limit
  * is exceeded, or `null` when the request may proceed.
@@ -68,7 +42,7 @@ function keyFingerprint(req: Request): string {
 export function checkRateLimit(req: Request): NextResponse | null {
   const now = Date.now();
   sweep(now);
-  const id = `${clientIp(req)}:${keyFingerprint(req)}`;
+  const id = clientIp(req);
   const times = (buckets.get(id) ?? []).filter((t) => now - t < WINDOW_MS);
   if (times.length >= MAX_REQUESTS) {
     const retryAfter = Math.max(1, Math.ceil((WINDOW_MS - (now - times[0])) / 1000));
@@ -119,7 +93,7 @@ export function sanitizeAIError(err: unknown): Sanitized {
         status: 503,
         body: {
           error:
-            'AI yapılandırılmamış. Sağ üstteki ayarlardan API anahtarı girin. / AI is not configured.',
+            'AI yapılandırılmamış. Sunucuda AI ortam değişkeni yok. / AI is not configured on the server.',
           code: 'not_configured',
         },
       };

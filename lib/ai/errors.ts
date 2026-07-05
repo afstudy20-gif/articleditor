@@ -8,7 +8,7 @@ export function isAbortError(err: unknown): boolean {
   return (
     err.name === 'AbortError' ||
     err.name === 'TimeoutError' ||
-    /\baborted\b|timed?\s*out/i.test(err.message)
+    /\baborted\b|\btimed?\s*out\b|\bETIMEDOUT\b/i.test(err.message)
   );
 }
 

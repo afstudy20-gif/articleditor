@@ -107,6 +107,7 @@ export function ProjectAssetsPanel({ project, onSaved, onOpenManuscript }: Props
   const [busy, setBusy] = useState(false);
   const [exportBusy, setExportBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [dragActive, setDragActive] = useState(false);
   const [menuAssetId, setMenuAssetId] = useState<string | null>(null);
   const [converterAsset, setConverterAsset] = useState<ProjectAsset | null>(null);
   const assets = project.assets ?? [];
@@ -330,7 +331,39 @@ export function ProjectAssetsPanel({ project, onSaved, onOpenManuscript }: Props
   };
 
   return (
-    <div className="card p-6 flex flex-col justify-between hover:shadow-md transition border-2 border-transparent hover:border-sky-500/20 group relative overflow-hidden bg-white">
+    <div
+      className={`card p-6 flex flex-col justify-between hover:shadow-md transition border-2 ${dragActive ? 'border-sky-500 ring-2 ring-sky-500' : 'border-transparent hover:border-sky-500/20'} group relative overflow-hidden bg-white`}
+      onDragEnter={(e) => {
+        if (e.dataTransfer?.types?.includes('Files')) {
+          e.preventDefault();
+          setDragActive(true);
+        }
+      }}
+      onDragOver={(e) => {
+        if (e.dataTransfer?.types?.includes('Files')) {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'copy';
+          if (!dragActive) setDragActive(true);
+        }
+      }}
+      onDragLeave={(e) => {
+        if (e.currentTarget === e.target) setDragActive(false);
+      }}
+      onDrop={async (e) => {
+        if (!e.dataTransfer?.types?.includes('Files')) return;
+        e.preventDefault();
+        setDragActive(false);
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+          await addFiles(e.dataTransfer.files);
+        }
+      }}
+    >
+      {dragActive && (
+        <div className="pointer-events-none absolute inset-0 z-30 rounded-lg border-2 border-dashed border-sky-500 bg-sky-50/80 flex flex-col items-center justify-center gap-1">
+          <span className="text-3xl">📥</span>
+          <span className="text-sm font-semibold text-sky-700">Bırak — dosya olarak eklenecek</span>
+        </div>
+      )}
       <input
         ref={inputRef}
         type="file"
@@ -366,7 +399,7 @@ export function ProjectAssetsPanel({ project, onSaved, onOpenManuscript }: Props
               className="w-full h-full min-h-[140px] flex flex-col items-center justify-center text-center p-4 border border-dashed border-border rounded-xl bg-slate-50/50 hover:bg-slate-50 transition"
             >
               <span className="text-2xl mb-1 opacity-60">📎</span>
-              <span className="text-[11px] text-muted max-w-[240px]">Dosya ekle</span>
+              <span className="text-[11px] text-muted max-w-[240px]">Dosya bırak veya tıkla — Word, PDF, grafik, ek dosya</span>
             </button>
           ) : (
             assets.map((asset) => (

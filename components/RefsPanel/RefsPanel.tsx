@@ -81,6 +81,10 @@ export function RefsPanel({
   const [librarySort, setLibrarySort] = useState<LibrarySort>('record');
   const [librarySortDirection, setLibrarySortDirection] = useState<SortDirection>('asc');
   const [internalSelectedIds, setInternalSelectedIds] = useState<Set<string>>(new Set());
+  const [dragActive, setDragActive] = useState(false);
+  const [importMsg, setImportMsg] = useState<string | null>(null);
+  const [importBusy, setImportBusy] = useState(false);
+  const importFileRef = useRef<HTMLInputElement>(null);
   const selectedIds = extSelectedIds ?? internalSelectedIds;
   const setSelectedIds = (next: Set<string>): void => {
     if (onSelectedIdsChange) onSelectedIdsChange(next);
@@ -128,6 +132,99 @@ export function RefsPanel({
     if (onBulkDelete) onBulkDelete(ids);
     clearSelection();
   }
+
+  // ── Import (drag-drop & paste) — shared across all tabs ──
+  async function commitImport(newRefs: Ref[], format: ImportFormat): Promise<void> {
+    if (newRefs.length === 0) {
+      setImportMsg(t('rp_import_no_refs').replace('{format}', FORMAT_LABELS[format]));
+      return;
+    }
+    setImportBusy(true);
+    try {
+      let toAdd = newRefs;
+      // For plaintext (no DOI/PMID), auto-enrich via CrossRef/PubMed when handler available.
+      if (format === 'plaintext' && onEnrichRefs) {
+        const needLookup = newRefs.filter((r) => !r.doi && !r.pmid);
+        if (needLookup.length > 0) {
+          setImportMsg(t('rp_import_enriching').replace('{count}', String(newRefs.length)));
+          try {
+            const enriched = await onEnrichRefs(needLookup);
+            const byRaw = new Map(enriched.map((r) => [r.raw ?? r.title ?? '', r]));
+            toAdd = newRefs.map((r) => byRaw.get(r.raw ?? r.title ?? '') ?? r);
+          } catch {
+            // Non-fatal: still add originals.
+          }
+        }
+      }
+      for (const r of toAdd) onAddRef(r);
+      const withDoi = toAdd.filter((r) => r.doi || r.pmid).length;
+      setImportMsg(
+        format === 'plaintext'
+          ? t('rp_import_success_plain').replace('{total}', String(toAdd.length)).replace('{found}', String(withDoi))
+          : t('rp_import_success').replace('{total}', String(toAdd.length)).replace('{format}', FORMAT_LABELS[format]),
+      );
+      setTab('list'); // jump to library so added refs are visible
+      setTimeout(() => setImportMsg(null), 8000);
+    } finally {
+      setImportBusy(false);
+    }
+  }
+
+  async function importFromText(text: string): Promise<void> {
+    if (!text || text.trim().length < 10) return;
+    try {
+      const { format, refs } = importByAutoDetect(text);
+      await commitImport(refs, format);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setImportMsg(t('rp_import_error').replace('{msg}', msg));
+    }
+  }
+
+  // EndNote .ens is a STYLE, not references — detect it and open the Style
+  // Editor pre-filled instead of importing refs. Returns true if consumed.
+  async function tryImportEnsStyle(file: File): Promise<boolean> {
+    if (!/\.ens$/i.test(file.name)) return false;
+    try {
+      const buf = new Uint8Array(await file.arrayBuffer());
+      if (!looksLikeEns(buf)) return false;
+      const parsed = parseEns(buf);
+      window.dispatchEvent(new CustomEvent('enr-open-style-editor', { detail: parsed }));
+      setImportMsg(t('rp_ens_loaded').replace('{name}', parsed.name));
+      setTimeout(() => setImportMsg(null), 6000);
+      return true;
+    } catch {
+      setImportMsg(t('rp_ens_error'));
+      return true; // consumed (it was a .ens) even though it failed
+    }
+  }
+
+  async function importFromFile(file: File): Promise<void> {
+    if (await tryImportEnsStyle(file)) return;
+    try {
+      const text = await file.text();
+      const { format, refs } = importByExtension(file.name, text);
+      await commitImport(refs, format);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setImportMsg(t('rp_import_file_error').replace('{msg}', msg));
+    }
+  }
+
+  async function handleDroppedData(dt: DataTransfer | null): Promise<void> {
+    const files = Array.from(dt?.files ?? []);
+    if (files.length === 0) {
+      const text = dt?.getData('text/plain');
+      if (text && text.trim().length >= 10) {
+        await importFromText(text);
+      }
+      return;
+    }
+    for (const f of files) {
+      await importFromFile(f);
+    }
+  }
+
   function handleLibrarySort(nextSort: LibrarySort): void {
     if (librarySort === nextSort) {
       setLibrarySortDirection((current) => (current === 'asc' ? 'desc' : 'asc'));
@@ -182,7 +279,63 @@ export function RefsPanel({
   }, [libraryNoById, libraryQuery, librarySort, librarySortDirection, refs]);
 
   return (
-    <div className="card flex flex-col h-full">
+    <div
+      className={`card flex flex-col h-full relative transition ${dragActive ? 'ring-2 ring-teal' : ''}`}
+      onDragEnter={(e) => {
+        if (e.dataTransfer?.types?.includes('Files')) {
+          e.preventDefault();
+          setDragActive(true);
+        }
+      }}
+      onDragOver={(e) => {
+        if (e.dataTransfer?.types?.includes('Files')) {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'copy';
+          if (!dragActive) setDragActive(true);
+        }
+      }}
+      onDragLeave={(e) => {
+        if (e.currentTarget === e.target) setDragActive(false);
+      }}
+      onDrop={async (e) => {
+        if (!e.dataTransfer?.types?.includes('Files') && !e.dataTransfer?.getData('text/plain')) return;
+        e.preventDefault();
+        setDragActive(false);
+        await handleDroppedData(e.dataTransfer);
+      }}
+    >
+      {dragActive && (
+        <div className="pointer-events-none absolute inset-0 z-20 rounded-lg border-2 border-dashed border-teal bg-teal-bg/70 flex flex-col items-center justify-center gap-1">
+          <span className="text-2xl">⬇️</span>
+          <span className="text-sm font-semibold text-teal">{t('rp_import_drop_label')}</span>
+        </div>
+      )}
+      {importMsg && (
+        <div className="absolute top-1 left-1 right-1 z-30 mx-auto max-w-[95%] rounded-md border border-teal/40 bg-white px-2.5 py-1.5 text-xs text-teal shadow-md flex items-center gap-2">
+          <span className="flex-1 min-w-0">{importMsg}</span>
+          <button
+            onClick={() => setImportMsg(null)}
+            className="text-muted hover:text-primary leading-none shrink-0"
+            title={t('rp_cancel') || '×'}
+          >
+            ×
+          </button>
+        </div>
+      )}
+      <input
+        ref={importFileRef}
+        type="file"
+        multiple
+        accept=".ris,.enw,.nbib,.xml,.enx,.bib,.bibtex,.json,.csv,.tsv,.cff,.yaml,.yml,.ens,.txt,application/xml,application/json,text/csv,text/plain"
+        className="hidden"
+        onChange={async (e) => {
+          const files = Array.from(e.target.files ?? []);
+          e.target.value = '';
+          for (const f of files) {
+            await importFromFile(f);
+          }
+        }}
+      />
       <div className="flex border-b border-border">
         <button
           className={`flex-1 px-2 py-2 text-xs font-semibold ${
@@ -295,23 +448,11 @@ export function RefsPanel({
       <div className="flex-1 overflow-auto p-3">
         {tab === 'list' ? (
           refs.length === 0 ? (
-            <RefList
-              refs={refs}
-              libraryNoById={libraryNoById}
-              onInsert={onInsertCitation}
-              onUpdate={onUpdateRef}
-              onDelete={onDeleteRef}
-              onLookup={onLookupRef}
-              onExtractAspects={onExtractAspects}
-              lookupBusyId={lookupBusyId}
-              selectedIds={selectedIds}
-              onToggleSelect={toggleSelect}
-              highlightedId={selectedId}
-              onHighlight={onSelectRef}
-              onInsertText={onInsertText}
-              getRefCitationCount={getRefCitationCount}
-              onJumpToRefCitation={onJumpToRefCitation}
+            <EmptyLibraryDrop
               t={t}
+              importBusy={importBusy}
+              onPickFile={() => importFileRef.current?.click()}
+              onGoAdd={() => setTab('add')}
             />
           ) : visibleRefs.length > 0 ? (
             <RefList
@@ -336,7 +477,16 @@ export function RefsPanel({
             <p className="text-sm text-muted text-center py-8">{t('rp_library_no_match')}</p>
           )
         ) : tab === 'add' ? (
-          <AddPanel onAddByDoi={onAddByDoi} onLookupDoi={onLookupDoi} onSearch={onSearch} onAddRef={onAddRef} onEnrichRefs={onEnrichRefs} t={t} />
+          <AddPanel
+            onAddByDoi={onAddByDoi}
+            onLookupDoi={onLookupDoi}
+            onSearch={onSearch}
+            onAddRef={onAddRef}
+            onImportText={importFromText}
+            onPickFile={() => importFileRef.current?.click()}
+            importBusy={importBusy}
+            t={t}
+          />
         ) : (
           <HistoryPanel
             history={history ?? []}
@@ -389,6 +539,44 @@ type ContextMenuState = {
   x: number;
   y: number;
 };
+
+/* ─── Empty library drop hero ─── */
+function EmptyLibraryDrop({
+  t,
+  importBusy,
+  onPickFile,
+  onGoAdd,
+}: {
+  t: (k: string) => string;
+  importBusy: boolean;
+  onPickFile: () => void;
+  onGoAdd: () => void;
+}): JSX.Element {
+  return (
+    <div className="h-full flex flex-col items-center justify-center text-center py-6">
+      <div className="w-full max-w-[320px] rounded-xl border-2 border-dashed border-teal/50 bg-teal-bg/30 px-6 py-8 flex flex-col items-center gap-3">
+        <span className="text-4xl">{importBusy ? '⏳' : '📥'}</span>
+        <div>
+          <div className="text-sm font-semibold text-primary">{t('rp_library_empty_drop_title')}</div>
+          <p className="text-xs text-muted mt-1.5 leading-relaxed">{t('rp_library_empty_drop_hint')}</p>
+        </div>
+        <div className="flex items-center gap-2 mt-1">
+          <button
+            onClick={onPickFile}
+            disabled={importBusy}
+            className="btn-primary text-xs px-3 py-1.5 disabled:opacity-50"
+          >
+            {t('rp_import_file')}
+          </button>
+          <button onClick={onGoAdd} className="btn-secondary text-xs px-3 py-1.5">
+            {t('rp_library_empty_add_btn')}
+          </button>
+        </div>
+        <p className="text-[10px] text-faint leading-relaxed mt-1">{t('rp_import_support')}</p>
+      </div>
+    </div>
+  );
+}
 
 function downloadText(text: string, filename: string): void {
   const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
@@ -1402,14 +1590,18 @@ function AddPanel({
   onLookupDoi,
   onSearch,
   onAddRef,
-  onEnrichRefs,
+  onImportText,
+  onPickFile,
+  importBusy,
   t,
 }: {
   onAddByDoi: (doi: string) => Promise<void>;
   onLookupDoi?: (doi: string) => Promise<Ref | null>;
   onSearch: (q: string, opts?: { fromYear?: number; toYear?: number }) => Promise<Ref[]>;
   onAddRef: (ref: Ref) => void;
-  onEnrichRefs?: (refs: Ref[]) => Promise<Ref[]>;
+  onImportText: (text: string) => Promise<void>;
+  onPickFile: () => void;
+  importBusy: boolean;
   t: (k: string) => string;
 }): JSX.Element {
   const [doi, setDoi] = useState('');
@@ -1419,91 +1611,9 @@ function AddPanel({
   const [results, setResults] = useState<Ref[]>([]);
   const [busy, setBusy] = useState(false);
   const [importText, setImportText] = useState('');
-  const [importMsg, setImportMsg] = useState<string | null>(null);
-  const [importBusy, setImportBusy] = useState(false);
   const [detectedFormat, setDetectedFormat] = useState<ImportFormat | null>(null);
-  const [dragActive, setDragActive] = useState(false);
-  const importFileRef = useRef<HTMLInputElement>(null);
   const [doiPreview, setDoiPreview] = useState<Ref | null>(null);
   const [doiError, setDoiError] = useState<string | null>(null);
-
-  async function commitImport(refs: Ref[], format: ImportFormat): Promise<void> {
-    if (refs.length === 0) {
-      setImportMsg(t('rp_import_no_refs').replace('{format}', FORMAT_LABELS[format]));
-      return;
-    }
-    setImportBusy(true);
-    try {
-      let toAdd = refs;
-      // For plaintext (no DOI/PMID), auto-enrich via CrossRef/PubMed when handler available.
-      if (format === 'plaintext' && onEnrichRefs) {
-        const needLookup = refs.filter((r) => !r.doi && !r.pmid);
-        if (needLookup.length > 0) {
-          setImportMsg(t('rp_import_enriching').replace('{count}', String(refs.length)));
-          try {
-            const enriched = await onEnrichRefs(needLookup);
-            const byRaw = new Map(enriched.map((r) => [r.raw ?? r.title ?? '', r]));
-            toAdd = refs.map((r) => byRaw.get(r.raw ?? r.title ?? '') ?? r);
-          } catch (e: unknown) {
-            // Non-fatal: still add originals.
-          }
-        }
-      }
-      for (const r of toAdd) onAddRef(r);
-      const withDoi = toAdd.filter((r) => r.doi || r.pmid).length;
-      setImportMsg(
-        format === 'plaintext'
-          ? t('rp_import_success_plain').replace('{total}', String(toAdd.length)).replace('{found}', String(withDoi))
-          : t('rp_import_success').replace('{total}', String(toAdd.length)).replace('{format}', FORMAT_LABELS[format]),
-      );
-      setImportText('');
-      setDetectedFormat(null);
-      setTimeout(() => setImportMsg(null), 8000);
-    } finally {
-      setImportBusy(false);
-    }
-  }
-
-  async function importFromText(text: string): Promise<void> {
-    if (!text || text.trim().length < 10) return;
-    try {
-      const { format, refs } = importByAutoDetect(text);
-      await commitImport(refs, format);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setImportMsg(t('rp_import_error').replace('{msg}', msg));
-    }
-  }
-
-  // EndNote .ens is a STYLE, not references — detect it and open the Style
-  // Editor pre-filled instead of importing refs. Returns true if consumed.
-  async function tryImportEnsStyle(file: File): Promise<boolean> {
-    if (!/\.ens$/i.test(file.name)) return false;
-    try {
-      const buf = new Uint8Array(await file.arrayBuffer());
-      if (!looksLikeEns(buf)) return false;
-      const parsed = parseEns(buf);
-      window.dispatchEvent(new CustomEvent('enr-open-style-editor', { detail: parsed }));
-      setImportMsg(t('rp_ens_loaded').replace('{name}', parsed.name));
-      setTimeout(() => setImportMsg(null), 6000);
-      return true;
-    } catch {
-      setImportMsg(t('rp_ens_error'));
-      return true; // consumed (it was a .ens) even though it failed
-    }
-  }
-
-  async function importFromFile(file: File): Promise<void> {
-    if (await tryImportEnsStyle(file)) return;
-    try {
-      const text = await file.text();
-      const { format, refs } = importByExtension(file.name, text);
-      await commitImport(refs, format);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setImportMsg(t('rp_import_file_error').replace('{msg}', msg));
-    }
-  }
 
   function onTextChange(v: string): void {
     setImportText(v);
@@ -1564,51 +1674,8 @@ function AddPanel({
     }
   }
 
-  async function handleDroppedData(dt: DataTransfer | null): Promise<void> {
-    const files = Array.from(dt?.files ?? []);
-    if (files.length === 0) {
-      const text = dt?.getData('text/plain');
-      if (text && text.trim().length >= 10) {
-        setImportText(text);
-        await importFromText(text);
-      }
-      return;
-    }
-    for (const f of files) {
-      await importFromFile(f);
-    }
-  }
-
   return (
-    <div
-      className={`space-y-4 relative rounded-lg transition ${dragActive ? 'ring-2 ring-teal' : ''}`}
-      onDragEnter={(e) => {
-        if (e.dataTransfer?.types?.includes('Files')) {
-          e.preventDefault();
-          setDragActive(true);
-        }
-      }}
-      onDragOver={(e) => {
-        if (e.dataTransfer?.types?.includes('Files')) {
-          e.preventDefault();
-          e.dataTransfer.dropEffect = 'copy';
-          if (!dragActive) setDragActive(true);
-        }
-      }}
-      onDragLeave={(e) => {
-        if (e.currentTarget === e.target) setDragActive(false);
-      }}
-      onDrop={async (e) => {
-        e.preventDefault();
-        setDragActive(false);
-        await handleDroppedData(e.dataTransfer);
-      }}
-    >
-      {dragActive && (
-        <div className="pointer-events-none absolute inset-0 z-10 rounded-lg border-2 border-dashed border-teal bg-teal-bg/70 flex items-center justify-center">
-          <span className="text-sm font-semibold text-teal">⬇ {t('rp_import_drop_label')}</span>
-        </div>
-      )}
+    <div className="space-y-4 relative rounded-lg">
       <div>
         <label className="tool-label block mb-1">{t('rp_doi_label')}</label>
         <div className="flex gap-2">
@@ -1757,25 +1824,11 @@ function AddPanel({
         <div className="flex items-center justify-between mb-1">
           <label className="tool-label">{t('rp_import_label')}</label>
           <button
-            onClick={() => importFileRef.current?.click()}
+            onClick={onPickFile}
             className="text-xs text-teal hover:underline"
           >
             {t('rp_import_file')}
           </button>
-          <input
-            ref={importFileRef}
-            type="file"
-            multiple
-            accept=".ris,.enw,.nbib,.xml,.enx,.bib,.bibtex,.json,.csv,.tsv,.cff,.yaml,.yml,.ens,.txt,application/xml,application/json,text/csv,text/plain"
-            className="hidden"
-            onChange={async (e) => {
-              const files = Array.from(e.target.files ?? []);
-              e.target.value = '';
-              for (const f of files) {
-                await importFromFile(f);
-              }
-            }}
-          />
         </div>
         <p className="text-xs text-muted mb-1.5">
           {t('rp_import_support')} {t('rp_import_drop_hint')}
@@ -1792,10 +1845,13 @@ function AddPanel({
         {detectedFormat === 'unknown' && importText.trim().length > 20 && (
           <p className="text-xs text-red mt-1">{t('rp_import_unknown')}</p>
         )}
-        <div className="mt-2 flex items-center justify-between gap-2">
-          {importMsg && <span className="text-xs text-teal flex-1">{importMsg}</span>}
+        <div className="mt-2 flex items-center justify-end gap-2">
           <button
-            onClick={() => void importFromText(importText)}
+            onClick={() => {
+              void onImportText(importText);
+              setImportText('');
+              setDetectedFormat(null);
+            }}
             disabled={
               importBusy || importText.trim().length < 10 || detectedFormat === 'unknown'
             }

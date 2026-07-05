@@ -16,7 +16,7 @@ export async function POST(req: Request) {
   const cfg = configFromHeaders(req.headers);
   if (!isAIConfigured(cfg)) {
     return NextResponse.json(
-      { error: 'AI configured değil. Sağ üstteki ayarlardan API anahtarı gir.' },
+      { error: 'AI configured değil. Server env içinde AI provider anahtarı ayarlanmalı.' },
       { status: 503 },
     );
   }

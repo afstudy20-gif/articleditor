@@ -65,7 +65,6 @@ import {
 import { embedMissingRefs, embedTexts, embedInputFor } from '@/lib/ai/embed-refs';
 import { topK } from '@/lib/ai/cosine';
 import { aiHeaders } from '@/lib/ai/user-keys';
-import { SettingsModal } from '@/components/AI/SettingsModal';
 import { CommandPalette, type Command } from '@/components/CommandPalette/CommandPalette';
 import { StatsPanel } from '@/components/Stats/StatsPanel';
 import { SnapshotsPanel } from '@/components/Snapshots/SnapshotsPanel';
@@ -279,7 +278,6 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
     outputEncoded: '',
   });
   const [aiConfigured, setAiConfigured] = useState<boolean | null>(null);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [integrityOpen, setIntegrityOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
@@ -383,23 +381,17 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
     };
   }, []);
 
-  // One-shot AI config check on mount — disables AI buttons when no key.
+  // One-shot AI config check on mount; AI credentials are server-side only.
   useEffect(() => {
     let alive = true;
-    const refresh = (): void => {
-      fetch('/api/ai/status', { headers: aiHeaders() })
-        .then((r) => r.json())
-        .then((d) => {
-          if (alive) setAiConfigured(Boolean(d?.configured));
-        })
-        .catch(() => alive && setAiConfigured(false));
-    };
-    refresh();
-    const onKeyUpdate = (): void => refresh();
-    window.addEventListener('enr-keys-updated', onKeyUpdate);
+    fetch('/api/ai/status', { headers: aiHeaders() })
+      .then((r) => r.json())
+      .then((d) => {
+        if (alive) setAiConfigured(Boolean(d?.configured));
+      })
+      .catch(() => alive && setAiConfigured(false));
     return () => {
       alive = false;
-      window.removeEventListener('enr-keys-updated', onKeyUpdate);
     };
   }, []);
   // Exactly ONE ArticleEditor mounts at a time (desktop OR mobile layout,
@@ -2581,7 +2573,6 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
     { id: 'abstract', group: t('cmd_g_doc'), label: t('ed_abstract'), run: () => setAbstractOpen(true) },
     { id: 'letters', group: t('cmd_g_doc'), label: t('ed_letters'), run: () => { if (onGoToDocuments) onGoToDocuments(); else setLettersOpen(true); } },
     { id: 'snapshot-now', group: t('cmd_g_doc'), label: t('snap_create'), run: () => { void autoSnapshot(t('snap_manual_label')); setSnapshotsOpen(true); } },
-    { id: 'settings', group: t('cmd_g_view'), label: t('ai_settings_title'), run: () => setSettingsOpen(true) },
     { id: 'ai-review', group: t('cmd_g_ai'), label: t('ed_ai_review'), disabled: aiOff, run: runAIReview },
     { id: 'ai-score', group: t('cmd_g_ai'), label: t('ed_ai_score'), disabled: aiOff, run: runAIScore },
     { id: 'ai-suggest', group: t('cmd_g_ai'), label: t('ed_ai_suggest_citation'), disabled: aiOff, run: runAISuggestCitation },
@@ -2694,14 +2685,6 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
             <HeaderIcon onClick={() => setJournalOpen(true)} title={t('ed_journal_check')} label="📋" caption={t('hdr_journal')} />
             <HeaderIcon onClick={() => setChecklistOpen(true)} title={t('ed_checklist')} label="✅" caption={t('hdr_checklist')} />
             <HeaderIcon onClick={() => setFocusMode(true)} title={`${t('ed_focus_mode')} (⌘.)`} label="🎯" caption={t('hdr_focus')} />
-            <HeaderIcon
-              onClick={() => setSettingsOpen(true)}
-              title={aiConfigured ? 'AI ayarlanmış — API anahtarlarını düzenle' : 'AI servisi yapılandırılmamış — API anahtarı gir'}
-              label="⚙️"
-              caption={t('hdr_settings')}
-              accent={!!aiConfigured}
-              badge={aiConfigured === false}
-            />
           </div>
           <div className="row-start-2 col-span-2 flex items-center gap-1.5 max-w-full flex-nowrap overflow-x-auto min-w-0 [scrollbar-width:thin]">
             <StickyNote />
@@ -3273,15 +3256,6 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
             setCompareOpen(false);
           }}
           onExtractAspects={extractAspectsFor}
-        />
-      )}
-
-      {settingsOpen && (
-        <SettingsModal
-          onClose={() => setSettingsOpen(false)}
-          onSaved={() => {
-            // status hook re-fetches via 'enr-keys-updated' event
-          }}
         />
       )}
 

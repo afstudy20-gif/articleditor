@@ -67,7 +67,7 @@ export async function POST(req: Request) {
   const cfg = configFromHeaders(req.headers);
   if (!isAIConfigured(cfg)) {
     return NextResponse.json(
-      { error: 'AI configured değil. Sağ üstteki ayarlardan API anahtarı gir veya GEMINI_API_KEY env değişkenini ayarla.' },
+      { error: 'AI configured değil. Server env içinde GEMINI_API_KEY, ANTHROPIC_API_KEY veya OPENAI_API_KEY ayarlanmalı.' },
       { status: 503 },
     );
   }

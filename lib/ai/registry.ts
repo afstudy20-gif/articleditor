@@ -1,8 +1,7 @@
 // Single source of truth for AI provider metadata.
 // Mirrors /Users/yh/claude/paper/backend/services/ai_providers.py PROVIDERS map.
-// New providers added here automatically flow to UI (SettingsModal),
-// headers (configFromHeaders), and resolveConfig once their key/model
-// fields are wired into UserKeys + ProviderConfig.
+// New providers added here flow to server-side resolveConfig once their
+// key/model environment variables are wired into ProviderConfig.
 
 export type ProviderId = 'gemini' | 'anthropic' | 'openai' | 'deepseek' | 'nvidia';
 

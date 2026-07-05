@@ -1,6 +1,5 @@
 // Gemini provider adapter using @google/generative-ai SDK.
-// Accepts per-call ResolvedGeminiConfig (key, model, embedModel) so BYO-key
-// headers can override env defaults without mutating module state.
+// Accepts ResolvedGeminiConfig (key, model, embedModel) from server-side env.
 
 import {
   GoogleGenerativeAI,

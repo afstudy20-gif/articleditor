@@ -1,9 +1,6 @@
 /**
- * SSRF guard for user-supplied OpenAI-compatible base URLs.
- *
- * The base URL arrives via the X-AI-OpenAI-BaseURL request header and is used
- * for SERVER-side fetches — without validation a malicious client could point
- * it at internal services (cloud metadata, localhost admin ports, ...).
+ * SSRF guard for OpenAI-compatible base URLs. Kept for env-supplied custom
+ * endpoints and future server-side configuration.
  *
  * Policy: https only, no embedded credentials, no localhost/private/link-local
  * hosts. DNS-rebinding is out of scope (we don't resolve hostnames here), but

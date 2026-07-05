@@ -25,13 +25,14 @@ Browser-based editor that converts plain-text numbered citations (`[1]`, `[2]`�
 
 ## Stack
 
-Next.js 14 (App Router) · React 18 · TypeScript · TipTap (ProseMirror) · Tailwind · Dexie (IndexedDB) · JSZip · fast-xml-parser · Zod
+Next.js 16 (App Router) · React 19 · TypeScript · TipTap (ProseMirror) · Tailwind · Dexie (IndexedDB) · JSZip · fast-xml-parser · Zod
 
 ## Local development
 
 ```bash
 npm install
 npm run dev          # http://localhost:3000
+npm test
 npm run typecheck
 npm run build
 ```
@@ -58,9 +59,12 @@ docker run -p 3000:3000 arted
    | `CROSSREF_MAILTO` | CrossRef polite-pool (higher rate limits) |
    | `NCBI_API_KEY` | NCBI E-utilities rate limit boost |
    | `NCBI_EMAIL` | Polite identifier for PubMed |
-   | `ANTHROPIC_API_KEY` | Optional AI features (server fallback; users can BYO-key in UI) |
-   | `OPENAI_API_KEY` | Same, OpenAI-compatible providers |
+   | `GEMINI_API_KEY` | Optional AI features, server-side only |
+   | `ANTHROPIC_API_KEY` | Optional AI features, server-side only |
+   | `OPENAI_API_KEY` | Optional AI features, OpenAI-compatible providers |
    | `OPENAI_BASE_URL` | Custom OpenAI-compatible endpoint (LM Studio, Groq, OpenRouter) |
+   | `DEEPSEEK_API_KEY` | Optional AI features via DeepSeek |
+   | `NVIDIA_API_KEY` | Optional AI features via NVIDIA NIM |
    | `COPYLEAKS_EMAIL` | Copyleaks account email for AI-writing and similarity checks |
    | `COPYLEAKS_API_KEY` | Copyleaks server API key |
    | `COPYLEAKS_WEBHOOK_SECRET` | Long random secret used to authenticate plagiarism callbacks |
@@ -90,7 +94,7 @@ services:
 
 - All projects, article text and your reference library live in **IndexedDB on your device**
 - DOI/PubMed lookups send only the reference **title + first author + year** to public APIs (CrossRef / OpenAlex / NCBI E-utilities)
-- Optional AI features use **your own API key** stored only in your browser
+- Optional AI features use **server-side provider configuration only**; browser API keys are not stored or sent
 - AI-writing and similarity checks are opt-in; when started, the manuscript text is sent to **Copyleaks** through the app server
 - **No tracking, no analytics, no cookies**
 
