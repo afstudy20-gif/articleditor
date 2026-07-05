@@ -40,6 +40,7 @@ export function CitationPopover({
   const tr = lang === 'tr';
   const [mode, setMode] = useState<'view' | 'replace' | 'add' | 'options'>('view');
   const [replaceTargetId, setReplaceTargetId] = useState<string | null>(null);
+  const [selectedRefIds, setSelectedRefIds] = useState<string[]>(refIds);
   const [query, setQuery] = useState('');
   const [opts, setOpts] = useState<CiteOptsValue>(
     initialOpts ?? { locator: '', prefix: '', suffix: '', suppressAuthor: false },
@@ -50,6 +51,7 @@ export function CitationPopover({
     () => allRefs.map((ref, index) => ({ ref, libraryNo: index + 1 })),
     [allRefs],
   );
+  const selectedIdSet = useMemo(() => new Set(selectedRefIds), [selectedRefIds]);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent): void {
@@ -81,17 +83,33 @@ export function CitationPopover({
       .slice(0, 40);
   }, [query, refsWithLibraryNo]);
 
-  function handleSelect(targetRef: Ref): void {
-    if (mode === 'replace') {
-      if (replaceTargetId) {
-        const newRefIds = refIds.map((id) => id === replaceTargetId ? targetRef.id : id);
-        onReplace(pos, newRefIds);
-      } else {
-        onReplace(pos, [targetRef.id]);
-      }
-    } else if (mode === 'add') {
-      onReplace(pos, [...refIds, targetRef.id]);
-    }
+  function beginReplace(targetId?: string): void {
+    setReplaceTargetId(targetId ?? null);
+    setSelectedRefIds(targetId ? refIds.filter((id) => id !== targetId) : refIds);
+    setQuery('');
+    setMode('replace');
+  }
+
+  function beginAdd(): void {
+    setReplaceTargetId(null);
+    setSelectedRefIds(refIds);
+    setQuery('');
+    setMode('add');
+  }
+
+  function toggleSelectedRef(id: string): void {
+    setSelectedRefIds((current) => (
+      current.includes(id)
+        ? current.filter((x) => x !== id)
+        : [...current, id]
+    ));
+  }
+
+  function applySelectedRefs(): void {
+    const unique = selectedRefIds.filter((id, index, arr) => arr.indexOf(id) === index);
+    onReplace(pos, unique);
+    setMode('view');
+    setReplaceTargetId(null);
   }
 
   function removeRef(id: string): void {
@@ -182,10 +200,7 @@ export function CitationPopover({
                     <div className="text-xs mt-1.5 flex items-center gap-2">
                       <div className="flex items-center gap-2 ml-auto">
                         <button
-                          onClick={() => {
-                            setReplaceTargetId(r.id);
-                            setMode('replace');
-                          }}
+                          onClick={() => beginReplace(r.id)}
                           className="text-teal hover:underline font-semibold"
                         >
                           {t('cite_replace')}
@@ -208,10 +223,10 @@ export function CitationPopover({
               </ul>
             </div>
             <div className="px-4 py-3 border-t border-border flex gap-2 flex-wrap">
-              <button onClick={() => setMode('replace')} className="btn-secondary text-xs">
+              <button onClick={() => beginReplace()} className="btn-secondary text-xs">
                 {t('cite_replace')}
               </button>
-              <button onClick={() => setMode('add')} className="btn-secondary text-xs">
+              <button onClick={() => beginAdd()} className="btn-secondary text-xs">
                 + Ref ekle
               </button>
               {onUpdateOpts && (
@@ -305,8 +320,10 @@ export function CitationPopover({
             <div className="px-4 py-3 border-b border-border">
               <p className="text-xs text-muted mb-2">
                 {mode === 'replace'
-                  ? (tr ? "Yerine kullanılacak ref'i seç:" : 'Select the replacement reference:')
-                  : (tr ? "Bu atıfa eklenecek ref'i seç:" : 'Select a reference to add to this citation:')}
+                  ? (replaceTargetId
+                    ? (tr ? "Bu ref yerine kullanılacak ref'leri seç:" : 'Select references to use in place of this ref:')
+                    : t('cite_replace_select_refs'))
+                  : t('cite_add_select_refs')}
               </p>
               <input
                 autoFocus
@@ -323,9 +340,19 @@ export function CitationPopover({
               {filtered.map(({ ref: r, libraryNo }) => (
                 <li
                   key={r.id}
-                  onClick={() => handleSelect(r)}
-                  className="border border-border rounded-lg p-2 text-xs hover:bg-teal-bg hover:border-teal cursor-pointer transition flex gap-2"
+                  onClick={() => toggleSelectedRef(r.id)}
+                  className={`border rounded-lg p-2 text-xs hover:bg-teal-bg hover:border-teal cursor-pointer transition flex gap-2 ${
+                    selectedIdSet.has(r.id) ? 'border-teal bg-teal-bg' : 'border-border'
+                  }`}
                 >
+                  <input
+                    type="checkbox"
+                    checked={selectedIdSet.has(r.id)}
+                    onChange={() => toggleSelectedRef(r.id)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="mt-2 h-4 w-4 shrink-0 accent-teal"
+                    aria-label={tr ? `${libraryNo} numaralı ref'i seç` : `Select reference ${libraryNo}`}
+                  />
                   <span className="shrink-0 w-8 h-8 rounded-md bg-slate-100 text-muted font-bold flex items-center justify-center">
                     #{libraryNo}
                   </span>
@@ -341,10 +368,22 @@ export function CitationPopover({
                 </li>
               ))}
             </ul>
-            <div className="px-4 py-2 border-t border-border flex justify-end">
+            <div className="px-4 py-2 border-t border-border flex items-center justify-between gap-3">
               <button onClick={() => { setMode('view'); setReplaceTargetId(null); }} className="text-xs text-muted hover:text-primary">
                 ← Geri
               </button>
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-muted">
+                  {t('cite_selected_count').replace('{count}', String(selectedRefIds.length))}
+                </span>
+                <button
+                  onClick={applySelectedRefs}
+                  disabled={selectedRefIds.length === 0}
+                  className="btn-primary text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {t('cite_apply_refs')}
+                </button>
+              </div>
             </div>
           </>
         )}
