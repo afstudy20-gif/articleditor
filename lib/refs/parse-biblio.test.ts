@@ -65,6 +65,49 @@ describe('parseRefLine', () => {
     const { ref } = parseRefLine(line, 'r1');
     assert.ok((ref.confidence ?? 0) > 0);
   });
+
+  it('parses Turkish authors, a quoted title, and a Turkish journal name', () => {
+    // Regression: previously the journal name "Türkiye Çocuk Hastalıkları Dergisi"
+    // was truncated to "Dergisi" and the title was dropped, because the regexes
+    // used ASCII-only character classes that cannot match ü ç ş ğ ı ö.
+    const line =
+      'Aygün F, Durak C, Varol F, Çokuğraş H, Camcıoğlu Y. "The lactate/albumin ratio is an effective predictor for mortality in critically ill children". Türkiye Çocuk Hastalıkları Dergisi. 2020;14(6):493-499.';
+    const { ref } = parseRefLine(line, 'tr1');
+
+    assert.equal(ref.authors.length, 5);
+    assert.equal(ref.authors[0].family, 'Aygün');
+    assert.equal(ref.authors[0].given, 'F');
+    assert.equal(ref.authors[4].family, 'Camcıoğlu');
+    assert.ok(ref.title?.includes('lactate/albumin ratio'));
+    assert.ok(!ref.title?.includes('"')); // surrounding quotes must be stripped
+    assert.equal(ref.containerTitle, 'Türkiye Çocuk Hastalıkları Dergisi');
+    assert.equal(ref.year, 2020);
+    assert.equal(ref.volume, '14');
+    assert.equal(ref.issue, '6');
+    assert.equal(ref.pages, '493-499');
+  });
+
+  it('parses an unquoted Turkish title and Turkish journal', () => {
+    const line =
+      'Yılmaz Ö, Kaya Ş, Demir İ. Çölyak hastalığında tanı yöntemleri. Türk Pediatri Arşivi. 2018;53(2):112-119.';
+    const { ref } = parseRefLine(line, 'tr2');
+
+    assert.equal(ref.authors.length, 3);
+    assert.equal(ref.authors[0].family, 'Yılmaz');
+    assert.equal(ref.title, 'Çölyak hastalığında tanı yöntemleri');
+    assert.equal(ref.containerTitle, 'Türk Pediatri Arşivi');
+    assert.equal(ref.year, 2018);
+  });
+
+  it('parses accented (German) author names and journal name', () => {
+    const line =
+      'Müller K, Schmidt B. Eine Studie über Herzfehler. Klinische Pädiatrie. 2017;229(4):220-225.';
+    const { ref } = parseRefLine(line, 'de1');
+
+    assert.equal(ref.authors[0].family, 'Müller');
+    assert.equal(ref.containerTitle, 'Klinische Pädiatrie');
+    assert.equal(ref.title, 'Eine Studie über Herzfehler');
+  });
 });
 
 describe('parseBiblioLines', () => {
