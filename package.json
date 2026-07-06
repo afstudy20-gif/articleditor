@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test \"lib/**/*.test.ts\" \"store/**/*.test.ts\"",
+    "test:e2e": "playwright test",
     "tauri": "tauri"
   },
   "dependencies": {
@@ -49,6 +50,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@tauri-apps/cli": "^2.11.2",
     "@types/katex": "0.16.7",
     "@types/node": "22.10.1",

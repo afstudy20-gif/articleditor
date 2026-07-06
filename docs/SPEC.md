@@ -161,16 +161,21 @@ phrasebank (`lib/phrasebank`), checklists (`lib/checklists`), compliance
 ## 3. Quality Gates
 
 Definition of green (all must pass):
-1. `npm test` — every `lib/**/*.test.ts` suite passes.
+1. `npm test` — every `lib/**/*.test.ts` and `store/**/*.test.ts` suite passes.
 2. `npm run typecheck` — zero errors.
 3. `npm run lint -- --quiet` — zero errors.
 4. `npm run build` — production build succeeds.
 
-## 4. Out Of Scope For Node Tests
+## 4. E2E Smoke (`npm run test:e2e`, Playwright)
 
-React components, TipTap editor interaction, Dexie/IndexedDB behavior, File
-System Access sync, service worker, Tauri shell. These are exercised manually or
-via future Playwright E2E.
+Covers the browser-only core loop the node runner cannot reach: landing render,
+empty-project → workspace hub → editor open, and paste-import with citation +
+bibliography detection (bilingual UI assertions). Reuses a running dev server.
+
+## 4b. Out Of Scope For Automated Tests
+
+TipTap editing interactions beyond open, File System Access sync, service
+worker, Google Drive OAuth, Tauri shell. Exercised manually.
 
 ## 5. Final Acceptance Matrix
 
