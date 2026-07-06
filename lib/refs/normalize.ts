@@ -55,8 +55,11 @@ function parseSingleAuthor(s: string): Author {
   // Corporate / consortium author — keep as a single literal entry so it does
   // not get split into a fake "family + given" pair.
   if (CORPORATE_KEYWORDS_RE.test(t)) return { literal: t };
-  // "Smith J" or "Smith JA"
-  const m1 = t.match(/^([A-ZÇĞİÖŞÜ][\w'\-]+(?:\s+[A-ZÇĞİÖŞÜ][\w'\-]+)?)\s+([A-ZÇĞİÖŞÜ]{1,4})$/);
+  // "Smith J" or "Smith JA" — name body may contain non-ASCII letters
+  // (Aygün, Çokuğraş, Yılmaz, etc.). \u00C0-\u017F covers À-ÿ incl. Turkish.
+  const m1 = t.match(
+    /^([A-ZÇĞİÖŞÜ][\w'\-\u00C0-\u017F]+(?:\s+[A-ZÇĞİÖŞÜ][\w'\-\u00C0-\u017F]+)?)\s+([A-ZÇĞİÖŞÜ]{1,4})$/,
+  );
   if (m1) return { family: m1[1], given: m1[2] };
   // "Smith, J." or "Smith, John"
   const m2 = t.match(/^([^,]+),\s*(.+)$/);

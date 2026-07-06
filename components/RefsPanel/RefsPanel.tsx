@@ -1045,6 +1045,9 @@ function RefList({
           onSaveNote={(note: string) => {
             onUpdate(ctxRef.id, { userNote: note });
           }}
+          onSaveDoi={(doi: string) => {
+            onUpdate(ctxRef.id, { doi: doi || undefined });
+          }}
           onEdit={() => {
             setEditingId(ctxRef.id);
             closeContext();
@@ -1297,6 +1300,7 @@ function ContextMenu({
   onLookup,
   onShowAbstract,
   onSaveNote,
+  onSaveDoi,
   onEdit,
   onExtractAspects,
   t,
@@ -1311,11 +1315,13 @@ function ContextMenu({
   onLookup?: () => void;
   onShowAbstract?: () => void;
   onSaveNote?: (note: string) => void;
+  onSaveDoi?: (doi: string) => void;
   onEdit?: () => void;
   onExtractAspects?: () => void;
   t: (k: string) => string;
 }): JSX.Element {
   const [noteValue, setNoteValue] = useState(r.userNote ?? '');
+  const [doiValue, setDoiValue] = useState(r.doi ?? '');
   const [selectedText, setSelectedText] = useState('');
   
   function handleSelection(): void {
@@ -1427,6 +1433,39 @@ function ContextMenu({
                 </div>
               </div>
             )}
+
+            {/* DOI field — inline-editable so a DOI can be pasted & saved
+                without opening the full Edit form. Mirrors the Note pattern. */}
+            <div className="px-3 py-2 shrink-0">
+              <div className="tool-label mb-1.5">{t('rp_edit_doi')}</div>
+              <input
+                type="text"
+                value={doiValue}
+                onChange={(e) => setDoiValue(e.target.value)}
+                placeholder="10.xxxx/xxxxxxx"
+                className="w-full text-sm border border-border rounded px-2 py-1.5 outline-none focus:border-teal bg-slate-50 focus:bg-white"
+              />
+              {doiValue !== (r.doi ?? '') && (
+                <div className="flex gap-2 mt-1.5 justify-end">
+                  <button
+                    onClick={() => {
+                      onSaveDoi?.(doiValue.trim());
+                    }}
+                    className="btn-primary text-sm px-2.5 py-1"
+                  >
+                    {t('rp_edit_save')}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setDoiValue(r.doi ?? '');
+                    }}
+                    className="text-sm text-muted hover:text-primary px-1 py-1"
+                  >
+                    {t('rp_edit_cancel')}
+                  </button>
+                </div>
+              )}
+            </div>
 
             {/* Note field */}
             <div className="px-3 py-2 shrink-0">

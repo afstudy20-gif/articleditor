@@ -72,6 +72,10 @@ export type DocxStyleMap = {
   abstractSeparator?: string;
   numIdBullet?: number;
   numIdOrdered?: number;
+  /** Numbering instance ID for level-1 section headings (e.g. MDPI's "1.", "2." …
+   *  outline). When set, level-1 headings render with an auto-incrementing
+   *  decimal number instead of a plain style. */
+  numIdHeading?: number;
 };
 
 export type RichBuildInput = {
@@ -269,9 +273,11 @@ ${this.rels.join('\n')}
 
     const articleTypeStyle = this.sid('articleType');
     if (this.input.articleType?.trim() && articleTypeStyle) {
+      // The article-type style (e.g. MDPI11articletype) already defines italic,
+      // so no inline <w:i/> override is needed.
       paragraphs.push(
         `<w:p><w:pPr><w:pStyle w:val="${articleTypeStyle}"/></w:pPr>`
-        + `<w:r><w:rPr><w:i/></w:rPr><w:t xml:space="preserve">${escapeXml(this.input.articleType.trim())}</w:t></w:r></w:p>`,
+        + `<w:r><w:t xml:space="preserve">${escapeXml(this.input.articleType.trim())}</w:t></w:r></w:p>`,
       );
     }
     if (
@@ -288,14 +294,27 @@ ${this.rels.join('\n')}
     const abstractText = this.input.abstractText?.trim() ?? '';
     const keywords = normalizeKeywords(this.input.keywords);
     if (abstractText || keywords.length > 0) {
-      paragraphs.push(`<w:p><w:pPr><w:pStyle w:val="${abstractHeadingStyle}"/></w:pPr>${textRun('Abstract')}</w:p>`);
+      // MDPI production output indents the abstract block (heading + body +
+      // keywords) to the left margin of the body-text gutter, overriding the
+      // MDPI31text first-line indent. When the template defines a dedicated
+      // abstract style (e.g. MDPI31text), emit the override explicitly.
+      const abstractHasOwnStyle = abstractHeadingStyle !== h1Style;
+      const abstractIndent = abstractHasOwnStyle ? '<w:ind w:left="2552" w:firstLine="0"/>' : '';
+      paragraphs.push(
+        `<w:p><w:pPr><w:pStyle w:val="${abstractHeadingStyle}"/>${abstractIndent}</w:pPr>`
+        + `<w:r><w:rPr><w:b/><w:bCs/></w:rPr><w:t xml:space="preserve">Abstract</w:t></w:r></w:p>`,
+      );
       abstractText
         .split(/\n{2,}/)
         .map((part) => part.trim())
         .filter(Boolean)
         .forEach((part) => {
-          const pPr = normalStyle ? `<w:pPr><w:pStyle w:val="${normalStyle}"/></w:pPr>` : '';
-          paragraphs.push(`<w:p>${pPr}${textRun(part)}</w:p>`);
+          const pPr = normalStyle
+            ? `<w:pPr><w:pStyle w:val="${normalStyle}"/>${abstractIndent}</w:pPr>`
+            : abstractIndent
+              ? `<w:pPr>${abstractIndent}</w:pPr>`
+              : '';
+          paragraphs.push(`<w:p>${pPr}${this.abstractSectionRuns(part)}</w:p>`);
         });
       if (keywords.length > 0) {
         const pPr = keywordsStyle ? `<w:pPr><w:pStyle w:val="${keywordsStyle}"/></w:pPr>` : '';
@@ -325,10 +344,12 @@ ${this.rels.join('\n')}
         const block = content[index];
         if (block?.type === 'heading') seenHeading = true;
         let styleOverride: string | undefined;
+        let frontMatterKind: 'byline' | 'affiliation' | undefined;
         if (block?.type === 'paragraph') {
           const text = nodeText(block).trim();
           if (!seenHeading && authorNamesStyle && !seenByline && looksLikeAuthorByline(text)) {
             styleOverride = authorNamesStyle;
+            frontMatterKind = 'byline';
             seenByline = true;
           } else if (
             !seenHeading
@@ -337,11 +358,20 @@ ${this.rels.join('\n')}
             && (/^\d+\s+\S/.test(text) || /^\*?\s*(Correspondence|İletişim)/i.test(text))
           ) {
             styleOverride = affiliationStyle;
+            frontMatterKind = 'affiliation';
           } else if (backMatterStyle && BACK_MATTER_RE.test(text)) {
             styleOverride = backMatterStyle;
           }
         }
-        paragraphs.push(...this.blockToXml(block, {}, styleOverride));
+        if (frontMatterKind === 'byline') {
+          paragraphs.push(this.bylineParagraph(block, styleOverride));
+        } else if (frontMatterKind === 'affiliation') {
+          paragraphs.push(this.affiliationParagraph(block, styleOverride));
+        } else {
+          // Front-matter (pre-first-heading) lists inherit the body-gutter
+          // indent to match MDPI production output.
+          paragraphs.push(...this.blockToXml(block, {}, styleOverride, !seenHeading));
+        }
       }
     }
     if (this.input.includeBibliography !== false) {
@@ -402,11 +432,12 @@ ${paragraphs.join('\n')}
     n: Json,
     listCtx: { numId?: number; ilvl?: number },
     styleOverride?: string,
+    frontMatter = false,
   ): string[] {
     if (!n) return [];
     switch (n.type) {
       case 'paragraph':
-        return [this.paragraph(n, listCtx, styleOverride)];
+        return [this.paragraph(n, listCtx, styleOverride, frontMatter)];
       case 'heading': {
         const level = Math.min(Math.max(Number(n.attrs?.level ?? 1), 1), 3);
         const mapped = this.sid(`heading${level}` as keyof DocxStyleMap, `Heading${level}`);
@@ -423,15 +454,23 @@ ${paragraphs.join('\n')}
         if (isLevel2Fallback) {
           return [this.boldBodyParagraph(n, listCtx)];
         }
+        // MDPI production output renders level-1 section headings with an
+        // auto-incrementing outline number ("1.", "2." …). When a heading
+        // numbering instance is mapped, render the heading against the normal
+        // body style + the outline list instead of a static heading style.
+        const headingNumId = this.input.styleMap?.numIdHeading;
+        if (level === 1 && headingNumId !== undefined) {
+          return [this.numberedHeadingParagraph(n, headingNumId)];
+        }
         return [this.paragraph(n, listCtx, mapped)];
       }
       case 'bulletList':
-        return this.list(n, this.input.styleMap?.numIdBullet ?? 1);
+        return this.list(n, this.input.styleMap?.numIdBullet ?? 1, 0, frontMatter);
       case 'orderedList':
-        return this.list(n, this.input.styleMap?.numIdOrdered ?? 2);
+        return this.list(n, this.input.styleMap?.numIdOrdered ?? 2, 0, frontMatter);
       case 'blockquote': {
         const out: string[] = [];
-        for (const c of n.content ?? []) out.push(...this.blockToXml(c, listCtx));
+        for (const c of n.content ?? []) out.push(...this.blockToXml(c, listCtx, undefined, frontMatter));
         return out;
       }
       case 'table':
@@ -472,33 +511,44 @@ ${paragraphs.join('\n')}
     }
   }
 
-  private list(n: Json, numId: number, ilvl = 0): string[] {
+  private list(n: Json, numId: number, ilvl = 0, frontMatter = false): string[] {
     this.usesNumbering = true;
     const out: string[] = [];
     for (const item of n.content ?? []) {
       if (item.type !== 'listItem') continue;
       for (const child of item.content ?? []) {
         if (child.type === 'bulletList') {
-          out.push(...this.list(child, this.input.styleMap?.numIdBullet ?? 1, ilvl + 1));
+          out.push(...this.list(child, this.input.styleMap?.numIdBullet ?? 1, ilvl + 1, frontMatter));
         } else if (child.type === 'orderedList') {
-          out.push(...this.list(child, this.input.styleMap?.numIdOrdered ?? 2, ilvl + 1));
+          out.push(...this.list(child, this.input.styleMap?.numIdOrdered ?? 2, ilvl + 1, frontMatter));
         } else if (child.type === 'paragraph') {
-          out.push(this.paragraph(child, { numId, ilvl }));
+          out.push(this.paragraph(child, { numId, ilvl }, undefined, frontMatter));
         } else {
-          out.push(...this.blockToXml(child, { numId, ilvl }));
+          out.push(...this.blockToXml(child, { numId, ilvl }, undefined, frontMatter));
         }
       }
     }
     return out;
   }
 
-  private paragraph(n: Json, listCtx: { numId?: number; ilvl?: number }, styleId?: string): string {
+  private paragraph(
+    n: Json,
+    listCtx: { numId?: number; ilvl?: number },
+    styleId?: string,
+    frontMatter = false,
+  ): string {
     const pPr: string[] = [];
     // Plain body paragraphs pick up the template's normal-text style.
     const effectiveStyle = styleId ?? (listCtx.numId === undefined ? this.sid('normal') : undefined);
     if (effectiveStyle) pPr.push(`<w:pStyle w:val="${effectiveStyle}"/>`);
     if (listCtx.numId !== undefined) {
       pPr.push(`<w:numPr><w:ilvl w:val="${listCtx.ilvl ?? 0}"/><w:numId w:val="${listCtx.numId}"/></w:numPr>`);
+    }
+    // Lists that appear in the front-matter area (before the first section
+    // heading) are indented to the body gutter in MDPI production output,
+    // overriding the list definition's default hanging indent.
+    if (frontMatter && listCtx.numId !== undefined) {
+      pPr.push('<w:ind w:left="2552" w:hanging="360"/>');
     }
     const align = n.attrs?.textAlign;
     if (align === 'center') pPr.push('<w:jc w:val="center"/>');
@@ -518,6 +568,102 @@ ${paragraphs.join('\n')}
   }
 
   /**
+   * Render an abstract body paragraph, splitting a leading structured label
+   * ("Background:", "Methods:", "Results:", "Conclusions:") into a bold run
+   * so it matches MDPI production output. Bilingual (Turkish) labels too.
+   * Returns the run XML (no <w:p> wrapper).
+   */
+  private abstractSectionRuns(part: string): string {
+    const m = part.match(
+      /^(Background|Methods|Results|Conclusions?|Objective?s?|Purpose|Aim|Findings|Giriş|Yöntemler?|Sonuçlar?|Amaç|Bulgular?|Çıkarımlar?)\s*[:：]\s*/i,
+    );
+    if (!m) return textRun(part);
+    const label = m[0];
+    const rest = part.slice(label.length);
+    return `<w:r><w:rPr><w:b/><w:bCs/></w:rPr><w:t xml:space="preserve">${escapeXml(label)}</w:t></w:r>`
+      + textRun(rest);
+  }
+
+  /**
+   * Author byline paragraph. MDPI production output places it flush against
+   * the left margin (no first-line indent) in bold, with affiliation markers
+   * ("1", "1*") rendered as superscript. We override the body-text style's
+   * default indent and bold the runs; numeric/symbol markers following a
+   * name become superscript.
+   */
+  private bylineParagraph(n: Json, styleId?: string): string {
+    const pPr: string[] = [];
+    if (styleId) pPr.push(`<w:pStyle w:val="${styleId}"/>`);
+    pPr.push('<w:ind w:left="0" w:firstLine="0"/>');
+    const pPrXml = pPr.length ? `<w:pPr>${pPr.join('')}</w:pPr>` : '';
+    const runs = this.bylineRuns(n.content ?? []);
+    return `<w:p>${pPrXml}${runs || textRun('')}</w:p>`;
+  }
+
+  /** Split a byline into bold name-runs with superscript affiliation markers. */
+  private bylineRuns(content: Json[]): string {
+    // Walk inline text nodes; runs of letters/spaces/comma are bold body text,
+    // runs of digits/asterisks that trail a name are superscript markers.
+    const out: string[] = [];
+    for (const c of content ?? []) {
+      if (!c) continue;
+      if (c.type === 'text') {
+        out.push(...this.splitBylineText(c.text ?? ''));
+      } else if (c.type === 'hardBreak') {
+        out.push('<w:r><w:br/></w:r>');
+      } else if (Array.isArray(c.content)) {
+        out.push(this.bylineRuns(c.content));
+      }
+    }
+    return out.join('');
+  }
+
+  /** Emit a byline text string as alternating bold/superscript runs. */
+  private splitBylineText(text: string): string[] {
+    // A marker is a short run of digits/asterisks/daggers optionally separated
+    // by commas, that follows a name. e.g. "1", "1,2", "1*", "†".
+    const re = /([0-9][0-9,*†‡§¶\s]*\*?|[†‡§¶]\*?)/g;
+    const runs: string[] = [];
+    let last = 0;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(text))) {
+      if (m.index > last) {
+        const seg = text.slice(last, m.index);
+        runs.push(this.boldRun(seg));
+      }
+      runs.push(this.superscriptRun(m[1].trim()));
+      last = m.index + m[0].length;
+    }
+    if (last < text.length) runs.push(this.boldRun(text.slice(last)));
+    return runs.length ? runs : [this.boldRun(text)];
+  }
+
+  private boldRun(text: string): string {
+    if (!text) return '';
+    return `<w:r><w:rPr><w:b/><w:bCs/></w:rPr><w:t xml:space="preserve">${escapeXml(text)}</w:t></w:r>`;
+  }
+
+  private superscriptRun(text: string): string {
+    if (!text) return '';
+    return `<w:r><w:rPr><w:b/><w:bCs/><w:vertAlign w:val="superscript"/></w:rPr><w:t xml:space="preserve">${escapeXml(text)}</w:t></w:r>`;
+  }
+
+  /**
+   * Affiliation / correspondence paragraph. MDPI production output indents it
+   * to the body gutter (no first-line indent) in 8pt (sz=16). We override the
+   * body-text style indent and force the run size down.
+   */
+  private affiliationParagraph(n: Json, styleId?: string): string {
+    const pPr: string[] = [];
+    if (styleId) pPr.push(`<w:pStyle w:val="${styleId}"/>`);
+    pPr.push('<w:ind w:left="2552" w:firstLine="0"/>');
+    const pPrXml = pPr.length ? `<w:pPr>${pPr.join('')}</w:pPr>` : '';
+    const text = nodeText(n);
+    const rPr = '<w:rPr><w:sz w:val="16"/><w:szCs w:val="16"/></w:rPr>';
+    return `<w:p>${pPrXml}<w:r>${rPr}<w:t xml:space="preserve">${escapeXml(text)}</w:t></w:r></w:p>`;
+  }
+
+  /**
    * Sub-heading rendered as plain bold body text (normal style + a bold
    * inline run). Used when a template intentionally does NOT map level-2
    * headings to a dedicated style — matches MDPI production output where
@@ -534,6 +680,28 @@ ${paragraphs.join('\n')}
     const runs = this.inlineRuns(n.content ?? [], true);
     const pPrXml = pPr.length ? `<w:pPr>${pPr.join('')}</w:pPr>` : '';
     return `<w:p>${pPrXml}${runs || textRun('')}</w:p>`;
+  }
+
+  /**
+   * Level-1 section heading rendered with an auto-incrementing outline number
+   * ("1.", "2." …). Matches MDPI production output: the heading text sits on
+   * the body-text style (MDPI31text) with a decimal outline list attached,
+   * a 12pt bold run, and the outline list's hanging indent.
+   */
+  private numberedHeadingParagraph(n: Json, numId: number): string {
+    this.usesNumbering = true;
+    const normalStyle = this.sid('normal');
+    const pPr: string[] = [];
+    if (normalStyle) pPr.push(`<w:pStyle w:val="${normalStyle}"/>`);
+    pPr.push(`<w:numPr><w:ilvl w:val="0"/><w:numId w:val="${numId}"/></w:numPr>`);
+    pPr.push('<w:ind w:left="2835" w:hanging="283"/>');
+    // Section headings are not justified like body text.
+    pPr.push('<w:jc w:val="left"/>');
+    const pPrXml = pPr.length ? `<w:pPr>${pPr.join('')}</w:pPr>` : '';
+    // Bold 12pt (sz=24 half-points) run, matching the production template.
+    const rPr = '<w:rPr><w:b/><w:bCs/><w:sz w:val="24"/><w:szCs w:val="24"/></w:rPr>';
+    const text = nodeText(n);
+    return `<w:p>${pPrXml}<w:r>${rPr}<w:t xml:space="preserve">${escapeXml(text)}</w:t></w:r></w:p>`;
   }
 
   /** Convert inline nodes (text/citation/hardBreak/figureRef/image) to runs. */
@@ -564,16 +732,25 @@ ${paragraphs.join('\n')}
     if (text === '') return '';
     const marks: Json[] = Array.isArray(n.marks) ? n.marks : [];
     const rPr: string[] = [];
-    if (forceBold) rPr.push('<w:b/>');
+    // Track which simple toggle properties have already been emitted so that
+    // forceBold and a bold mark (or a duplicate mark) never duplicate <w:b/>.
+    const seen = new Set<string>();
+    const toggle = (tag: string): void => {
+      if (!seen.has(tag)) {
+        seen.add(tag);
+        rPr.push(tag);
+      }
+    };
+    if (forceBold) toggle('<w:b/>');
     let linkHref: string | null = null;
     for (const m of marks) {
       switch (m.type) {
-        case 'bold': rPr.push('<w:b/>'); break;
-        case 'italic': rPr.push('<w:i/>'); break;
-        case 'underline': rPr.push('<w:u w:val="single"/>'); break;
-        case 'strike': rPr.push('<w:strike/>'); break;
-        case 'superscript': rPr.push('<w:vertAlign w:val="superscript"/>'); break;
-        case 'subscript': rPr.push('<w:vertAlign w:val="subscript"/>'); break;
+        case 'bold': toggle('<w:b/>'); break;
+        case 'italic': toggle('<w:i/>'); break;
+        case 'underline': toggle('<w:u w:val="single"/>'); break;
+        case 'strike': toggle('<w:strike/>'); break;
+        case 'superscript': toggle('<w:vertAlign w:val="superscript"/>'); break;
+        case 'subscript': toggle('<w:vertAlign w:val="subscript"/>'); break;
         case 'code': rPr.push('<w:rFonts w:ascii="Courier New" w:hAnsi="Courier New" w:cs="Courier New" w:eastAsia="Courier New"/>'); break;
         case 'highlight': rPr.push('<w:highlight w:val="yellow"/>'); break;
         case 'textStyle': {

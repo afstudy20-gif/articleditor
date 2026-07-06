@@ -267,7 +267,7 @@ export function parseRefLine(raw: string, id: string): ParsedRef {
   const titleMatch = rest.match(/^\.?\s*(.+?[?.!])\s+/);
   let afterTitle = rest;
   if (titleMatch) {
-    ref.title = stripTrailingPunct(titleMatch[1]);
+    ref.title = stripSurroundingQuotes(stripTrailingPunct(titleMatch[1]));
     afterTitle = rest.slice(titleMatch[0].length);
     confidence += 0.15;
   }
@@ -307,8 +307,9 @@ function extractUrl(s: string): string | undefined {
 function extractAuthorBlock(s: string): { text: string; endIndex: number } {
   // Find first ". X" where X starts the title. Authors typically end with a single
   // capital initial (J., AB.) or a family name; the next sentence starts with a
-  // capital letter or digit. Use a non-greedy scan.
-  const re = /\.\s+(?=[A-ZÇĞİÖŞÜ\(\d])/g;
+  // capital letter, digit, or an opening quote (titles are often wrapped in
+  // quotes: `Author A. "Title...". Journal.`). Use a non-greedy scan.
+  const re = /\.\s+(?=["“”‘'\u00C0-\u017FA-ZÇĞİÖŞÜ\(\d])/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(s))) {
     const prefix = s.slice(0, m.index);
@@ -339,12 +340,14 @@ function isCorporateAuthor(s: string): boolean {
 function looksLikeSingleAuthorToken(s: string): boolean {
   const t = s.trim().replace(/\.$/, '');
   if (!t) return false;
-  // "Smith J" / "Smith JA" / "Smith-Jones JA"
-  if (/^[A-ZÇĞİÖŞÜ][\w'\-]+(?:\s+[A-ZÇĞİÖŞÜ][\w'\-]+)?\s+[A-ZÇĞİÖŞÜ]{1,4}$/.test(t)) return true;
+  // "Smith J" / "Smith JA" / "Smith-Jones JA" — name body may contain non-ASCII
+  // letters (Aygün, Çokuğraş, etc.). \u00C0-\u017F covers À-ÿ incl. Turkish.
+  if (/^[A-ZÇĞİÖŞÜ][\w'\-\u00C0-\u017F]+(?:\s+[A-ZÇĞİÖŞÜ][\w'\-\u00C0-\u017F]+)?\s+[A-ZÇĞİÖŞÜ]{1,4}$/.test(t))
+    return true;
   // Initials-only continuation token
   if (/^[A-ZÇĞİÖŞÜ](?:\.?[A-ZÇĞİÖŞÜ]){0,3}\.?$/.test(t)) return true;
   // "First Last" pattern (two capitalized tokens) — rare but plausible
-  if (/^[A-ZÇĞİÖŞÜ][\w'\-]+\s+[A-ZÇĞİÖŞÜ][\w'\-]+$/.test(t)) return true;
+  if (/^[A-ZÇĞİÖŞÜ][\w'\-\u00C0-\u017F]+\s+[A-ZÇĞİÖŞÜ][\w'\-\u00C0-\u017F]+$/.test(t)) return true;
   return false;
 }
 
@@ -376,8 +379,11 @@ function looksLikeAuthorList(s: string): boolean {
 
 function extractJournalLikely(s: string): { name?: string; volume?: string; issue?: string; pages?: string } | undefined {
   // Pattern: "JournalName. 2020;15(3):123-130" or "JournalName 2020; 15: 123-130"
+  // The journal name may contain non-ASCII letters (Türkiye, Hastalıkları, etc.),
+  // so the char class includes Latin-1 Supplement + Turkish letters explicitly.
+  // `\u00C0-\u017F` covers À-ÿ (incl. ü ç ş ğ ı ö and their capitals).
   const m = s.match(
-    /([A-Z][\w &.\-:'/]{1,80}?)\.?\s+(?:19|20)?\d{2}\s*[;,]?\s*(\d+)?(?:\s*\((\d+)\))?\s*[:\-]?\s*([\dA-Za-z\-–]+)?/,
+    /([A-Z\u00C0-\u017F][\w &.\-:'/\u00C0-\u017F]{1,80}?)\.?\s+(?:19|20)?\d{2}\s*[;,]?\s*(\d+)?(?:\s*\((\d+)\))?\s*[:\-]?\s*([\dA-Za-z\-–]+)?/,
   );
   if (!m) return undefined;
   return {
@@ -398,6 +404,17 @@ function detectType(s: string): RefType {
 
 function stripTrailingPunct(s: string): string {
   return s.replace(/[\s.,;:]+$/, '').trim();
+}
+
+/** Strip a single layer of surrounding ASCII or typographic quotes. */
+function stripSurroundingQuotes(s: string): string {
+  const trimmed = s.trim();
+  const QUOTES = `"“”‘’'`;
+  if (trimmed.length < 2) return trimmed;
+  if (QUOTES.includes(trimmed[0]) && QUOTES.includes(trimmed[trimmed.length - 1])) {
+    return trimmed.slice(1, -1).trim();
+  }
+  return trimmed;
 }
 
 export type ParsedBiblio = {

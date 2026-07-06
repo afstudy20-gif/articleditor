@@ -227,4 +227,174 @@ describe('buildTemplateDocx (JCM/MDPI)', () => {
       assert.ok(para.includes('<w:pStyle w:val="MDPI62backmatter"/>'), `${label} back-matter style`);
     }
   });
+
+  it('renders level-1 headings with an auto-incrementing outline number', async () => {
+    // Regression: previously section headings rendered as plain bold body
+    // text with no number. MDPI production output numbers them "1.", "2." …
+    const tpl = getDocxTemplate('jcm')!;
+    const bytes = readFileSync(TEMPLATE_PATH);
+    const blob = await buildTemplateDocx(bytes, tpl, {
+      doc: {
+        type: 'doc',
+        content: [
+          // A leading paragraph ensures the editor title is used (not the first
+          // heading), so both level-1 headings below are treated as section
+          // headings and numbered.
+          { type: 'paragraph', content: [{ type: 'text', text: 'Abstract placeholder.' }] },
+          { type: 'heading', attrs: { level: 1 }, content: [{ type: 'text', text: 'Introduction' }] },
+          { type: 'paragraph', content: [{ type: 'text', text: 'Body.' }] },
+          { type: 'heading', attrs: { level: 1 }, content: [{ type: 'text', text: 'Results' }] },
+        ],
+      },
+      refsById: new Map(),
+      refOrder: new Map(),
+      style: 'vancouver',
+      mode: 'plain',
+      title: 'Numbered Headings',
+    });
+    const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+    const xml = await zip.file('word/document.xml')!.async('string');
+    const numbering = await zip.file('word/numbering.xml')!.async('string');
+
+    // The heading numbering list (903) is defined in numbering.xml.
+    assert.ok(numbering.includes('w:numId="903"'), 'heading numbering list defined');
+    assert.ok(
+      numbering.includes('w:abstractNumId="903"'),
+      'heading numbering abstractNum present',
+    );
+
+    // Each level-1 heading paragraph carries the heading numPr + the
+    // production indent, on the body-text style (not MDPI21heading1).
+    for (const headingText of ['Introduction', 'Results']) {
+      const idx = xml.indexOf(headingText);
+      assert.ok(idx > -1, `${headingText} present`);
+      const para = xml.slice(xml.lastIndexOf('<w:p>', idx), idx);
+      assert.ok(para.includes('<w:pStyle w:val="MDPI31text"/>'), `${headingText} on body style`);
+      assert.ok(
+        para.includes('<w:numId w:val="903"/>'),
+        `${headingText} linked to heading numbering`,
+      );
+      assert.ok(
+        para.includes('w:left="2835" w:hanging="283"'),
+        `${headingText} production hanging indent`,
+      );
+    }
+    // Headings must NOT carry the static MDPI21heading1 style on section headings.
+    // (The References bibliography heading still uses MDPI21heading1, so only
+    // verify the section-heading paragraphs are not using it.)
+    assert.ok(
+      !/<w:pStyle w:val="MDPI21heading1"\/><w:r><w:t[^>]*>Introduction/.test(xml),
+      'section heading Introduction does not use static heading1 style',
+    );
+  });
+
+  it('indents front-matter paragraphs (byline, affiliation, abstract) to the body gutter', async () => {
+    // Regression: previously front-matter paragraphs inherited the
+    // MDPI31text first-line indent; production output overrides it.
+    const tpl = getDocxTemplate('jcm')!;
+    const bytes = readFileSync(TEMPLATE_PATH);
+    const blob = await buildTemplateDocx(bytes, tpl, {
+      doc: {
+        type: 'doc',
+        content: [
+          { type: 'paragraph', content: [{ type: 'text', text: 'Fatih Akkaya 1, Nihan Bahadır 1' }] },
+          { type: 'paragraph', content: [{ type: 'text', text: '1 Department of Cardiology, Ordu University, Ordu' }] },
+          { type: 'heading', attrs: { level: 1 }, content: [{ type: 'text', text: 'Introduction' }] },
+        ],
+      },
+      refsById: new Map(),
+      refOrder: new Map(),
+      style: 'vancouver',
+      mode: 'plain',
+      title: 'Indent Test',
+      abstractText: 'Background: structured abstract.\n\nMethods: methods text.',
+    });
+    const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+    const xml = await zip.file('word/document.xml')!.async('string');
+
+    // Byline sits flush-left (no first-line indent).
+    const bylineIdx = xml.indexOf('Fatih Akkaya');
+    const bylinePara = xml.slice(xml.lastIndexOf('<w:p>', bylineIdx), bylineIdx);
+    assert.ok(
+      bylinePara.includes('w:left="0" w:firstLine="0"'),
+      'byline overrides first-line indent',
+    );
+    // Affiliation indented to the gutter in 8pt (sz=16).
+    const affIdx = xml.indexOf('Department of Cardiology');
+    const affPara = xml.slice(xml.lastIndexOf('<w:p>', affIdx), affIdx);
+    assert.ok(
+      affPara.includes('w:left="2552" w:firstLine="0"'),
+      'affiliation gutter indent',
+    );
+    assert.ok(affPara.includes('<w:sz w:val="16"/>'), 'affiliation small font');
+    // Abstract heading indented to the gutter.
+    const absIdx = xml.indexOf('>Abstract<');
+    const absPara = xml.slice(xml.lastIndexOf('<w:p>', absIdx), absIdx);
+    assert.ok(
+      absPara.includes('w:left="2552" w:firstLine="0"'),
+      'abstract heading gutter indent',
+    );
+    // Abstract body paragraph indented to the gutter with bold label.
+    const bgIdx = xml.indexOf('Background:');
+    const bgPara = xml.slice(xml.lastIndexOf('<w:p>', bgIdx), bgIdx);
+    assert.ok(
+      bgPara.includes('w:left="2552" w:firstLine="0"'),
+      'abstract body gutter indent',
+    );
+    // The label run is bold: the run rPr should contain <w:b/> right before
+    // the "Background:" text run.
+    const bgRun = xml.slice(bgIdx - 80, bgIdx + 20);
+    assert.ok(
+      bgRun.includes('<w:b/><w:bCs/></w:rPr><w:t xml:space="preserve">Background'),
+      'structured abstract label is bold',
+    );
+  });
+
+  it('indents front-matter lists to the body gutter but leaves body lists untouched', async () => {
+    const tpl = getDocxTemplate('jcm')!;
+    const bytes = readFileSync(TEMPLATE_PATH);
+    const blob = await buildTemplateDocx(bytes, tpl, {
+      doc: {
+        type: 'doc',
+        content: [
+          { type: 'paragraph', content: [{ type: 'text', text: 'Author One 1' }] },
+          { type: 'paragraph', content: [{ type: 'text', text: '1 Department, University, City' }] },
+          {
+            type: 'bulletList',
+            content: [
+              { type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Front-matter item' }] }] },
+            ],
+          },
+          { type: 'heading', attrs: { level: 1 }, content: [{ type: 'text', text: 'Introduction' }] },
+          {
+            type: 'bulletList',
+            content: [
+              { type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Body item' }] }] },
+            ],
+          },
+        ],
+      },
+      refsById: new Map(),
+      refOrder: new Map(),
+      style: 'vancouver',
+      mode: 'plain',
+      title: 'List Indent Test',
+    });
+    const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+    const xml = await zip.file('word/document.xml')!.async('string');
+
+    const frontIdx = xml.indexOf('Front-matter item');
+    const frontPara = xml.slice(xml.lastIndexOf('<w:p>', frontIdx), frontIdx);
+    assert.ok(
+      frontPara.includes('w:left="2552"'),
+      'front-matter list indented to gutter',
+    );
+
+    const bodyIdx = xml.indexOf('Body item');
+    const bodyPara = xml.slice(xml.lastIndexOf('<w:p>', bodyIdx), bodyIdx);
+    assert.ok(
+      !bodyPara.includes('w:left="2552"'),
+      'body list not overridden',
+    );
+  });
 });
