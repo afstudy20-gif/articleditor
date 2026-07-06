@@ -12,13 +12,16 @@ import {
   formatHistoryTime,
   type HistoryEntry,
 } from '@/lib/history';
+
+type AddRefResult = { ref: Ref; added: boolean };
+
 type Props = {
   refs: Ref[];
   refOrder: Map<string, number>;
   onAddByDoi: (doi: string) => Promise<void>;
   onLookupDoi?: (doi: string) => Promise<Ref | null>;
   onSearch: (query: string, opts?: { fromYear?: number; toYear?: number }) => Promise<Ref[]>;
-  onAddRef: (ref: Ref) => void;
+  onAddRef: (ref: Ref) => AddRefResult;
   onInsertCitation: (refId: string) => void;
   onInsertCitationMulti?: (refIds: string[]) => void;
   onUpdateRef: (id: string, patch: Partial<Ref>) => void;
@@ -90,6 +93,17 @@ export function RefsPanel({
     if (onSelectedIdsChange) onSelectedIdsChange(next);
     else setInternalSelectedIds(next);
   };
+  function revealRef(ref: Ref): void {
+    setLibraryQuery('');
+    setTab('list');
+    onSelectRef?.(ref.id);
+  }
+
+  function addRefAndReveal(ref: Ref): AddRefResult {
+    const result = onAddRef(ref);
+    revealRef(result.ref);
+    return result;
+  }
 
   function toggleSelect(id: string): void {
     const next = new Set(selectedIds);
@@ -481,7 +495,7 @@ export function RefsPanel({
             onAddByDoi={onAddByDoi}
             onLookupDoi={onLookupDoi}
             onSearch={onSearch}
-            onAddRef={onAddRef}
+            onAddRef={addRefAndReveal}
             onImportText={importFromText}
             onPickFile={() => importFileRef.current?.click()}
             importBusy={importBusy}
@@ -779,7 +793,12 @@ function RefList({
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const highlightedRowRef = useRef<HTMLLIElement | null>(null);
   const useExternalHighlight = !!onHighlight;
+
+  useEffect(() => {
+    highlightedRowRef.current?.scrollIntoView({ block: 'nearest' });
+  }, [highlightedId, refs]);
 
   function toggleExpand(id: string): void {
     setExpandedId(expandedId === id ? null : id);
@@ -813,6 +832,7 @@ function RefList({
         return (
           <li
             key={r.id}
+            ref={isHighlighted ? highlightedRowRef : null}
             onContextMenu={(e) => openContext(e, r.id)}
             className={`border rounded-lg p-2.5 text-sm transition ${
               isHighlighted
@@ -1637,7 +1657,7 @@ function AddPanel({
   onAddByDoi: (doi: string) => Promise<void>;
   onLookupDoi?: (doi: string) => Promise<Ref | null>;
   onSearch: (q: string, opts?: { fromYear?: number; toYear?: number }) => Promise<Ref[]>;
-  onAddRef: (ref: Ref) => void;
+  onAddRef: (ref: Ref) => AddRefResult;
   onImportText: (text: string) => Promise<void>;
   onPickFile: () => void;
   importBusy: boolean;
@@ -1690,9 +1710,11 @@ function AddPanel({
 
   function confirmDoiAdd(): void {
     if (!doiPreview) return;
-    onAddRef(doiPreview);
-    setDoiPreview(null);
-    setDoi('');
+    const result = onAddRef(doiPreview);
+    if (result.added) {
+      setDoiPreview(null);
+      setDoi('');
+    }
   }
 
   function cancelDoiPreview(): void {
@@ -1842,8 +1864,10 @@ function AddPanel({
                 <div className="mt-2 flex justify-end">
                   <button
                     onClick={() => {
-                      onAddRef(r);
-                      setResults(results.filter((x) => x.id !== r.id));
+                      const result = onAddRef(r);
+                      if (result.added) {
+                        setResults(results.filter((x) => x.id !== r.id));
+                      }
                     }}
                     className="btn-primary text-xs px-3 py-1"
                     title={t('rp_doi_add_to_lib')}
@@ -1908,7 +1932,7 @@ function ManualAddSection({
   onAddRef,
   t,
 }: {
-  onAddRef: (ref: Ref) => void;
+  onAddRef: (ref: Ref) => AddRefResult;
   t: (k: string) => string;
 }): JSX.Element {
   const [mType, setMType] = useState<RefType>('journal-article');
@@ -1952,7 +1976,8 @@ function ManualAddSection({
       doi: mDoi.trim() || undefined,
       pmid: mPmid.trim() || undefined,
     };
-    onAddRef(ref);
+    const result = onAddRef(ref);
+    if (!result.added) return;
     setMType('journal-article');
     setMTitle('');
     setMAuthors('');

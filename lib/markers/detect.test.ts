@@ -79,4 +79,9 @@ describe('detectMarkers', () => {
     assert.equal(m3.length, 1, 'only the real citation kept');
     assert.deepEqual(m3[0]?.refNumbers, [3, 4]);
   });
+
+  it('keeps single-number bracket citations after numbers', () => {
+    const occ = detectMarkers('Prior 2020 data [12] and group 2 [15] support this.');
+    assert.deepEqual(occ.map((o) => o.refNumbers), [[12], [15]]);
+  });
 });

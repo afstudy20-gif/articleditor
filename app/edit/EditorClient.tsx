@@ -881,12 +881,15 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
         return;
       }
       const enriched: Ref = (await callLookup(data.ref as Ref).catch(() => data.ref as Ref)) ?? (data.ref as Ref);
-      if (findMatchingRef(refs, enriched)) {
+      const existing = findMatchingRef(refs, enriched);
+      if (existing) {
+        setHighlightRefId(existing.id);
         alert(t('ed_ref_duplicate'));
         return;
       }
       const r: Ref = { ...enriched, id: newRefId() };
       setRefs((prev) => appendUniqueRefs(prev, [r]).refs);
+      setHighlightRefId(r.id);
       addHistory(
         'add-ref',
         t('ed_ref_added_doi').replace('{title}', truncate(r.title ?? r.doi ?? r.pmid ?? doi, 60)),
@@ -918,14 +921,16 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
   }, []);
 
   const addRef = useCallback(
-    (ref: Ref): Ref | undefined => {
+    (ref: Ref): { ref: Ref; added: boolean } => {
       const duplicate = findMatchingRef(refs, ref);
       if (duplicate) {
+        setHighlightRefId(duplicate.id);
         alert(t('ed_ref_duplicate'));
-        return duplicate;
+        return { ref: duplicate, added: false };
       }
       const r: Ref = { ...ref, id: newRefId() };
       setRefs((prev) => appendUniqueRefs(prev, [r]).refs);
+      setHighlightRefId(r.id);
       addHistory(
         'add-ref',
         t('ed_ref_added').replace('{title}', truncate(r.title ?? r.raw ?? r.id, 60)),
@@ -933,7 +938,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
           setRefs((prev) => prev.filter((x) => x.id !== r.id));
         },
       );
-      return r;
+      return { ref: r, added: true };
     },
     [addHistory, refs, t],
   );

@@ -80,7 +80,10 @@ export function detectMarkers(text: string): MarkerOccurrence[] {
     // (IQR / CI / measurement intervals), e.g. "median 61 [49–63]",
     // "83 [71–92] mg/dL", "IQR [53–70]". Parenthetical ranges are kept —
     // Vancouver-style citations "(4-6)" must still resolve.
-    if (raw[0] === '[' && looksLikeValueRange(normalized, m.index, m.index + raw.length)) {
+    if (
+      raw[0] === '['
+      && looksLikeValueRange(normalized, m.index, m.index + raw.length, raw)
+    ) {
       continue;
     }
     out.push({
@@ -103,11 +106,15 @@ export function detectMarkers(text: string): MarkerOccurrence[] {
  *     mean, range, CI, percentile, interquartile).
  *  3. A unit follows ']' within ~12 chars (mg/dL, mmol/L, years, kg, %).
  */
-function looksLikeValueRange(text: string, start: number, end: number): boolean {
+function looksLikeValueRange(text: string, start: number, end: number, raw: string): boolean {
+  const inner = raw.replace(/^\[\s*|\s*\]$/g, '');
+  const isRangeLike = /[–—-]/.test(inner) || /\b(?:iqr|ci|range)\b/i.test(inner);
+  const singleNumber = /^\d+$/.test(inner.trim());
+
   // 1. Digit immediately before the opening bracket (ignoring spaces).
   let i = start - 1;
   while (i >= 0 && /\s/.test(text[i])) i -= 1;
-  if (i >= 0 && /\d/.test(text[i])) return true;
+  if (i >= 0 && /\d/.test(text[i]) && isRangeLike) return true;
 
   // 2. Stats/range keyword within the preceding ~16 characters.
   const before = text.slice(Math.max(0, start - 24), start).toLowerCase();
@@ -116,7 +123,7 @@ function looksLikeValueRange(text: string, start: number, end: number): boolean 
       before,
     )
   ) {
-    return true;
+    return !singleNumber;
   }
 
   // 3. A measurement unit follows the closing bracket.
@@ -126,7 +133,7 @@ function looksLikeValueRange(text: string, start: number, end: number): boolean 
       after,
     )
   ) {
-    return true;
+    return !singleNumber;
   }
   return false;
 }
