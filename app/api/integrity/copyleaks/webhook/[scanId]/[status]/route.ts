@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { normalizePlagiarismWebhook, type PlagiarismResult } from '@/lib/integrity/copyleaks';
 import { setPlagiarismResult } from '@/lib/integrity/store';
+import { verifyRequestBodyHmac } from '@/lib/integrity/webhook-signature';
 
 export const runtime = 'nodejs';
 
@@ -8,13 +9,13 @@ export async function POST(
   req: Request,
   context: { params: Promise<{ scanId: string; status: string }> },
 ) {
-  const expectedToken = process.env.COPYLEAKS_WEBHOOK_SECRET?.trim();
-  const suppliedToken = new URL(req.url).searchParams.get('token');
-  if (!expectedToken || suppliedToken !== expectedToken) {
+  const webhookSecret = process.env.COPYLEAKS_WEBHOOK_SECRET?.trim();
+  const rawBody = await req.text();
+  if (!webhookSecret || !verifyRequestBodyHmac(req, rawBody, webhookSecret)) {
     return NextResponse.json({ error: 'Unauthorized webhook.' }, { status: 401 });
   }
   const { scanId, status } = await context.params;
-  const payload = await req.json().catch(() => ({}));
+  const payload = parseJson(rawBody);
   if (status === 'completed') {
     setPlagiarismResult(normalizePlagiarismWebhook(scanId, payload));
   } else if (status === 'error') {
@@ -31,6 +32,14 @@ export async function POST(
     setPlagiarismResult(result);
   }
   return new NextResponse(null, { status: 204 });
+}
+
+function parseJson(body: string): unknown {
+  try {
+    return JSON.parse(body);
+  } catch {
+    return {};
+  }
 }
 
 function extractError(payload: unknown): string {

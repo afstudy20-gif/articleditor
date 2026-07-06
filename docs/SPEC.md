@@ -135,6 +135,7 @@ phrasebank (`lib/phrasebank`), checklists (`lib/checklists`), compliance
 ### F11 — Integrity checks (Copyleaks)
 - **Modules**: `lib/integrity/copyleaks.ts`; 4 routes under `app/api/integrity/*`.
 - **Invariants**: env-gated (503 when unconfigured); webhook callbacks verified
+  with an HMAC-SHA256 signature over the raw body (`X-Copyleaks-Signature`)
   against `COPYLEAKS_WEBHOOK_SECRET`; webhook base URL must be public HTTPS.
 
 ### F12 — Persistence, i18n, PWA
@@ -155,7 +156,7 @@ phrasebank (`lib/phrasebank`), checklists (`lib/checklists`), compliance
 | `GET /api/mesh/lookup` | length bounds, 6 s timeout | empty suggestions on failure |
 | `GET/POST /api/pdf-proxy` | host allowlist, 50 MB cap, magic bytes | 403 off-list, 413 oversize, 502 upstream |
 | `GET/POST /api/pdf-resolve` | url sanitize | `{pdfUrl: null}` on miss |
-| `POST /api/integrity/*` | env gate + webhook secret | 503 unconfigured, 401 bad signature |
+| `POST /api/integrity/*` | env gate + body HMAC signature | 503 unconfigured, 401 bad signature |
 | `GET /api/health` | none | always 200 |
 
 ## 3. Quality Gates

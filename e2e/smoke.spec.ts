@@ -1,4 +1,6 @@
 import { test, expect } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
+import JSZip from 'jszip';
 
 // Core product promise: paste a manuscript with numbered citations and a
 // bibliography → citations are detected and linked → editor opens with a
@@ -39,3 +41,52 @@ test('pasted manuscript detects citations and bibliography', async ({ page }) =>
   await expect(page.getByText(/Statin therapy in chronic heart failure/).first()).toBeVisible();
   await expect(page.getByText(/Outcomes of lipid lowering/).first()).toBeVisible();
 });
+
+test('exports imported manuscript as active EndNote docx', async ({ page }) => {
+  await importSampleManuscript(page);
+
+  await page.getByRole('button', { name: /export|dışa aktar/i }).click();
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    page.getByRole('button', { name: /active endnote|aktif endnote/i }).click(),
+  ]);
+
+  expect(download.suggestedFilename()).toMatch(/\.docx$/);
+  const path = await download.path();
+  expect(path).toBeTruthy();
+  const zip = await JSZip.loadAsync(await readFile(path!));
+  const documentXml = (await zip.file('word/document.xml')?.async('string')) ?? '';
+  expect(documentXml).toContain('ADDIN EN.CITE');
+  expect(documentXml).toContain('References');
+});
+
+test('style switch re-renders citation nodes', async ({ page }) => {
+  await importSampleManuscript(page);
+
+  const citation = page.locator('.enr-citation').first();
+  await expect(citation).toHaveText(/\[1\]/);
+
+  await page
+    .locator('select[title*="Citation"], select[title*="Atıf"]')
+    .first()
+    .selectOption('apa');
+
+  await expect(citation).toHaveText(/Smith.*2020/);
+  await expect(citation).not.toHaveText(/\[1\]/);
+});
+
+async function importSampleManuscript(page: import('@playwright/test').Page): Promise<void> {
+  await page.goto('/edit');
+  await page.getByRole('button', { name: /^paste$|yapıştır/i }).first().click();
+  const box = page.locator('textarea').first();
+  await expect(box).toBeVisible();
+  await box.fill(SAMPLE);
+  await page.getByRole('button', { name: /preview|önizle/i }).click();
+  await expect(page.getByText(/citation markers found|atıf işareti bulundu/i)).toBeVisible({
+    timeout: 20_000,
+  });
+  await page.getByRole('button', { name: /create project|proje oluştur/i }).click();
+  const openEditor = page.getByRole('button', { name: /open editor|editörü aç/i });
+  await openEditor.click({ timeout: 20_000 });
+  await expect(page.locator('.enr-citation').first()).toBeVisible({ timeout: 20_000 });
+}

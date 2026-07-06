@@ -67,7 +67,7 @@ docker run -p 3000:3000 arted
    | `NVIDIA_API_KEY` | Optional AI features via NVIDIA NIM |
    | `COPYLEAKS_EMAIL` | Copyleaks account email for AI-writing and similarity checks |
    | `COPYLEAKS_API_KEY` | Copyleaks server API key |
-   | `COPYLEAKS_WEBHOOK_SECRET` | Long random secret used to authenticate plagiarism callbacks |
+   | `COPYLEAKS_WEBHOOK_SECRET` | Long random secret used to verify `X-Copyleaks-Signature` HMAC-SHA256 over callback bodies |
    | `COPYLEAKS_WEBHOOK_BASE_URL` | Public HTTPS app origin, e.g. `https://arted.drtr.uk` |
    | `COPYLEAKS_SANDBOX` | Set to `true` while testing with Copyleaks mock results |
 

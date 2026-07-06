@@ -39,9 +39,7 @@ export async function POST(req: Request) {
   try {
     const body = BodySchema.parse(await req.json());
     const scanId = crypto.randomUUID().replaceAll('-', '');
-    const statusWebhook =
-      `${webhookBase}/api/integrity/copyleaks/webhook/${scanId}/{STATUS}` +
-      `?token=${encodeURIComponent(secret)}`;
+    const statusWebhook = `${webhookBase}/api/integrity/copyleaks/webhook/${scanId}/{STATUS}`;
     const pending: PlagiarismResult = {
       scanId,
       status: 'pending',

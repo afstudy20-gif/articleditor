@@ -1,0 +1,43 @@
+name: ci
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+
+      - name: install dependencies
+        run: npm ci
+
+      - name: install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: gate 1 - test
+        run: npm test
+
+      - name: gate 2 - e2e
+        run: npm run test:e2e
+
+      - name: gate 3 - typecheck
+        run: npm run typecheck
+
+      - name: gate 4 - lint
+        run: npm run lint
+
+      - name: gate 5 - build
+        run: npm run build
