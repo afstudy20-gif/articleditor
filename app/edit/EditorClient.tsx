@@ -2621,7 +2621,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
             <span className="hidden 2xl:inline-block text-xs text-faint shrink-0 w-[8.75rem] text-right tabular-nums whitespace-nowrap">
               {savingState === 'saving'
                 ? 'Kaydediliyor…'
-                : `Son kayıt ${new Date(savedAt).toLocaleTimeString('tr-TR')}`}
+                : `Son kayıt ${formatSavedAtTime(savedAt)}`}
             </span>
           </div>
           <div className="row-start-1 col-start-2 flex gap-1 items-center justify-end text-xs shrink-0 flex-nowrap overflow-x-auto scrollbar-none max-w-[55vw] ml-auto">
@@ -3588,9 +3588,32 @@ function HeaderDropdown({
   children: React.ReactNode;
 }): JSX.Element {
   const [open, setOpen] = useState(false);
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
+  const [menuPos, setMenuPos] = useState<{ top: number; right: number }>({ top: 0, right: 0 });
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const update = (): void => {
+      const rect = buttonRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      setMenuPos({
+        top: rect.bottom + 4,
+        right: Math.max(8, window.innerWidth - rect.right),
+      });
+    };
+    update();
+    window.addEventListener('resize', update);
+    window.addEventListener('scroll', update, true);
+    return () => {
+      window.removeEventListener('resize', update);
+      window.removeEventListener('scroll', update, true);
+    };
+  }, [open]);
+
   return (
     <div className="relative shrink-0">
       <button
+        ref={buttonRef}
         onClick={() => setOpen((v) => !v)}
         className={`px-2 py-0.5 text-xs rounded border whitespace-nowrap ${primary ? 'border-teal bg-teal text-white hover:bg-teal-dark' : 'border-border text-secondary hover:bg-slate-50'}`}
       >
@@ -3600,7 +3623,8 @@ function HeaderDropdown({
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div
-            className="absolute top-full right-0 mt-1 z-50 bg-white border border-border rounded-lg shadow-lg w-56 py-1"
+            className="fixed z-[100] bg-white border border-border rounded-lg shadow-lg w-56 py-1"
+            style={{ top: menuPos.top, right: menuPos.right }}
             onClick={() => setOpen(false)}
           >
             {children}
@@ -3630,6 +3654,13 @@ function DropItem({
 
 function truncate(s: string, n: number): string {
   return s.length > n ? s.slice(0, n) + '…' : s;
+}
+
+function formatSavedAtTime(value: number): string {
+  return new Date(value).toLocaleTimeString('tr-TR', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 type RuntimeReviewBlock = ReviewBlock & { positions: number[] };
