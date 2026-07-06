@@ -53,8 +53,13 @@ of the flows listed here.
 - **Behavior**: lookup by DOI, PMID or title+author+year against CrossRef, OpenAlex
   and PubMed; results merged field-by-field with source precedence; 1 h in-process
   cache; only title + first author + year leave the client (privacy contract).
-- **Invariants**: merge never overwrites a non-empty user-entered field with a
-  worse value (empty/shorter); DOI/PMID are normalized before comparison.
+- **Invariants**:
+  - Exact-DOI matches are authoritative: fetched bibliographic fields replace
+    local ones, but fields the source did not return are never blanked.
+  - Title-search matches below the confidence threshold merge conservatively
+    (identifiers/abstract only) or not at all — a low-confidence candidate must
+    never replace the user's title/authors/year with an unrelated paper.
+  - DOI/PMID are normalized (prefix-stripped, trimmed) before comparison.
 
 ### F5 — Editor & numbering
 - **Entry**: `/edit` TipTap editor; CitationPopover, CitationInsertPicker.
