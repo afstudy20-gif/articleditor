@@ -37,6 +37,8 @@ export function projectFilename(project: Project): string {
   const slug =
     project.title
       .toLowerCase()
+      // Dotless ı has no NFKD decomposition — map Turkish letters explicitly.
+      .replace(/ı/g, 'i')
       .normalize('NFKD')
       .replace(/[̀-ͯ]/g, '')
       .replace(/[^a-z0-9]+/g, '-')

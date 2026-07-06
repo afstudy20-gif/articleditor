@@ -3,8 +3,10 @@
 // edited text (still containing sentinels) that must be reinserted into the
 // document with the original citation nodes intact.
 
-const OPEN = '';
-const CLOSE = '';
+// Private-use-area sentinels (must match lib/ai/citation-safety.ts) so plain
+// digits in prose are never mistaken for citation tokens.
+const OPEN = '';
+const CLOSE = '';
 
 export type CitationNodeJSON = {
   type: 'citation';

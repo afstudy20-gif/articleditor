@@ -151,6 +151,8 @@ export function parseNbib(text: string): Ref[] {
 /** True when the text looks like MEDLINE / NBIB. */
 export function looksLikeNbib(text: string): boolean {
   const sample = text.slice(0, 1000);
+  // RIS shares TI/AU tags but always carries a TY record-type tag — defer to RIS.
+  if (/^TY\s*-\s/m.test(sample)) return false;
   // PMID/TI/AU/JT/SO are near-universal MEDLINE tags.
   return /^PMID-\s/m.test(sample) || (/^TI\s*-\s/m.test(sample) && /^AU\s*-\s/m.test(sample));
 }
