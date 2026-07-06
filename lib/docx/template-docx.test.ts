@@ -154,4 +154,77 @@ describe('buildTemplateDocx (JCM/MDPI)', () => {
     // An MDPI19line ruled separator paragraph follows the abstract block.
     assert.ok(xml.includes('<w:pStyle w:val="MDPI19line"/>'), 'abstract separator rule present');
   });
+
+  it('renders article type, byline, affiliations and back matter with MDPI styles', async () => {
+    const tpl = getDocxTemplate('jcm')!;
+    const bytes = readFileSync(TEMPLATE_PATH);
+    const frontDoc = {
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'Fatih Akkaya 1, Nihan Bahadır 1 and Ayşe Yılmaz 2' }],
+        },
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: '1 Department of Cardiology, Ordu University, Ordu, Türkiye' }],
+        },
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: '* Correspondence: author@example.org' }],
+        },
+        { type: 'heading', attrs: { level: 1 }, content: [{ type: 'text', text: 'Introduction' }] },
+        { type: 'paragraph', content: [{ type: 'text', text: 'Body sentence with 12 patients.' }] },
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'Author Contributions: Conceptualization, F.A.; writing, N.B.' }],
+        },
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'Conflicts of Interest: The authors declare no conflict of interest.' }],
+        },
+      ],
+    };
+    const blob = await buildTemplateDocx(bytes, tpl, {
+      doc: frontDoc,
+      refsById: new Map(),
+      refOrder: new Map(),
+      style: 'vancouver',
+      mode: 'plain',
+      title: 'Front Matter Paper',
+    });
+    const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+    const xml = await zip.file('word/document.xml')!.async('string');
+
+    // Article type line precedes the title.
+    const atIdx = xml.indexOf('<w:pStyle w:val="MDPI11articletype"/>');
+    const titleIdx = xml.indexOf('<w:pStyle w:val="MDPI12title"/>');
+    assert.ok(atIdx > -1, 'article type style present');
+    assert.ok(xml.slice(atIdx, xml.indexOf('</w:p>', atIdx)).includes('Article'), 'article type text');
+    assert.ok(titleIdx > atIdx, 'article type comes before the title');
+
+    // Byline and affiliation/correspondence lines mapped to journal styles.
+    const bylineIdx = xml.indexOf('Fatih Akkaya');
+    const bylinePara = xml.slice(xml.lastIndexOf('<w:p>', bylineIdx), bylineIdx);
+    assert.ok(bylinePara.includes('<w:pStyle w:val="MDPI13authornames"/>'), 'byline style');
+    const affIdx = xml.indexOf('Department of Cardiology');
+    const affPara = xml.slice(xml.lastIndexOf('<w:p>', affIdx), affIdx);
+    assert.ok(affPara.includes('<w:pStyle w:val="MDPI16affiliation"/>'), 'affiliation style');
+    const corrIdx = xml.indexOf('Correspondence:');
+    const corrPara = xml.slice(xml.lastIndexOf('<w:p>', corrIdx), corrIdx);
+    assert.ok(corrPara.includes('<w:pStyle w:val="MDPI16affiliation"/>'), 'correspondence style');
+
+    // Ordinary body text after the first heading stays MDPI31text.
+    const bodyIdx = xml.indexOf('Body sentence with 12 patients.');
+    const bodyPara = xml.slice(xml.lastIndexOf('<w:p>', bodyIdx), bodyIdx);
+    assert.ok(bodyPara.includes('<w:pStyle w:val="MDPI31text"/>'), 'body keeps normal style');
+
+    // Back-matter sections mapped to MDPI62backmatter.
+    for (const label of ['Author Contributions:', 'Conflicts of Interest:']) {
+      const idx = xml.indexOf(label);
+      assert.ok(idx > -1, `${label} present`);
+      const para = xml.slice(xml.lastIndexOf('<w:p>', idx), idx);
+      assert.ok(para.includes('<w:pStyle w:val="MDPI62backmatter"/>'), `${label} back-matter style`);
+    }
+  });
 });

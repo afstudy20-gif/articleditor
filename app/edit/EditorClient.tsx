@@ -9,6 +9,7 @@ import { RefsPanel } from '@/components/RefsPanel/RefsPanel';
 import { tiptapToBuildInput } from '@/lib/editor/to-export';
 import { buildRichDocx } from '@/lib/docx/build-rich';
 import { buildTemplateDocx, getDocxTemplate } from '@/lib/docx/template-docx';
+import { buildExportPreviewSrcdoc } from '@/lib/export/preview';
 import {
   buildPrintDocumentHtml,
   printStylesheet,
@@ -282,6 +283,8 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
+  const [exportPreviewDoc, setExportPreviewDoc] = useState<string | null>(null);
+  const [exportPreviewTheme, setExportPreviewTheme] = useState<'standard' | 'mdpi'>('mdpi');
   const [workspaceRoot, setWorkspaceRoot] = useState<FileSystemDirectoryHandle | null>(null);
   const [snapshotsOpen, setSnapshotsOpen] = useState(false);
   const [figuresOpen, setFiguresOpen] = useState(false);
@@ -2225,22 +2228,54 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
    * same document — keeping blob image URLs valid — and printed with an
    * academic stylesheet. The bibliography is appended in the active style.
    */
-  function exportPdf(): void {
+  /** Clean clone of the live editor DOM for print/preview snapshots. */
+  function snapshotEditorHtml(): string | null {
     const ed = editorInstance.current;
-    if (!ed?.view?.dom) return;
-
-    const { orderedRefs } = tiptapToBuildInput(doc as any, refsById, refOrder, style);
-
+    if (!ed?.view?.dom) return null;
     const clone = ed.view.dom.cloneNode(true) as HTMLElement;
     clone.removeAttribute('contenteditable');
     clone.querySelectorAll('[contenteditable]').forEach((el) => el.removeAttribute('contenteditable'));
     // Strip editor-only artifacts; unwrap search highlights to keep their text.
     clone.querySelectorAll('.ProseMirror-trailingBreak, .ProseMirror-gapcursor').forEach((el) => el.remove());
     clone.querySelectorAll('.enr-find-match').forEach((el) => el.replaceWith(...Array.from(el.childNodes)));
+    return clone.innerHTML;
+  }
+
+  /** On-screen export preview (A4 sheet, standard or MDPI/JCM theme). */
+  function openExportPreview(theme: 'standard' | 'mdpi' = exportPreviewTheme): void {
+    const bodyHtml = snapshotEditorHtml();
+    if (bodyHtml === null) return;
+    const { orderedRefs } = tiptapToBuildInput(doc as any, refsById, refOrder, style);
+    const tpl = getDocxTemplate('jcm');
+    setExportPreviewTheme(theme);
+    setExportPreviewDoc(
+      buildExportPreviewSrcdoc({
+        title,
+        bodyHtml,
+        orderedRefs,
+        style: theme === 'mdpi' ? tpl?.citationStyle ?? style : style,
+        lang,
+        abstractText: includeAbstractExport ? abstractText : undefined,
+        keywords: includeAbstractExport ? keywords : undefined,
+        bibHeading: 'References',
+        theme,
+        articleType: theme === 'mdpi' ? tpl?.articleType ?? 'Article' : undefined,
+      }),
+    );
+  }
+
+  function exportPdf(): void {
+    const ed = editorInstance.current;
+    if (!ed?.view?.dom) return;
+
+    const { orderedRefs } = tiptapToBuildInput(doc as any, refsById, refOrder, style);
+
+    const bodyHtml = snapshotEditorHtml();
+    if (bodyHtml === null) return;
 
     const html = buildPrintDocumentHtml({
       title,
-      bodyHtml: clone.innerHTML,
+      bodyHtml,
       orderedRefs,
       style,
       lang,
@@ -2669,6 +2704,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
                 {lang === 'tr' ? 'Figure Legends, References sonrasında' : 'Figure Legends after References'}
               </DropItem>
               <hr className="border-border my-1" />
+              <DropItem onClick={() => openExportPreview()}>🔍 {t('ed_export_preview')}</DropItem>
               <DropItem onClick={() => exportDocx('active')}>📝 {t('ed_export_docx_active')}</DropItem>
               <DropItem onClick={() => exportDocx('placeholder')}>📝 {t('ed_export_docx_placeholder')}</DropItem>
               <DropItem onClick={() => void exportDocxTemplate('jcm')}>📰 {t('ed_export_jcm')}</DropItem>
@@ -3282,6 +3318,50 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
       )}
 
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} commands={commands} t={t} />
+
+      {exportPreviewDoc && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-surface rounded-xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col overflow-hidden">
+            <div className="flex items-center gap-2 px-4 py-2 border-b border-border">
+              <strong className="text-sm">{t('ed_export_preview')}</strong>
+              <div className="flex items-center gap-1 ml-4 text-xs">
+                <button
+                  className={`px-2 py-1 rounded ${exportPreviewTheme === 'mdpi' ? 'bg-accent text-white' : 'bg-muted/10'}`}
+                  onClick={() => openExportPreview('mdpi')}
+                >
+                  MDPI / JCM
+                </button>
+                <button
+                  className={`px-2 py-1 rounded ${exportPreviewTheme === 'standard' ? 'bg-accent text-white' : 'bg-muted/10'}`}
+                  onClick={() => openExportPreview('standard')}
+                >
+                  {lang === 'tr' ? 'Standart' : 'Standard'}
+                </button>
+              </div>
+              <div className="ml-auto flex items-center gap-2">
+                {exportPreviewTheme === 'mdpi' ? (
+                  <button className="btn btn-sm" onClick={() => void exportDocxTemplate('jcm')}>
+                    📰 {t('ed_export_jcm')}
+                  </button>
+                ) : (
+                  <button className="btn btn-sm" onClick={() => void exportDocx('active')}>
+                    📝 {t('ed_export_docx_active')}
+                  </button>
+                )}
+                <button className="btn btn-sm" onClick={() => setExportPreviewDoc(null)}>
+                  ✕
+                </button>
+              </div>
+            </div>
+            <iframe
+              title={t('ed_export_preview')}
+              className="flex-1 w-full border-0 bg-slate-200"
+              sandbox="allow-same-origin"
+              srcDoc={exportPreviewDoc}
+            />
+          </div>
+        </div>
+      )}
 
       {statsOpen && (
         <div className="fixed right-4 top-24 w-[320px] z-40 shadow-2xl">

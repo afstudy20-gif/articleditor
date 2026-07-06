@@ -30,6 +30,8 @@ export type DocxTemplateDef = {
   /** Citation style this journal expects; forced during export. */
   citationStyle?: StyleId;
   bibHeading?: string;
+  /** Article-type line above the title (e.g. "Article"). */
+  articleType?: string;
 };
 
 /** Registry of bundled journal templates (served from /public/templates). */
@@ -40,10 +42,18 @@ export const DOCX_TEMPLATES: readonly DocxTemplateDef[] = [
     file: '/templates/jcm-template.dot',
     citationStyle: 'mdpi-acs',
     bibHeading: 'References',
+    articleType: 'Article',
     styleMap: {
       normal: 'MDPI31text',
       title: 'MDPI12title',
       heading1: 'MDPI21heading1',
+      // Front matter: byline + affiliation lines before the first heading are
+      // auto-detected (lib/markers/byline) and mapped to the journal styles.
+      articleType: 'MDPI11articletype',
+      authorNames: 'MDPI13authornames',
+      affiliation: 'MDPI16affiliation',
+      // Back matter: "Author Contributions:", "Funding:", … paragraphs.
+      backMatter: 'MDPI62backmatter',
       // Sub-headings intentionally NOT mapped: MDPI22heading2 is italic in
       // the template, but MDPI production output renders "2.1. ..." as bold
       // MDPI31text. Leaving heading2 unset triggers the bold-body fallback
@@ -80,6 +90,7 @@ export async function buildTemplateDocx(
     ...input,
     style: template.citationStyle ?? input.style,
     bibHeading: input.bibHeading ?? template.bibHeading,
+    articleType: input.articleType ?? template.articleType,
     styleMap: template.styleMap,
     figureCaptionPlacement: 'after-bibliography',
     // Templates ship their own media/imageN.* parts — avoid name collisions.

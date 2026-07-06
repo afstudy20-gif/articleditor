@@ -12,6 +12,7 @@ import {
   collectFigureLegends,
   type FigureCaptionPlacement,
 } from '@/lib/figures/export-layout';
+import { looksLikeAuthorByline } from '@/lib/markers/byline';
 import { type BuildMode } from './build';
 import { activeEndNoteField, assignRecNums, placeholderText } from './field-code';
 import { NUMBERING_XML } from './numbering';
@@ -53,6 +54,15 @@ export type DocxStyleMap = {
   tableCaption?: string;
   /** Word table style (w:tblStyle) reference, e.g. MDPItable. */
   table?: string;
+  /** Style for the article-type line above the title (e.g. MDPI11articletype). */
+  articleType?: string;
+  /** Style for the author byline paragraph (e.g. MDPI13authornames). */
+  authorNames?: string;
+  /** Style for affiliation / correspondence lines (e.g. MDPI16affiliation). */
+  affiliation?: string;
+  /** Style for back-matter sections — Author Contributions, Funding, …
+   *  (e.g. MDPI62backmatter). */
+  backMatter?: string;
   /** Style for the "Abstract" heading; falls back to heading1 when unset. */
   abstractHeading?: string;
   /** Style for the "Keywords:" paragraph; falls back to normal when unset. */
@@ -78,6 +88,9 @@ export type RichBuildInput = {
   bibHeading?: string;
   /** Add the title as the first body paragraph. Defaults to true. */
   includeDocumentTitle?: boolean;
+  /** Article-type line above the title (e.g. "Article"); rendered only when
+   *  the style map provides an articleType style. */
+  articleType?: string;
   /** Optional manuscript abstract inserted before the main body. */
   abstractText?: string;
   /** Optional keywords rendered inside the abstract block. */
@@ -254,6 +267,13 @@ ${this.rels.join('\n')}
         ? firstVisibleIndex
         : -1;
 
+    const articleTypeStyle = this.sid('articleType');
+    if (this.input.articleType?.trim() && articleTypeStyle) {
+      paragraphs.push(
+        `<w:p><w:pPr><w:pStyle w:val="${articleTypeStyle}"/></w:pPr>`
+        + `<w:r><w:rPr><w:i/></w:rPr><w:t xml:space="preserve">${escapeXml(this.input.articleType.trim())}</w:t></w:r></w:p>`,
+      );
+    }
     if (
       this.input.includeDocumentTitle !== false
       && this.input.title
@@ -291,10 +311,37 @@ ${this.rels.join('\n')}
     }
 
     if (content.length > 0) {
+      // Journal front/back-matter styling (only when the template maps the
+      // styles): the author byline and affiliation lines before the first
+      // heading get their dedicated styles, and "Author Contributions:" /
+      // "Funding:" … sections get the back-matter style.
+      const authorNamesStyle = this.sid('authorNames');
+      const affiliationStyle = this.sid('affiliation');
+      const backMatterStyle = this.sid('backMatter');
+      let seenHeading = false;
+      let seenByline = false;
       for (let index = 0; index < content.length; index += 1) {
         if (index === titleBlockIndex) continue;
         const block = content[index];
-        paragraphs.push(...this.blockToXml(block, {}));
+        if (block?.type === 'heading') seenHeading = true;
+        let styleOverride: string | undefined;
+        if (block?.type === 'paragraph') {
+          const text = nodeText(block).trim();
+          if (!seenHeading && authorNamesStyle && !seenByline && looksLikeAuthorByline(text)) {
+            styleOverride = authorNamesStyle;
+            seenByline = true;
+          } else if (
+            !seenHeading
+            && affiliationStyle
+            && seenByline
+            && (/^\d+\s+\S/.test(text) || /^\*?\s*(Correspondence|İletişim)/i.test(text))
+          ) {
+            styleOverride = affiliationStyle;
+          } else if (backMatterStyle && BACK_MATTER_RE.test(text)) {
+            styleOverride = backMatterStyle;
+          }
+        }
+        paragraphs.push(...this.blockToXml(block, {}, styleOverride));
       }
     }
     if (this.input.includeBibliography !== false) {
@@ -351,11 +398,15 @@ ${paragraphs.join('\n')}
   }
 
   /** Convert a block-level TipTap node into one or more <w:p>/<w:tbl> strings. */
-  blockToXml(n: Json, listCtx: { numId?: number; ilvl?: number }): string[] {
+  blockToXml(
+    n: Json,
+    listCtx: { numId?: number; ilvl?: number },
+    styleOverride?: string,
+  ): string[] {
     if (!n) return [];
     switch (n.type) {
       case 'paragraph':
-        return [this.paragraph(n, listCtx)];
+        return [this.paragraph(n, listCtx, styleOverride)];
       case 'heading': {
         const level = Math.min(Math.max(Number(n.attrs?.level ?? 1), 1), 3);
         const mapped = this.sid(`heading${level}` as keyof DocxStyleMap, `Heading${level}`);
@@ -726,6 +777,11 @@ function hasVisibleBlockContent(node: Json): boolean {
   if (node.type !== 'paragraph' && node.type !== 'heading') return true;
   return nodeText(node).trim().length > 0;
 }
+
+// MDPI-style back-matter section labels ("Author Contributions: …"). Bilingual
+// so Turkish drafts map too.
+const BACK_MATTER_RE =
+  /^(Author Contributions?|Funding|Institutional Review Board Statement|Informed Consent Statement|Data Availability Statement|Acknowledg(e)?ments?|Conflicts? of Interest|Abbreviations|Supplementary Materials?|Yazar Katkıları|Finansman|Çıkar Çatışması|Teşekkür)\s*[:：]/i;
 
 function nodeText(node: Json): string {
   if (!node) return '';
