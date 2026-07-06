@@ -18,8 +18,13 @@ const WORD_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingm
 // so they can't collide with the template's own list definitions.
 const TPL_NUM_BULLET = 901;
 const TPL_NUM_ORDERED = 902;
+// Outline numbering attached to level-1 section headings so Word renders
+// "1. Introduction", "2. Materials and Methods", … automatically. Mirrors the
+// production template, which binds section headings to a decimal outline list.
+const TPL_NUM_HEADING = 903;
 const TPL_ABS_BULLET = 901;
 const TPL_ABS_ORDERED = 902;
+const TPL_ABS_HEADING = 903;
 
 export type DocxTemplateDef = {
   id: string;
@@ -73,6 +78,9 @@ export const DOCX_TEMPLATES: readonly DocxTemplateDef[] = [
       abstractSeparator: 'MDPI19line',
       numIdBullet: TPL_NUM_BULLET,
       numIdOrdered: TPL_NUM_ORDERED,
+      // Level-1 section headings render with an auto-incrementing "1.", "2." …
+      // outline number (matches MDPI production output).
+      numIdHeading: TPL_NUM_HEADING,
     },
   },
 ];
@@ -202,7 +210,7 @@ function ensureImageDefaults(contentTypes: string, exts: string[]): string {
   return out;
 }
 
-/** Append our bullet + decimal list definitions with non-colliding IDs. */
+/** Append our bullet + decimal + heading-outline list definitions with non-colliding IDs. */
 function mergeNumbering(numberingXml: string): string {
   if (numberingXml.includes(`w:numId="${TPL_NUM_BULLET}"`)) return numberingXml;
   const abstracts = `<w:abstractNum w:abstractNumId="${TPL_ABS_BULLET}">
@@ -214,9 +222,16 @@ function mergeNumbering(numberingXml: string): string {
 <w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="decimal"/><w:lvlText w:val="%1."/><w:lvlJc w:val="left"/><w:pPr><w:ind w:left="720" w:hanging="360"/></w:pPr></w:lvl>
 <w:lvl w:ilvl="1"><w:start w:val="1"/><w:numFmt w:val="lowerLetter"/><w:lvlText w:val="%2."/><w:lvlJc w:val="left"/><w:pPr><w:ind w:left="1440" w:hanging="360"/></w:pPr></w:lvl>
 <w:lvl w:ilvl="2"><w:start w:val="1"/><w:numFmt w:val="lowerRoman"/><w:lvlText w:val="%3."/><w:lvlJc w:val="left"/><w:pPr><w:ind w:left="2160" w:hanging="360"/></w:pPr></w:lvl>
+</w:abstractNum>
+<w:abstractNum w:abstractNumId="${TPL_ABS_HEADING}" w15:restartNumberingAfterBreak="0">
+<w:multiLevelType w:val="multilevel"/>
+<w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="decimal"/><w:lvlText w:val="%1."/><w:lvlJc w:val="left"/><w:pPr><w:ind w:left="2835" w:hanging="283"/></w:pPr><w:rPr><w:b/></w:rPr></w:lvl>
+<w:lvl w:ilvl="1"><w:start w:val="1"/><w:numFmt w:val="decimal"/><w:lvlText w:val="%1.%2."/><w:lvlJc w:val="left"/><w:pPr><w:ind w:left="3405" w:hanging="283"/></w:pPr><w:rPr><w:b/></w:rPr></w:lvl>
+<w:lvl w:ilvl="2"><w:start w:val="1"/><w:numFmt w:val="decimal"/><w:lvlText w:val="%1.%2.%3."/><w:lvlJc w:val="left"/><w:pPr><w:ind w:left="3975" w:hanging="283"/></w:pPr><w:rPr><w:b/></w:rPr></w:lvl>
 </w:abstractNum>`;
   const nums = `<w:num w:numId="${TPL_NUM_BULLET}"><w:abstractNumId w:val="${TPL_ABS_BULLET}"/></w:num>
-<w:num w:numId="${TPL_NUM_ORDERED}"><w:abstractNumId w:val="${TPL_ABS_ORDERED}"/></w:num>`;
+<w:num w:numId="${TPL_NUM_ORDERED}"><w:abstractNumId w:val="${TPL_ABS_ORDERED}"/></w:num>
+<w:num w:numId="${TPL_NUM_HEADING}"><w:abstractNumId w:val="${TPL_ABS_HEADING}"/></w:num>`;
 
   // abstractNum elements must precede all <w:num> elements.
   const firstNum = numberingXml.indexOf('<w:num ');
