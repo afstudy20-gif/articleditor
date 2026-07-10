@@ -65,7 +65,7 @@ docker run -p 3000:3000 arted
    | `OPENAI_BASE_URL` | Custom OpenAI-compatible endpoint (LM Studio, Groq, OpenRouter) |
    | `DEEPSEEK_API_KEY` | Optional AI features via DeepSeek |
    | `NVIDIA_API_KEY` | Optional AI features via NVIDIA NIM |
-   | `AI_LOCAL_CLI_VISION` | `codex` or `gemini` — dev-only, **best-effort** fallback for the image→table tool when no vision API key is set; shells out to a CLI agent already authenticated on the **same machine** running the server. Verified unreliable in testing (codex intermittently fails to read the image; Gemini CLI's free tier can be deauthorized outside the app's control) — prefer a real API key. Do not set in a normal Docker/Coolify deploy (the image has no CLI binaries). |
+   | `AI_LOCAL_CLI_VISION` | Set to `claude` for a **keyless** fallback for the image→table tool: no vision API key needed, shells out to the Claude Code CLI already authenticated on the **same machine** running the server (same pattern as the `paper` project's CLI-based reference checker). Verified reliable in testing. Do not set in a normal Docker/Coolify deploy (the image has no `claude` binary/session). |
    | `COPYLEAKS_EMAIL` | Copyleaks account email for AI-writing and similarity checks |
    | `COPYLEAKS_API_KEY` | Copyleaks server API key |
    | `COPYLEAKS_WEBHOOK_SECRET` | Long random secret used to verify `X-Copyleaks-Signature` HMAC-SHA256 over callback bodies |

@@ -45,8 +45,9 @@ export async function POST(req: Request) {
       {
         error:
           'Görsel destekli AI yapılandırılmamış (Gemini/OpenAI/Anthropic anahtarı ya da ' +
-          'AI_LOCAL_CLI_VISION gerekir). / No vision-capable AI is configured (needs a Gemini, ' +
-          'OpenAI or Anthropic key, or AI_LOCAL_CLI_VISION for a local CLI backend).',
+          'AI_LOCAL_CLI_VISION=claude gerekir). / No vision-capable AI is configured (needs a ' +
+          'Gemini, OpenAI or Anthropic key, or AI_LOCAL_CLI_VISION=claude for the local Claude ' +
+          'Code CLI fallback).',
       },
       { status: 503 },
     );
