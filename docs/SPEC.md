@@ -46,6 +46,17 @@ of the flows listed here.
   - Dedupe keys on DOI, then PMID, then normalized title+year; merging keeps the
     richer record.
   - Parsers never throw on truncated/garbage input; they return `[]` or partial.
+- **PDF-folder import** (ProjectAssetsPanel → PdfFolderImportModal): user
+  picks a folder (File System Access `showDirectoryPicker`, read-only; falls
+  back to a multi-file `<input>` when unsupported). Every PDF is converted
+  client-side to text via `lib/pdf/pdf-to-markdown.ts` (pdf.js text layer,
+  Y-position line reconstruction — no OCR), then `lib/refs/article-metadata.ts`
+  extracts title/first-author/year/DOI/PMID/abstract (ports the regex
+  heuristics from the sibling `paper` project's reference checker). Refs with
+  a DOI/title are best-effort enriched via `POST /api/lookup {mode:'enrich'}`
+  (same privacy contract as F4). User reviews the list, selects, and adds to
+  the library through the same `appendUniqueRefs` dedupe as every other
+  import path. No OCR fallback — scanned-only PDFs report as failed.
 
 ### F4 — Metadata lookup & enrichment
 - **Entry**: RefDetail "enrich", RefsPanel import auto-enrich; `/api/lookup`.

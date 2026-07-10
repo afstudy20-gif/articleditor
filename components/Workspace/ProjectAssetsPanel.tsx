@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react';
 import JSZip from 'jszip';
-import type { Project, ProjectAsset } from '@/store/types';
+import type { Project, ProjectAsset, Ref } from '@/store/types';
 import { saveProject } from '@/store/db';
 import { newId } from '@/lib/id';
 import {
@@ -17,6 +17,8 @@ import { buildRichDocx } from '@/lib/docx/build-rich';
 import { docxFilename, plainTextToTiptapDoc } from '@/lib/docx/plain-text';
 import { AcademicImageConverterModal } from '@/components/Workspace/AcademicImageConverterModal';
 import type { AcademicImageResult } from '@/lib/image/academic-converter';
+import { PdfFolderImportModal } from '@/components/Workspace/PdfFolderImportModal';
+import { appendUniqueRefs } from '@/lib/refs/dedupe';
 
 type Props = {
   project: Project;
@@ -110,6 +112,7 @@ export function ProjectAssetsPanel({ project, onSaved, onOpenManuscript }: Props
   const [dragActive, setDragActive] = useState(false);
   const [menuAssetId, setMenuAssetId] = useState<string | null>(null);
   const [converterAsset, setConverterAsset] = useState<ProjectAsset | null>(null);
+  const [pdfImportOpen, setPdfImportOpen] = useState(false);
   const assets = project.assets ?? [];
   const submissionAssets = assets.filter((asset) => asset.submissionIncluded);
   const totalSize = assets.reduce((sum, asset) => sum + asset.size, 0);
@@ -253,6 +256,13 @@ export function ProjectAssetsPanel({ project, onSaved, onOpenManuscript }: Props
         diskPath,
       },
     ]);
+  };
+
+  const addRefsToLibrary = async (newRefs: Ref[]) => {
+    const { refs: nextRefs } = appendUniqueRefs(project.refs, newRefs);
+    const updatedProject: Project = { ...project, refs: nextRefs, updatedAt: Date.now() };
+    await saveProject(updatedProject);
+    onSaved(updatedProject);
   };
 
   const exportSubmissionPackage = async () => {
@@ -544,6 +554,14 @@ export function ProjectAssetsPanel({ project, onSaved, onOpenManuscript }: Props
       <button
         type="button"
         disabled={busy}
+        onClick={() => setPdfImportOpen(true)}
+        className="btn-secondary w-full py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 border-sky-200 text-sky-700 hover:bg-sky-50 transition mb-2"
+      >
+        📚 PDF Klasöründen Kütüphaneye Aktar
+      </button>
+      <button
+        type="button"
+        disabled={busy}
         onClick={() => inputRef.current?.click()}
         className="btn-secondary w-full py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 border-sky-200 text-sky-700 hover:bg-sky-50 transition"
       >
@@ -554,6 +572,13 @@ export function ProjectAssetsPanel({ project, onSaved, onOpenManuscript }: Props
           asset={converterAsset}
           onClose={() => setConverterAsset(null)}
           onSave={saveConvertedImage}
+        />
+      )}
+      {pdfImportOpen && (
+        <PdfFolderImportModal
+          existingRefs={project.refs}
+          onClose={() => setPdfImportOpen(false)}
+          onAddRefs={(newRefs) => void addRefsToLibrary(newRefs)}
         />
       )}
     </div>
