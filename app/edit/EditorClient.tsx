@@ -3416,6 +3416,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
             onStoredTablesChange={setManuscriptTables}
             onClose={() => setTablesOpen(false)}
             t={t}
+            lang={lang}
             initialView={tablePanelView}
           />
         </div>

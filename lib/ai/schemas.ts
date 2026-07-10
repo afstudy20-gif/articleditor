@@ -139,6 +139,17 @@ export const GapDetectResult = z.object({
 export type ClaimT = z.infer<typeof ClaimNeedingCitation>;
 export type GapDetectResultT = z.infer<typeof GapDetectResult>;
 
+// ── Image → Table (D1) ──────────────────────────────────────────────
+export const ImageTableResult = z.object({
+  title: z.string().max(500).optional(),
+  footnote: z.string().max(2_000).optional(),
+  hasHeader: z.boolean().default(true),
+  // Rectangular grid of cell text, exactly as laid out in the image.
+  rows: z.array(z.array(z.string())).min(1).max(200),
+});
+
+export type ImageTableResultT = z.infer<typeof ImageTableResult>;
+
 // ── Compare My Work (C1) ────────────────────────────────────────────
 export const CompareOverlap = z.object({
   aspect: z.string(),

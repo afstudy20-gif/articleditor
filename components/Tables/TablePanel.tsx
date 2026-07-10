@@ -33,7 +33,18 @@ interface TablePanelProps {
   onStoredTablesChange: (tables: ProjectTable[]) => void;
   onClose: () => void;
   t: (k: string) => string;
+  lang?: 'tr' | 'en';
   initialView?: ViewMode;
+}
+
+/** Read a File into a base64 data URL. */
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error ?? new Error('read failed'));
+    reader.readAsDataURL(file);
+  });
 }
 
 type ViewMode = 'list' | 'edit' | 'import';
@@ -84,6 +95,7 @@ export function TablePanel({
   onStoredTablesChange,
   onClose,
   t,
+  lang = 'tr',
   initialView = 'list',
 }: TablePanelProps): JSX.Element {
   const [tables, setTables] = useState<TableEntry[]>(() => collectTables(editor));
@@ -103,7 +115,10 @@ export function TablePanel({
   const [editTitle, setEditTitle] = useState('');
   const [editFootnote, setEditFootnote] = useState('');
   const [copyMsg, setCopyMsg] = useState('');
+  const [imageBusy, setImageBusy] = useState(false);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const imageRef = useRef<HTMLInputElement>(null);
 
   const appendStoredTables = useCallback((items: ProjectTable[]) => {
     if (items.length === 0) return;
@@ -146,7 +161,61 @@ export function TablePanel({
     setImportPreview(parsed);
   }, []);
 
+  // Extract a table from an image via the vision AI route, then drop the
+  // result into the existing import-preview pipeline (same as file/paste).
+  const extractTableFromImage = useCallback(async (file: File) => {
+    if (!/^image\//.test(file.type)) {
+      setImportError(t('tbl_image_unsupported'));
+      return;
+    }
+    setImageBusy(true);
+    setImportError('');
+    setWordTables([]);
+    setWordTableIndex(0);
+    setImportPreview(null);
+    setImportText('');
+    try {
+      const dataUrl = await fileToDataUrl(file);
+      setImagePreviewUrl(dataUrl);
+      const res = await fetch('/api/ai/image-table', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageDataUrl: dataUrl, lang }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.table) {
+        setImportError(data?.error ?? t('tbl_image_failed'));
+        return;
+      }
+      const table = data.table as ParsedTable;
+      setImportPreview(table);
+      setImportTitle(table.title ?? '');
+      setImportFootnote(table.footnote ?? '');
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      setImportError(`${t('tbl_image_failed')} (${errMsg})`);
+    } finally {
+      setImageBusy(false);
+    }
+  }, [lang, t]);
+
+  const handleImageInput = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (file) await extractTableFromImage(file);
+  }, [extractTableFromImage]);
+
   const handlePaste = useCallback(async (e: React.ClipboardEvent) => {
+    // Pasted image (screenshot) → vision extraction.
+    const imageItem = Array.from(e.clipboardData.items).find((it) => it.type.startsWith('image/'));
+    if (imageItem) {
+      const file = imageItem.getAsFile();
+      if (file) {
+        e.preventDefault();
+        await extractTableFromImage(file);
+        return;
+      }
+    }
     // Try HTML first (Word/Excel clipboard)
     const html = e.clipboardData.getData('text/html');
     if (html && /<table/i.test(html)) {
@@ -709,12 +778,38 @@ export function TablePanel({
                 className="hidden"
                 onChange={handleFileImport}
               />
+              <button
+                onClick={() => imageRef.current?.click()}
+                disabled={imageBusy}
+                title={t('tbl_image_hint')}
+                className="text-xs px-2 py-1 border border-teal text-teal rounded hover:bg-teal-bg disabled:opacity-50"
+              >
+                🖼️ {imageBusy ? t('tbl_image_processing') : t('tbl_image_button')}
+              </button>
+              <input
+                ref={imageRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                className="hidden"
+                onChange={handleImageInput}
+              />
               {importPreview && (
                 <span className="text-[10px] text-teal">
                   ✓ {importPreview.rows.length}×{importPreview.rows[0]?.length ?? 0} ({importPreview.format})
                 </span>
               )}
             </div>
+
+            <p className="text-[10px] text-muted">{t('tbl_image_hint')}</p>
+
+            {imagePreviewUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={imagePreviewUrl}
+                alt={t('tbl_image_button')}
+                className="max-h-40 w-auto rounded border border-border"
+              />
+            )}
 
             {importError && (
               <p className="text-[10px] text-red">{importError}</p>

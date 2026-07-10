@@ -41,6 +41,43 @@ export async function generateTextOpenAI(
   }
 }
 
+export async function generateVisionOpenAI(
+  prompt: string,
+  image: { dataUrl: string },
+  opts: GenerateOptions | undefined,
+  cfg: OpenAICfg,
+): Promise<string> {
+  const client = getClient(cfg);
+  try {
+    const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [];
+    if (opts?.system) messages.push({ role: 'system', content: opts.system });
+    messages.push({
+      role: 'user',
+      content: [
+        { type: 'text', text: prompt },
+        { type: 'image_url', image_url: { url: image.dataUrl } },
+      ],
+    });
+    const res = await client.chat.completions.create(
+      {
+        model: cfg.model,
+        messages,
+        temperature: opts?.temperature ?? 0.2,
+        max_tokens: opts?.maxTokens ?? 4096,
+        response_format: opts?.jsonMode ? { type: 'json_object' } : undefined,
+      },
+      opts?.signal ? { signal: opts.signal } : undefined,
+    );
+    const text = res.choices[0]?.message?.content;
+    if (!text) throw new AIError('openai', 'generate', 'Empty response');
+    return text;
+  } catch (err) {
+    if (err instanceof AIError) throw err;
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new AIError('openai', 'generate', msg);
+  }
+}
+
 export async function* streamTextOpenAI(
   prompt: string,
   opts: GenerateOptions | undefined,

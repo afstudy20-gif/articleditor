@@ -4,9 +4,9 @@
 // AI credentials are server-side only. Browser BYO-key headers are ignored.
 
 import { z } from 'zod';
-import { generateTextGemini, streamTextGemini, embedBatchGemini } from './gemini';
-import { generateTextAnthropic, streamTextAnthropic } from './anthropic';
-import { generateTextOpenAI, streamTextOpenAI, embedBatchOpenAI } from './openai';
+import { generateTextGemini, generateVisionGemini, streamTextGemini, embedBatchGemini } from './gemini';
+import { generateTextAnthropic, generateVisionAnthropic, streamTextAnthropic } from './anthropic';
+import { generateTextOpenAI, generateVisionOpenAI, streamTextOpenAI, embedBatchOpenAI } from './openai';
 import { PROVIDERS, getProviderMeta, type ProviderId } from './registry';
 import { isAbortError, isTransientError } from './errors';
 
@@ -30,12 +30,25 @@ export type GenerateOptions = {
   signal?: AbortSignal;
 };
 
+/** A decoded image for vision requests. */
+export type VisionImage = {
+  mimeType: string;
+  base64: string;
+  /** `data:<mime>;base64,<data>` — used by the OpenAI transport. */
+  dataUrl: string;
+};
+
 export interface AIProvider {
   name: ProviderName;
   generateText(prompt: string, opts?: GenerateOptions): Promise<string>;
   streamText(prompt: string, opts?: GenerateOptions): AsyncIterable<string>;
   embedBatch?(texts: string[], signal?: AbortSignal): Promise<number[][]>;
+  /** Present only on providers with multimodal (vision) support. */
+  generateVision?(prompt: string, image: VisionImage, opts?: GenerateOptions): Promise<string>;
 }
+
+// Providers with reliable image understanding, in preference order.
+const VISION_PROVIDERS: readonly ProviderName[] = ['gemini', 'openai', 'anthropic'];
 
 export class AIError extends Error {
   constructor(
@@ -123,12 +136,16 @@ export function getProvider(name?: ProviderName, cfg?: ProviderConfig): AIProvid
         generateText: (p, o) => generateTextGemini(p, o, r.gemini),
         streamText: (p, o) => streamTextGemini(p, o, r.gemini),
         embedBatch: (t, s) => embedBatchGemini(t, r.gemini, s),
+        generateVision: (p, img, o) =>
+          generateVisionGemini(p, { mimeType: img.mimeType, base64: img.base64 }, o, r.gemini),
       };
     case 'anthropic':
       return {
         name: 'anthropic',
         generateText: (p, o) => generateTextAnthropic(p, o, r.anthropic),
         streamText: (p, o) => streamTextAnthropic(p, o, r.anthropic),
+        generateVision: (p, img, o) =>
+          generateVisionAnthropic(p, { mimeType: img.mimeType, base64: img.base64 }, o, r.anthropic),
       };
     case 'openai':
       return {
@@ -136,6 +153,8 @@ export function getProvider(name?: ProviderName, cfg?: ProviderConfig): AIProvid
         generateText: (p, o) => generateTextOpenAI(p, o, r.openai),
         streamText: (p, o) => streamTextOpenAI(p, o, r.openai),
         embedBatch: (t, s) => embedBatchOpenAI(t, r.openai, s),
+        generateVision: (p, img, o) =>
+          generateVisionOpenAI(p, { dataUrl: img.dataUrl }, o, r.openai),
       };
     case 'deepseek':
       // OpenAI-compatible; reuse openai adapter with vendor-specific baseUrl.
@@ -177,6 +196,25 @@ export function getProvider(name?: ProviderName, cfg?: ProviderConfig): AIProvid
     default:
       throw new AIError(provider, 'config', `Unknown provider: ${provider}`);
   }
+}
+
+/** First vision-capable provider that has a configured key, or null. */
+export function getVisionProvider(cfg?: ProviderConfig): AIProvider | null {
+  const r = resolveConfig(cfg);
+  // Honor an explicit preference when it is vision-capable and configured.
+  if (r.preferred && VISION_PROVIDERS.includes(r.preferred) && r[r.preferred].apiKey) {
+    return getProvider(r.preferred, cfg);
+  }
+  for (const name of VISION_PROVIDERS) {
+    if (r[name].apiKey) return getProvider(name, cfg);
+  }
+  return null;
+}
+
+/** True when at least one vision-capable provider is configured. */
+export function isVisionConfigured(cfg?: ProviderConfig): boolean {
+  const r = resolveConfig(cfg);
+  return VISION_PROVIDERS.some((name) => Boolean(r[name].apiKey));
 }
 
 // Max transient (network/upstream-5xx) retries, on top of one schema-reminder
