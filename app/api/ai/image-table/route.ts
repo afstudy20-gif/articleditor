@@ -7,6 +7,7 @@ import {
   isVisionConfigured,
 } from '@/lib/ai/provider';
 import { checkRateLimit, timeoutSignal, aiErrorResponse } from '@/lib/ai/guard';
+import { generateVisionCli, isCliVisionEnabled, CliVisionError } from '@/lib/ai/cli-vision';
 import {
   parseImageDataUrl,
   buildImageTablePrompt,
@@ -38,12 +39,14 @@ export async function POST(req: Request) {
   if (limited) return limited;
 
   const config = configFromHeaders(req.headers);
-  if (!isVisionConfigured(config)) {
+  const cliBackend = isCliVisionEnabled();
+  if (!isVisionConfigured(config) && !cliBackend) {
     return NextResponse.json(
       {
         error:
-          'Görsel destekli AI yapılandırılmamış (Gemini/OpenAI/Anthropic anahtarı gerekir). / ' +
-          'No vision-capable AI is configured (needs a Gemini, OpenAI or Anthropic key).',
+          'Görsel destekli AI yapılandırılmamış (Gemini/OpenAI/Anthropic anahtarı ya da ' +
+          'AI_LOCAL_CLI_VISION gerekir). / No vision-capable AI is configured (needs a Gemini, ' +
+          'OpenAI or Anthropic key, or AI_LOCAL_CLI_VISION for a local CLI backend).',
       },
       { status: 503 },
     );
@@ -78,21 +81,28 @@ export async function POST(req: Request) {
   }
 
   const provider = getVisionProvider(config);
-  if (!provider?.generateVision) {
-    return NextResponse.json(
-      { error: 'No vision-capable AI is configured.' },
-      { status: 503 },
-    );
-  }
+  const prompt = buildImageTablePrompt(body.lang);
 
   try {
-    const raw = await provider.generateVision(buildImageTablePrompt(body.lang), image, {
-      system: SYSTEM,
-      temperature: 0,
-      maxTokens: 8_192,
-      jsonMode: true,
-      signal: timeoutSignal(),
-    });
+    let raw: string;
+    if (provider?.generateVision) {
+      raw = await provider.generateVision(prompt, image, {
+        system: SYSTEM,
+        temperature: 0,
+        maxTokens: 8_192,
+        jsonMode: true,
+        signal: timeoutSignal(),
+      });
+    } else if (cliBackend) {
+      // No server API key configured — fall back to a local CLI agent already
+      // authenticated on this machine (dev-only; see AI_LOCAL_CLI_VISION docs).
+      raw = await generateVisionCli(cliBackend, `${SYSTEM}\n\n${prompt}`, image);
+    } else {
+      return NextResponse.json(
+        { error: 'No vision-capable AI is configured.' },
+        { status: 503 },
+      );
+    }
     const parsed = ImageTableResult.parse(JSON.parse(stripCodeFence(raw)));
     const table = imageResultToParsedTable(parsed);
     if (!table) {
@@ -108,6 +118,17 @@ export async function POST(req: Request) {
     }
     return NextResponse.json({ table });
   } catch (err) {
+    if (err instanceof CliVisionError) {
+      console.error('[ai/image-table:cli]', err);
+      return NextResponse.json(
+        {
+          error:
+            'Yerel CLI görsel işleme başarısız oldu. / Local CLI vision processing failed.',
+          code: 'cli_vision_error',
+        },
+        { status: 502 },
+      );
+    }
     return aiErrorResponse(err);
   }
 }
