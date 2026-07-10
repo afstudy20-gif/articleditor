@@ -82,6 +82,28 @@ export function buildImageTablePrompt(lang: 'tr' | 'en'): string {
 }
 
 /**
+ * Condensed, single-paragraph variant of {@link buildImageTablePrompt} for
+ * local-CLI vision backends (see lib/ai/cli-vision.ts). The long, itemized
+ * version above measurably degraded one CLI backend (zcode): its own
+ * internal vision-tool call sometimes derailed into an unrelated sub-task
+ * with the full instruction set, but stayed on-task with this shorter form.
+ * Kept functionally equivalent (same JSON schema, same fidelity rules) —
+ * just fewer words for a CLI's own tool-call layer to lose track of.
+ */
+export function buildCliImageTablePrompt(lang: 'tr' | 'en'): string {
+  const noteLang = lang === 'tr' ? 'Turkish' : 'English';
+  return (
+    'Transcribe the table in this image EXACTLY as a rectangular JSON grid — same rows, ' +
+    'columns, order and cell text, no translating, summarizing, or inventing content. ' +
+    'A cell spanning multiple columns: put its text in the first column it covers, leave ' +
+    'the rest as "". A cell spanning multiple rows: repeat its text in each row. ' +
+    `JSON schema: {"title":"optional caption","footnote":"optional note","hasHeader":true,` +
+    `"rows":[["c1","c2"],["v1","v2"]]} (title/footnote stay in their original language, do ` +
+    `not translate to ${noteLang}). Return ONLY that JSON, nothing else.`
+  );
+}
+
+/**
  * Normalize a raw LLM result into a ParsedTable: drop fully-empty trailing
  * rows/cols and pad ragged rows so the grid is rectangular. Returns null when
  * there is no usable content.

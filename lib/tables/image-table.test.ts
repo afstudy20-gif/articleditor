@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   parseImageDataUrl,
   buildImageTablePrompt,
+  buildCliImageTablePrompt,
   imageResultToParsedTable,
   IMAGE_TABLE_MIME_TYPES,
 } from './image-table';
@@ -57,6 +58,24 @@ describe('buildImageTablePrompt', () => {
   it('tells the model not to translate captions to the UI language', () => {
     assert.match(buildImageTablePrompt('tr'), /do not translate to Turkish/);
     assert.match(buildImageTablePrompt('en'), /do not translate to English/);
+  });
+});
+
+describe('buildCliImageTablePrompt', () => {
+  it('carries the same JSON schema and fidelity rules, condensed', () => {
+    const p = buildCliImageTablePrompt('en');
+    assert.match(p, /EXACTLY as a rectangular JSON grid/);
+    assert.match(p, /"hasHeader":true/);
+    assert.match(p, /Return ONLY that JSON/);
+    assert.match(p, /do not translate to English/);
+  });
+
+  it('is meaningfully shorter than the full API-provider prompt', () => {
+    assert.ok(buildCliImageTablePrompt('en').length < buildImageTablePrompt('en').length);
+  });
+
+  it('respects the language for the translate-note only, not the schema', () => {
+    assert.match(buildCliImageTablePrompt('tr'), /do not translate to Turkish/);
   });
 });
 

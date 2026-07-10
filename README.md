@@ -65,7 +65,7 @@ docker run -p 3000:3000 arted
    | `OPENAI_BASE_URL` | Custom OpenAI-compatible endpoint (LM Studio, Groq, OpenRouter) |
    | `DEEPSEEK_API_KEY` | Optional AI features via DeepSeek |
    | `NVIDIA_API_KEY` | Optional AI features via NVIDIA NIM |
-   | `AI_LOCAL_CLI_VISION` | Set to `claude` for a **keyless** fallback for the image→table tool: no vision API key needed, shells out to the Claude Code CLI already authenticated on the **same machine** running the server (same pattern as the `paper` project's CLI-based reference checker). Verified reliable in testing. Do not set in a normal Docker/Coolify deploy (the image has no `claude` binary/session). |
+   | `AI_LOCAL_CLI_VISION` | Set to `claude`, `kimi`, or `zcode` for a **keyless** fallback for the image→table tool: no vision API key needed, shells out to that CLI agent already authenticated on the **same machine** running the server (same pattern and env-var conventions as the `paper` project's CLI-based reference checker: `KIMI_ACP_RUNNER`, `KIMI_CLI_BIN`). `claude` and `kimi` were 100% correct across repeated live tests — prefer those. `zcode` has a native image-attach flag but its own internal vision tool call sometimes derails (~2/3 correct in testing) — usable, but verify its output. Do not set in a normal Docker/Coolify deploy (the image has none of these binaries/sessions). |
    | `COPYLEAKS_EMAIL` | Copyleaks account email for AI-writing and similarity checks |
    | `COPYLEAKS_API_KEY` | Copyleaks server API key |
    | `COPYLEAKS_WEBHOOK_SECRET` | Long random secret used to verify `X-Copyleaks-Signature` HMAC-SHA256 over callback bodies |

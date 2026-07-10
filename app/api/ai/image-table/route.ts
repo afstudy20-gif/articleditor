@@ -11,6 +11,7 @@ import { generateVisionCli, isCliVisionEnabled, CliVisionError } from '@/lib/ai/
 import {
   parseImageDataUrl,
   buildImageTablePrompt,
+  buildCliImageTablePrompt,
   imageResultToParsedTable,
 } from '@/lib/tables/image-table';
 
@@ -45,9 +46,9 @@ export async function POST(req: Request) {
       {
         error:
           'Görsel destekli AI yapılandırılmamış (Gemini/OpenAI/Anthropic anahtarı ya da ' +
-          'AI_LOCAL_CLI_VISION=claude gerekir). / No vision-capable AI is configured (needs a ' +
-          'Gemini, OpenAI or Anthropic key, or AI_LOCAL_CLI_VISION=claude for the local Claude ' +
-          'Code CLI fallback).',
+          'AI_LOCAL_CLI_VISION=claude|zcode|kimi gerekir). / No vision-capable AI is configured ' +
+          '(needs a Gemini, OpenAI or Anthropic key, or AI_LOCAL_CLI_VISION=claude|zcode|kimi for ' +
+          'a local CLI fallback).',
       },
       { status: 503 },
     );
@@ -97,7 +98,9 @@ export async function POST(req: Request) {
     } else if (cliBackend) {
       // No server API key configured — fall back to a local CLI agent already
       // authenticated on this machine (dev-only; see AI_LOCAL_CLI_VISION docs).
-      raw = await generateVisionCli(cliBackend, `${SYSTEM}\n\n${prompt}`, image);
+      // Uses the condensed prompt: the long API-oriented one measurably
+      // degraded one CLI backend's own internal tool-call behavior.
+      raw = await generateVisionCli(cliBackend, buildCliImageTablePrompt(body.lang), image);
     } else {
       return NextResponse.json(
         { error: 'No vision-capable AI is configured.' },
