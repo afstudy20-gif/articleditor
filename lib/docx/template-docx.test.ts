@@ -226,6 +226,16 @@ describe('buildTemplateDocx (JCM/MDPI)', () => {
       const para = xml.slice(xml.lastIndexOf('<w:p>', idx), idx);
       assert.ok(para.includes('<w:pStyle w:val="MDPI62backmatter"/>'), `${label} back-matter style`);
     }
+
+    // Regression: the byline's superscript-affiliation-number splitter used
+    // to match a trailing space as part of the digit/comma token and then
+    // .trim() it away, silently deleting the space between one author's
+    // marker and the next author's name ("Akkaya 1, Nihan" -> "Akkaya1,Nihan").
+    // Reconstruct the paragraph's full text from every run and compare
+    // against the original — this must be byte-for-byte equal.
+    const bylineParaFull = xml.slice(xml.lastIndexOf('<w:p>', bylineIdx), xml.indexOf('</w:p>', bylineIdx));
+    const bylineRunTexts = [...bylineParaFull.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map((m) => m[1]);
+    assert.equal(bylineRunTexts.join(''), 'Fatih Akkaya 1, Nihan Bahadır 1 and Ayşe Yılmaz 2');
   });
 
   it('renders level-1 headings with an auto-incrementing outline number', async () => {

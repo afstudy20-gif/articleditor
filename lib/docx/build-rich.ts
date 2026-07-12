@@ -622,7 +622,11 @@ ${paragraphs.join('\n')}
   private splitBylineText(text: string): string[] {
     // A marker is a short run of digits/asterisks/daggers optionally separated
     // by commas, that follows a name. e.g. "1", "1,2", "1*", "†".
-    const re = /([0-9][0-9,*†‡§¶\s]*\*?|[†‡§¶]\*?)/g;
+    // Deliberately excludes \s from the repeatable class: matching (and then
+    // trimming) a trailing space here would silently swallow the space
+    // between one author's marker and the next author's name — e.g.
+    // "Name 1, Next 2" lost its space and rendered as "Name¹,Next²".
+    const re = /([0-9][0-9,*†‡§¶]*\*?|[†‡§¶]\*?)/g;
     const runs: string[] = [];
     let last = 0;
     let m: RegExpExecArray | null;
