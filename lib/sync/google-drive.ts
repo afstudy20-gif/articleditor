@@ -253,7 +253,8 @@ async function refreshToken() {
   });
 }
 
-async function driveFetch(path: string, init?: RequestInit): Promise<Response> {
+/** Authenticated Drive API fetch — refreshes the token on expiry/401. Shared with drive-briefcase.ts. */
+export async function driveFetch(path: string, init?: RequestInit): Promise<Response> {
   if (!accessToken) throw new Error('Oturum açılmadı');
   if (tokenExpiresAt && tokenExpiresAt <= Date.now()) {
     await refreshToken();

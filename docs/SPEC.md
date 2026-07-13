@@ -179,11 +179,29 @@ phrasebank (`lib/phrasebank`), checklists (`lib/checklists`), compliance
   against `COPYLEAKS_WEBHOOK_SECRET`; webhook base URL must be public HTTPS.
 
 ### F12 — Persistence, i18n, PWA
-- **Modules**: `store/db.ts` (Dexie schema + migrations), `lib/sync` (local folder
-  sync), `lib/fs`, `lib/i18n/index.ts`, `public/sw.js`.
+- **Modules**: `store/db.ts` (Dexie schema + migrations), `lib/sync/google-drive.ts`
+  (Google Drive cloud sync — OAuth via GIS, project JSON pushed/pulled to/from
+  a hidden `appDataFolder`), `lib/fs` (local folder mirror via File System
+  Access API), `lib/i18n/index.ts`, `public/sw.js`.
+- **Drive briefcase** (`lib/sync/drive-briefcase.ts`, "💼 Briefcase" button on
+  the connected Google Drive Sync card → `DriveBriefcaseModal`): a second,
+  independent use of the same `appDataFolder` and the same OAuth token
+  (`driveFetch`, exported from `google-drive.ts`) — but tagged
+  `appProperties.arted='briefcase'` so it's never read by `pull()`/`push()`
+  or embedded in any project's JSON. For moving one ad-hoc file (a large
+  supplementary dataset, a scanned PDF) to another device without it riding
+  along on every project sync. Files over 95 MB are transparently split into
+  `.partNofM` chunks sharing an `appProperties.artedGroup` id
+  (`groupBriefcaseFiles` re-merges them into one logical entry; an
+  interrupted upload is surfaced as `incomplete` rather than silently
+  partial). Fully separate from — and does not replace — the existing
+  behavior where `project.assets` (the "Project Dosyaları" pool) travel
+  embedded as base64 inside each project's own synced JSON.
 - **Invariants**:
   - TR and EN dictionaries expose identical key sets (no missing translations).
   - Dexie schema migrations never drop stores.
+  - Briefcase entries never appear in `pull()`/`push()`'s project payload and
+    are never added to `project.refs` or `project.assets`.
 
 ## 2. Server API Contract
 

@@ -43,6 +43,7 @@ const EditorClient = dynamic(() => import('./EditorClient').then((m) => m.Editor
 
 import { ProjectWorkspace } from '@/components/Workspace/ProjectWorkspace';
 import { LocalFolderCard } from '@/components/Workspace/LocalFolderCard';
+import { DriveBriefcaseModal } from '@/components/Workspace/DriveBriefcaseModal';
 import { SiteHeader } from '@/components/SiteChrome';
 
 function formatAssetBytes(bytes: number): string {
@@ -74,6 +75,7 @@ function EditPageInner() {
   const [trashOpen, setTrashOpen] = useState(false);
   const [showSyncSettings, setShowSyncSettings] = useState(false);
   const [clientIdInput, setClientIdInput] = useState('');
+  const [briefcaseOpen, setBriefcaseOpen] = useState(false);
   const backupInputRef = useRef<HTMLInputElement>(null);
   const conversionDocxInputRef = useRef<HTMLInputElement>(null);
 
@@ -369,6 +371,12 @@ function EditPageInner() {
                       className="btn-secondary text-xs px-3 py-1.5"
                     >
                       {syncState.status === 'syncing' ? t('gdrive_syncing') : t('gdrive_sync_now')}
+                    </button>
+                    <button
+                      onClick={() => setBriefcaseOpen(true)}
+                      className="btn-secondary text-xs px-3 py-1.5"
+                    >
+                      {t('briefcase_button')}
                     </button>
                     <button
                       onClick={() => gdrive.signOut()}
@@ -708,6 +716,7 @@ function EditPageInner() {
             </div>
           </section>
         </main>
+        {briefcaseOpen && <DriveBriefcaseModal onClose={() => setBriefcaseOpen(false)} />}
         {conversionPreview && (
           <DocImportModal
             onClose={() => {
