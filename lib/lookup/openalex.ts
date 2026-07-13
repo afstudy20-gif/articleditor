@@ -12,6 +12,7 @@ type OpenAlexWork = {
   authorships?: Array<{ author?: { display_name?: string } }>;
   primary_location?: { source?: { display_name?: string } };
   biblio?: { volume?: string; issue?: string; first_page?: string; last_page?: string };
+  open_access?: { is_oa?: boolean; oa_url?: string };
 };
 
 async function fetchWithTimeout(url: string, ms: number, init: RequestInit = {}): Promise<Response> {
@@ -39,7 +40,7 @@ function cleanDoi(doi: string): string {
     .trim();
 }
 
-export async function getOpenAlexByDoi(doi: string, opts: OpenAlexOptions = {}): Promise<Partial<Ref> | null> {
+async function fetchOpenAlexWorkByDoi(doi: string, opts: OpenAlexOptions): Promise<OpenAlexWork | null> {
   const cleaned = cleanDoi(doi);
   const params = new URLSearchParams();
   const mailto = opts.mailto || 'polite@arted.com';
@@ -50,11 +51,31 @@ export async function getOpenAlexByDoi(doi: string, opts: OpenAlexOptions = {}):
       headers: { Accept: 'application/json', 'User-Agent': 'ARTED/0.1' },
     });
     if (!res.ok) return null;
-    const work = (await res.json()) as OpenAlexWork;
-    return toPartialRef(work);
+    return (await res.json()) as OpenAlexWork;
   } catch {
     return null;
   }
+}
+
+export async function getOpenAlexByDoi(doi: string, opts: OpenAlexOptions = {}): Promise<Partial<Ref> | null> {
+  const work = await fetchOpenAlexWorkByDoi(doi, opts);
+  return work ? toPartialRef(work) : null;
+}
+
+export type OpenAlexOaInfo = { isOa: boolean; oaUrl: string | null };
+
+/**
+ * Legal open-access fulltext lookup by DOI. OpenAlex sources this field from
+ * Unpaywall (the same publisher-sanctioned OA aggregator used by reference
+ * managers like Zotero) — never a piracy mirror.
+ */
+export async function getOpenAlexOpenAccess(doi: string, opts: OpenAlexOptions = {}): Promise<OpenAlexOaInfo | null> {
+  const work = await fetchOpenAlexWorkByDoi(doi, opts);
+  if (!work) return null;
+  return {
+    isOa: Boolean(work.open_access?.is_oa),
+    oaUrl: work.open_access?.oa_url ?? null,
+  };
 }
 
 export type OpenAlexResult = Partial<Ref> & { doi?: string; openalexId?: string };

@@ -4,7 +4,7 @@ import type { Ref } from '@/store/types';
 import { enrichRef } from '@/lib/lookup/enrich';
 import { searchCrossRef, getCrossRefByDoi } from '@/lib/lookup/crossref';
 import { searchPubmed, fetchPubmedSummaries } from '@/lib/lookup/pubmed';
-import { searchOpenAlex } from '@/lib/lookup/openalex';
+import { searchOpenAlex, getOpenAlexOpenAccess } from '@/lib/lookup/openalex';
 import { LookupCache } from '@/lib/lookup/cache';
 
 export const runtime = 'nodejs';
@@ -21,7 +21,7 @@ function enrichKey(ref: { doi?: string; pmid?: string; title?: string }): string
 }
 
 const BodySchema = z.object({
-  mode: z.enum(['enrich', 'search', 'doi']),
+  mode: z.enum(['enrich', 'search', 'doi', 'oa']),
   ref: z.any().optional(),
   query: z.string().optional(),
   doi: z.string().optional(),
@@ -115,6 +115,13 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: `DOI bulunamadı: ${raw}` }, { status: 404 });
       }
       return NextResponse.json({ ref });
+    }
+    if (parsed.mode === 'oa' && parsed.doi) {
+      const raw = parsed.doi.trim();
+      const info = await lookupCache.resolve(`oa:${raw.toLowerCase()}`, () =>
+        getOpenAlexOpenAccess(raw, { mailto }),
+      );
+      return NextResponse.json({ isOa: info?.isOa ?? false, oaUrl: info?.oaUrl ?? null });
     }
     return NextResponse.json({ error: 'missing params' }, { status: 400 });
   } catch (e: unknown) {

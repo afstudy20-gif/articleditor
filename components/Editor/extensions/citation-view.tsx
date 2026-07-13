@@ -20,6 +20,8 @@ declare global {
     __enrStyle?: StyleId;
     __enrHighlightRefId?: string | null;
     __enrOnCitationClick?: (pos: number, refIds: string[]) => void;
+    __enrOnCitationHoverStart?: (rect: DOMRect, refIds: string[]) => void;
+    __enrOnCitationHoverEnd?: () => void;
   }
 }
 
@@ -63,7 +65,9 @@ function CitationNodeView({ node, getPos }: any) {
     resolvedRefs.length > 0 ? formatInTextCitation(style, resolvedRefs, numbers, citeOpts) : '[?]';
   const superscript = isSuperscriptCitationStyle(style);
 
-  const titleAttr = refIds
+  // Screen-reader label only — a native `title` tooltip would fight with the
+  // rich CitationHoverCard rendered on hover (see onMouseEnter below).
+  const ariaLabel = refIds
     .map((id) => {
       const r = refsMap.get(id);
       if (!r) return id;
@@ -83,7 +87,7 @@ function CitationNodeView({ node, getPos }: any) {
     <NodeViewWrapper
       as={superscript ? 'sup' : 'span'}
       className={className}
-      title={titleAttr}
+      aria-label={ariaLabel}
       data-ref-ids={refIds.join(',')}
       onClick={(e: React.MouseEvent) => {
         e.preventDefault();
@@ -92,6 +96,12 @@ function CitationNodeView({ node, getPos }: any) {
           const pos = typeof getPos === 'function' ? getPos() : -1;
           window.__enrOnCitationClick(pos, refIds);
         }
+      }}
+      onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
+        window.__enrOnCitationHoverStart?.(e.currentTarget.getBoundingClientRect(), refIds);
+      }}
+      onMouseLeave={() => {
+        window.__enrOnCitationHoverEnd?.();
       }}
     >
       {display}

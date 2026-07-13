@@ -82,14 +82,24 @@ of the flows listed here.
   - DOI/PMID are normalized (prefix-stripped, trimmed) before comparison.
 
 ### F5 — Editor & numbering
-- **Entry**: `/edit` TipTap editor; CitationPopover, CitationInsertPicker.
+- **Entry**: `/edit` TipTap editor; CitationPopover, CitationInsertPicker,
+  CitationHoverCard.
 - **Modules**: `lib/editor/numbering.ts`, `doc-structure.ts`, `doc-text.ts`,
-  `mixed-content.ts`, `lib/history.ts`.
+  `mixed-content.ts`, `lib/history.ts`, `lib/refs/display.ts`.
+- **Behavior**: hovering a citation marker (350 ms show-delay, 150 ms
+  hide-delay, cancelled on re-entry into the card) shows a Consensus.app-style
+  card: numbered badge, title, authors, year, journal, abstract snippet, DOI
+  link, and a "Full text (open access)" link resolved from OpenAlex's
+  `open_access.oa_url` (`/api/lookup` `mode: 'oa'`, itself sourced from
+  Unpaywall). No Sci-Hub or other piracy-mirror link is ever surfaced — this
+  is a deliberate, permanent exclusion, not a gap to fill in later.
 - **Invariants**:
   - Citations are numbered by order of first appearance; deleting/inserting a
     citation renumbers the whole document and the bibliography consistently.
   - Multi-cite nodes render per active style (`[1,3]`, `[1-3]` collapsing).
   - Undo history checkpoints are bounded (no unbounded memory growth).
+  - Full-text links surfaced anywhere in the editor come only from
+    legitimate OA aggregation (OpenAlex/Unpaywall) — never a piracy mirror.
 
 ### F6 — Citation styles & bibliography
 - **Modules**: `lib/refs/styles.ts`, `style-spec.ts`, `mdpi-styles.ts`.

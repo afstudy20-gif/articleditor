@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Ref } from '@/store/types';
 import { useLang } from '@/lib/i18n/hooks';
+import { authorList, journalLine } from '@/lib/refs/display';
 
 export type CiteOptsValue = {
   locator: string;
@@ -115,23 +116,6 @@ export function CitationPopover({
   function removeRef(id: string): void {
     const remaining = refIds.filter((x) => x !== id);
     onReplace(pos, remaining);
-  }
-
-  function authorList(r: Ref): string {
-    const names = (r.authors ?? [])
-      .map((a) => a.literal || [a.family, a.given].filter(Boolean).join(', '))
-      .filter(Boolean);
-    return names.length > 0 ? names.join('; ') : '—';
-  }
-
-  function journalLine(r: Ref): string {
-    const volumeIssue = [r.volume, r.issue ? `(${r.issue})` : ''].filter(Boolean).join('');
-    const parts = [
-      r.containerTitle,
-      volumeIssue,
-      r.pages,
-    ].filter(Boolean);
-    return parts.length > 0 ? parts.join(', ') : '—';
   }
 
   return (

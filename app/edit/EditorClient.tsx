@@ -31,6 +31,7 @@ import { BibliographyPreview } from '@/components/Bibliography/BibliographyPrevi
 import { buildLatex } from '@/lib/tex/build';
 import JSZip from 'jszip';
 import { CitationPopover } from '@/components/Editor/CitationPopover';
+import { CitationHoverCard } from '@/components/Editor/CitationHoverCard';
 import { FindReplace } from '@/components/Editor/FindReplace';
 import { IssuesPanel } from '@/components/AI/IssuesPanel';
 import { ScorePanel } from '@/components/AI/ScorePanel';
@@ -213,6 +214,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
   const [bottomColWidth, setBottomColWidth] = useState<number>(380);
   const [topRowHeight, setTopRowHeight] = useState<number>(560);
   const [citationPopover, setCitationPopover] = useState<{ pos: number; refIds: string[] } | null>(null);
+  const [citationHover, setCitationHover] = useState<{ rect: DOMRect; refIds: string[] } | null>(null);
   const [showFind, setShowFind] = useState(false);
   const [librarySelectedIds, setLibrarySelectedIds] = useState<Set<string>>(new Set());
   const [aiReview, setAiReview] = useState<{
@@ -400,6 +402,8 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
   // Exactly ONE ArticleEditor mounts at a time (desktop OR mobile layout,
   // chosen by useIsDesktop). The registry prunes destroyed instances so a
   // breakpoint switch hands over cleanly to the freshly mounted editor.
+  const hoverShowTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hoverHideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const editorRegistry = useRef<any[]>([]);
   const editorInstance = {
     get current(): any {
@@ -1961,6 +1965,30 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
     };
   }, []);
 
+  // Hover-intent globals for the Citation NodeView: a short show-delay avoids
+  // flicker while scanning the page; a short hide-delay lets the cursor cross
+  // the small gap into the card itself without it closing.
+  useEffect(() => {
+    const clearTimers = (): void => {
+      if (hoverShowTimer.current) clearTimeout(hoverShowTimer.current);
+      if (hoverHideTimer.current) clearTimeout(hoverHideTimer.current);
+    };
+    window.__enrOnCitationHoverStart = (rect, ids) => {
+      if (hoverHideTimer.current) clearTimeout(hoverHideTimer.current);
+      if (hoverShowTimer.current) clearTimeout(hoverShowTimer.current);
+      hoverShowTimer.current = setTimeout(() => setCitationHover({ rect, refIds: ids }), 350);
+    };
+    window.__enrOnCitationHoverEnd = () => {
+      if (hoverShowTimer.current) clearTimeout(hoverShowTimer.current);
+      hoverHideTimer.current = setTimeout(() => setCitationHover(null), 150);
+    };
+    return () => {
+      clearTimers();
+      delete window.__enrOnCitationHoverStart;
+      delete window.__enrOnCitationHoverEnd;
+    };
+  }, []);
+
   // Listen for refs added via the RefDown Chrome extension bridge.
   useEffect(() => {
     const handler = (e: Event): void => {
@@ -3194,6 +3222,27 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
           onUpdateOpts={updateCitationOptsAt}
         />
       )}
+
+      {citationHover && !citationPopover && (() => {
+        const hoverRefs = citationHover.refIds
+          .map((id) => refsById.get(id))
+          .filter((r): r is Ref => Boolean(r));
+        const hoverNumbers = citationHover.refIds.map((id) => refOrder.get(id) ?? 0);
+        return hoverRefs.length > 0 ? (
+          <CitationHoverCard
+            refs={hoverRefs}
+            numbers={hoverNumbers}
+            anchorRect={citationHover.rect}
+            lang={lang}
+            onMouseEnter={() => {
+              if (hoverHideTimer.current) clearTimeout(hoverHideTimer.current);
+            }}
+            onMouseLeave={() => {
+              hoverHideTimer.current = setTimeout(() => setCitationHover(null), 150);
+            }}
+          />
+        ) : null;
+      })()}
 
       {showFind && editorInstance.current && (
         <FindReplace editor={editorInstance.current} onClose={() => setShowFind(false)} />
