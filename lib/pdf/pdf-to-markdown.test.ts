@@ -7,8 +7,21 @@ import {
   splitLineIntoCells,
   renderMarkdownTable,
   renderLinesAsMarkdown,
+  markdownFilenameFor,
   type PositionedItem,
 } from './pdf-to-markdown';
+
+describe('markdownFilenameFor', () => {
+  it('replaces a .pdf extension with .md', () => {
+    assert.equal(markdownFilenameFor('smith-2021.pdf'), 'smith-2021.md');
+    assert.equal(markdownFilenameFor('Article.PDF'), 'Article.md');
+  });
+
+  it('flattens folder separators from a picked-folder relative path', () => {
+    assert.equal(markdownFilenameFor('refs/subdir/a.pdf'), 'refs_subdir_a.md');
+    assert.equal(markdownFilenameFor('refs\\a.pdf'), 'refs_a.md');
+  });
+});
 
 describe('articleTitleFromFilename', () => {
   it('strips the extension and collapses separators to spaces', () => {

@@ -2,27 +2,25 @@
 
 import { useMemo, useRef, useState } from 'react';
 import JSZip from 'jszip';
-import type { Ref } from '@/store/types';
 import { isFsAccessSupported } from '@/lib/fs/workspace';
 import { pdfFileToMarkdown, markdownFilenameFor } from '@/lib/pdf/pdf-to-markdown';
-import { refFromArticleText } from '@/lib/refs/article-metadata';
-import { appendUniqueRefs } from '@/lib/refs/dedupe';
 import { downloadBlob } from '@/lib/download';
 
 type Props = {
-  existingRefs: Ref[];
   onClose: () => void;
-  onAddRefs: (refs: Ref[]) => void;
+  /** Saves the converted Markdown files back into this project's own asset pool — no citation library involved. */
+  onSaveAsAssets: (files: File[]) => void | Promise<void>;
 };
 
-type ItemStatus = 'converting' | 'enriching' | 'ok' | 'failed';
+type ItemStatus = 'converting' | 'ok' | 'failed';
 
 type Item = {
   key: string;
   filename: string;
   status: ItemStatus;
-  ref?: Ref;
   markdown?: string;
+  pages?: number;
+  textPages?: number;
   error?: string;
   selected: boolean;
 };
@@ -42,43 +40,15 @@ async function collectPdfHandles(
   return out;
 }
 
-/** Best-effort DOI/title enrichment via the server lookup proxy — only
- *  title + first author + year (or a DOI) ever leaves the browser. */
-async function enrichViaServer(ref: Ref): Promise<Ref> {
-  try {
-    const res = await fetch('/api/lookup', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mode: 'enrich', ref }),
-    });
-    if (!res.ok) return ref;
-    const data = (await res.json().catch(() => null)) as { ref?: Ref } | null;
-    return data?.ref ?? ref;
-  } catch {
-    return ref;
-  }
-}
-
 function matchesQuery(item: Item, query: string): boolean {
   if (!query) return true;
-  const q = query.toLowerCase();
-  const haystack = [
-    item.filename,
-    item.ref?.title,
-    item.ref?.containerTitle,
-    item.ref?.authors.map((a) => a.literal || `${a.family ?? ''} ${a.given ?? ''}`).join(' '),
-    item.ref?.year != null ? String(item.ref.year) : '',
-    item.ref?.doi,
-  ]
-    .filter(Boolean)
-    .join(' ')
-    .toLowerCase();
-  return haystack.includes(q);
+  return item.filename.toLowerCase().includes(query.toLowerCase());
 }
 
-export function PdfFolderImportModal({ existingRefs, onClose, onAddRefs }: Props) {
+export function PdfToMarkdownModal({ onClose, onSaveAsAssets }: Props) {
   const [items, setItems] = useState<Item[]>([]);
   const [busy, setBusy] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const folderInputRef = useRef<HTMLInputElement | null>(null);
@@ -97,7 +67,7 @@ export function PdfFolderImportModal({ existingRefs, onClose, onAddRefs }: Props
 
     for (const { path, file } of files) {
       try {
-        const { text, textPages, markdown } = await pdfFileToMarkdown(file);
+        const { markdown, totalPages, textPages } = await pdfFileToMarkdown(file);
         if (textPages === 0) {
           setItems((prev) => prev.map((it) => (
             it.key === path
@@ -106,12 +76,9 @@ export function PdfFolderImportModal({ existingRefs, onClose, onAddRefs }: Props
           )));
           continue;
         }
-        let ref = refFromArticleText({ filename: path, text });
-        setItems((prev) => prev.map((it) => (it.key === path ? { ...it, status: 'enriching', ref, markdown } : it)));
-        if (ref.doi || ref.title) {
-          ref = await enrichViaServer(ref);
-        }
-        setItems((prev) => prev.map((it) => (it.key === path ? { ...it, status: 'ok', ref } : it)));
+        setItems((prev) => prev.map((it) => (
+          it.key === path ? { ...it, status: 'ok', markdown, pages: totalPages, textPages } : it
+        )));
       } catch (err) {
         setItems((prev) => prev.map((it) => (
           it.key === path
@@ -165,15 +132,7 @@ export function PdfFolderImportModal({ existingRefs, onClose, onAddRefs }: Props
   };
 
   const visibleItems = useMemo(() => items.filter((it) => matchesQuery(it, query)), [items, query]);
-
-  const selectedRefs = items.filter((it) => it.status === 'ok' && it.selected && it.ref).map((it) => it.ref!);
-  const preview = appendUniqueRefs(existingRefs, selectedRefs);
-
-  const addSelected = () => {
-    if (preview.added.length === 0) return;
-    onAddRefs(preview.added);
-    onClose();
-  };
+  const selectedOk = items.filter((it) => it.status === 'ok' && it.selected && it.markdown);
 
   const downloadOne = (item: Item) => {
     if (!item.markdown) return;
@@ -192,6 +151,22 @@ export function PdfFolderImportModal({ existingRefs, onClose, onAddRefs }: Props
     downloadBlob(await zip.generateAsync({ type: 'blob' }), 'pdf-markdown.zip');
   };
 
+  const saveSelectedAsAssets = async () => {
+    if (selectedOk.length === 0 || saving) return;
+    setSaving(true);
+    try {
+      const files = selectedOk.map(
+        (it) => new File([it.markdown!], markdownFilenameFor(it.filename), { type: 'text/markdown' }),
+      );
+      await onSaveAsAssets(files);
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const okCount = items.filter((it) => it.status === 'ok').length;
   const failedCount = items.filter((it) => it.status === 'failed').length;
   const withMdCount = items.filter((it) => it.markdown).length;
@@ -200,7 +175,7 @@ export function PdfFolderImportModal({ existingRefs, onClose, onAddRefs }: Props
     <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
       <div className="bg-surface rounded-xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col overflow-hidden">
         <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
-          <strong className="text-sm">📚 PDF → Markdown / Atıf Kütüphanesi</strong>
+          <strong className="text-sm">📝 PDF → Markdown</strong>
           <button type="button" className="ml-auto text-muted hover:text-primary" onClick={onClose}>
             ✕
           </button>
@@ -208,9 +183,9 @@ export function PdfFolderImportModal({ existingRefs, onClose, onAddRefs }: Props
 
         <div className="p-4 overflow-y-auto flex-1 space-y-3">
           <p className="text-xs text-secondary">
-            Bir klasör ya da tek/çoklu PDF seç — her biri Markdown&apos;a dönüştürülür (metin, tablo ve
-            figürler dahil); makale başlığı, yazar, yıl ve (varsa) DOI/dergi bilgisi otomatik çıkarılır.
-            Sonra istediklerini atıf kütüphanesine ekleyebilir ya da Markdown olarak indirebilirsin.
+            Bir klasör ya da tek/çoklu PDF seç — sadece Markdown&apos;a dönüştürülür (metin, tablo ve
+            figürler dahil). Atıf kütüphanesine hiçbir şey eklenmez, dışarıya ağ isteği gitmez. Sonucu
+            indirebilir ya da doğrudan bu projenin dosya havuzuna kaydedebilirsin.
           </p>
 
           <input
@@ -257,13 +232,13 @@ export function PdfFolderImportModal({ existingRefs, onClose, onAddRefs }: Props
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Başlık, yazar, dergi veya dosya adında ara…"
+                placeholder="Dosya adında ara…"
                 className="w-full text-xs border border-border rounded-lg px-3 py-2 bg-white"
               />
 
               <div className="flex items-center justify-between text-[11px] text-muted">
                 <span>
-                  {okCount} bulundu{failedCount > 0 ? `, ${failedCount} başarısız` : ''} · {items.length} PDF
+                  {okCount} dönüştürüldü{failedCount > 0 ? `, ${failedCount} başarısız` : ''} · {items.length} PDF
                   {query && visibleItems.length !== items.length ? ` · ${visibleItems.length} eşleşme` : ''}
                 </span>
                 <span className="flex gap-2">
@@ -287,20 +262,16 @@ export function PdfFolderImportModal({ existingRefs, onClose, onAddRefs }: Props
                     />
                     <div className="min-w-0 flex-1">
                       {it.status === 'converting' && <span className="text-muted">⏳ Dönüştürülüyor — {it.filename}</span>}
-                      {it.status === 'enriching' && <span className="text-muted">🔎 Zenginleştiriliyor — {it.ref?.title || it.filename}</span>}
                       {it.status === 'failed' && (
                         <span className="text-red">
                           ⚠️ {it.filename} — {it.error}
                         </span>
                       )}
-                      {it.status === 'ok' && it.ref && (
+                      {it.status === 'ok' && (
                         <>
-                          <div className="font-semibold text-primary truncate">{it.ref.title || it.filename}</div>
+                          <div className="font-semibold text-primary truncate">{it.filename}</div>
                           <div className="text-[10px] text-muted truncate">
-                            {(it.ref.authors[0]?.literal || it.ref.authors[0]?.family || '—')}
-                            {it.ref.containerTitle ? ` · ${it.ref.containerTitle}` : ''}
-                            {it.ref.year ? ` · ${it.ref.year}` : ''}
-                            {it.ref.doi ? ` · DOI: ${it.ref.doi}` : ''}
+                            {it.textPages}/{it.pages} sayfa metin içeriyor
                           </div>
                         </>
                       )}
@@ -318,12 +289,6 @@ export function PdfFolderImportModal({ existingRefs, onClose, onAddRefs }: Props
                   </div>
                 ))}
               </div>
-
-              {preview.duplicates.length > 0 && (
-                <p className="text-[10px] text-muted">
-                  {preview.duplicates.length} seçili öğe kütüphanede zaten var, eklenmeyecek.
-                </p>
-              )}
             </>
           )}
         </div>
@@ -340,11 +305,11 @@ export function PdfFolderImportModal({ existingRefs, onClose, onAddRefs }: Props
             </button>
             <button
               type="button"
-              disabled={busy || preview.added.length === 0}
-              onClick={addSelected}
+              disabled={saving || selectedOk.length === 0}
+              onClick={() => void saveSelectedAsAssets()}
               className="btn-primary flex-1 py-2.5 text-xs font-semibold disabled:opacity-50"
             >
-              Kütüphaneye ekle ({preview.added.length})
+              {saving ? 'Kaydediliyor...' : `Proje dosyalarına ekle (${selectedOk.length})`}
             </button>
           </div>
         )}

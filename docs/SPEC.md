@@ -66,6 +66,16 @@ of the flows listed here.
   pdf.js's worker-based text extraction can misparse pages using uncommon
   filter stacks (e.g. ASCII85+Flate/DCT) — rare in real academic PDFs,
   documented in the module, not auto-detected.
+- **PDF → Markdown, library-free** (ProjectAssetsPanel → PdfToMarkdownModal):
+  sibling tool to PDF-folder import above, same folder/file picker and same
+  `lib/pdf/pdf-to-markdown.ts` conversion, but deliberately does none of
+  the reference-library work — no `article-metadata.ts` parsing, no
+  `/api/lookup` enrich call, nothing ever added to `project.refs`. Only
+  output: per-item `.md` download (or all as `.zip`), or "Proje dosyalarına
+  ekle" which saves the converted Markdown back into `project.assets`
+  (`ProjectAssetsPanel.addFiles`, so it gets a disk mirror too when a
+  workspace folder is connected) — the PDF stays where it is, nothing
+  leaves the project.
 
 ### F4 — Metadata lookup & enrichment
 - **Entry**: RefDetail "enrich", RefsPanel import auto-enrich; `/api/lookup`.

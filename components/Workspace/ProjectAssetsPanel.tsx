@@ -18,7 +18,9 @@ import { docxFilename, plainTextToTiptapDoc } from '@/lib/docx/plain-text';
 import { AcademicImageConverterModal } from '@/components/Workspace/AcademicImageConverterModal';
 import type { AcademicImageResult } from '@/lib/image/academic-converter';
 import { PdfFolderImportModal } from '@/components/Workspace/PdfFolderImportModal';
+import { PdfToMarkdownModal } from '@/components/Workspace/PdfToMarkdownModal';
 import { appendUniqueRefs } from '@/lib/refs/dedupe';
+import { downloadBlob } from '@/lib/download';
 
 type Props = {
   project: Project;
@@ -58,15 +60,6 @@ function safeFilename(name: string, fallback = 'file'): string {
     .trim()
     .replace(/[.\s]+$/g, '');
   return clean || fallback;
-}
-
-function downloadBlob(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 5000);
 }
 
 function assetIcon(asset: ProjectAsset): string {
@@ -113,6 +106,7 @@ export function ProjectAssetsPanel({ project, onSaved, onOpenManuscript }: Props
   const [menuAssetId, setMenuAssetId] = useState<string | null>(null);
   const [converterAsset, setConverterAsset] = useState<ProjectAsset | null>(null);
   const [pdfImportOpen, setPdfImportOpen] = useState(false);
+  const [mdToolOpen, setMdToolOpen] = useState(false);
   const assets = project.assets ?? [];
   const submissionAssets = assets.filter((asset) => asset.submissionIncluded);
   const totalSize = assets.reduce((sum, asset) => sum + asset.size, 0);
@@ -562,6 +556,14 @@ export function ProjectAssetsPanel({ project, onSaved, onOpenManuscript }: Props
       <button
         type="button"
         disabled={busy}
+        onClick={() => setMdToolOpen(true)}
+        className="btn-secondary w-full py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 border-sky-200 text-sky-700 hover:bg-sky-50 transition mb-2"
+      >
+        📝 PDF → Markdown (kütüphaneye eklemeden)
+      </button>
+      <button
+        type="button"
+        disabled={busy}
         onClick={() => inputRef.current?.click()}
         className="btn-secondary w-full py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 border-sky-200 text-sky-700 hover:bg-sky-50 transition"
       >
@@ -579,6 +581,12 @@ export function ProjectAssetsPanel({ project, onSaved, onOpenManuscript }: Props
           existingRefs={project.refs}
           onClose={() => setPdfImportOpen(false)}
           onAddRefs={(newRefs) => void addRefsToLibrary(newRefs)}
+        />
+      )}
+      {mdToolOpen && (
+        <PdfToMarkdownModal
+          onClose={() => setMdToolOpen(false)}
+          onSaveAsAssets={(files) => addFiles(files)}
         />
       )}
     </div>

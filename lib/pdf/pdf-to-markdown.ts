@@ -68,6 +68,11 @@ export type PdfMarkdownResult = {
   images: string[];
 };
 
+/** Derives a sibling `.md` filename from a PDF path/filename (e.g. `refs/a.pdf` → `refs_a.md`). */
+export function markdownFilenameFor(pdfFilename: string): string {
+  return pdfFilename.replace(/\.pdf$/i, '').replace(/[\\/]/g, '_') + '.md';
+}
+
 /** Strip a file extension and collapse separators into single spaces. */
 export function articleTitleFromFilename(filename: string): string {
   return filename
