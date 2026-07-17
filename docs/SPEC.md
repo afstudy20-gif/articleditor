@@ -46,7 +46,10 @@ of the flows listed here.
   - Dedupe keys on DOI, then PMID, then normalized title+year; merging keeps the
     richer record.
   - Parsers never throw on truncated/garbage input; they return `[]` or partial.
-- **PDF-folder import** (ProjectAssetsPanel → PdfFolderImportModal): two
+- **PDF-folder import** (PdfFolderImportModal, opened from ProjectAssetsPanel
+  "PDF Klasöründen Kütüphaneye Aktar" OR from the Library sidebar's "+ Add" tab
+  via the "PDF / PDF klasörü içe aktar" button in the IMPORT FILE / TEXT
+  section — `rp_import_pdf_*` i18n keys): two
   entry points — "Klasör Seç" (File System Access `showDirectoryPicker`,
   read-only, recurses subfolders) and "PDF Dosyası Seç" (plain multi-file
   `<input>`, works without FSA support and for single-file conversion

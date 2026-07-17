@@ -6,6 +6,7 @@ import { newId } from '@/lib/id';
 import { useLang } from '@/lib/i18n/hooks';
 import { importByAutoDetect, importByExtension, FORMAT_LABELS, type ImportFormat } from '@/lib/refs/import-auto';
 import { parseEns, looksLikeEns } from '@/lib/refs/ens';
+import { PdfFolderImportModal } from '@/components/Workspace/PdfFolderImportModal';
 import { refsToFullAuthorJournalList, refsToOrderedDoiList } from '@/lib/refs/export-library';
 import {
   HISTORY_LABELS,
@@ -87,6 +88,7 @@ export function RefsPanel({
   const [dragActive, setDragActive] = useState(false);
   const [importMsg, setImportMsg] = useState<string | null>(null);
   const [importBusy, setImportBusy] = useState(false);
+  const [pdfImportOpen, setPdfImportOpen] = useState(false);
   const importFileRef = useRef<HTMLInputElement>(null);
   const selectedIds = extSelectedIds ?? internalSelectedIds;
   const setSelectedIds = (next: Set<string>): void => {
@@ -498,6 +500,7 @@ export function RefsPanel({
             onAddRef={addRefAndReveal}
             onImportText={importFromText}
             onPickFile={() => importFileRef.current?.click()}
+            onOpenPdfImport={() => setPdfImportOpen(true)}
             importBusy={importBusy}
             t={t}
           />
@@ -544,6 +547,18 @@ export function RefsPanel({
         </>
       )}
 
+      {pdfImportOpen && (
+        <PdfFolderImportModal
+          existingRefs={refs}
+          onClose={() => setPdfImportOpen(false)}
+          onAddRefs={(newRefs) => {
+            for (const r of newRefs) onAddRef(r);
+            setImportMsg(t('rp_import_pdf_done').replace('{count}', String(newRefs.length)));
+            setTab('list');
+            setTimeout(() => setImportMsg(null), 8000);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -1651,6 +1666,7 @@ function AddPanel({
   onAddRef,
   onImportText,
   onPickFile,
+  onOpenPdfImport,
   importBusy,
   t,
 }: {
@@ -1660,6 +1676,7 @@ function AddPanel({
   onAddRef: (ref: Ref) => AddRefResult;
   onImportText: (text: string) => Promise<void>;
   onPickFile: () => void;
+  onOpenPdfImport: () => void;
   importBusy: boolean;
   t: (k: string) => string;
 }): JSX.Element {
@@ -1896,6 +1913,14 @@ function AddPanel({
         <p className="text-xs text-muted mb-1.5">
           {t('rp_import_support')} {t('rp_import_drop_hint')}
         </p>
+        <button
+          type="button"
+          onClick={onOpenPdfImport}
+          className="w-full mb-1.5 py-2 border border-dashed border-border rounded-lg text-xs font-semibold text-teal hover:bg-teal-bg/40 transition"
+          title={t('rp_import_pdf_hint')}
+        >
+          {t('rp_import_pdf_btn')}
+        </button>
         <textarea
           value={importText}
           onChange={(e) => onTextChange(e.target.value)}
