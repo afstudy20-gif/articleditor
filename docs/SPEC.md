@@ -126,13 +126,21 @@ of the flows listed here.
 - **Modules**: `lib/editor/to-export.ts`, `lib/docx/build.ts` (placeholder docx),
   `lib/docx/build-rich.ts` (active EndNote EN.CITE docx),
   `lib/docx/template-docx.ts` (journal production layout), `lib/tex/build.ts`
-  (LaTeX + BibTeX bundle), `lib/refs/bibtex-out.ts`, `lib/refs/export-library.ts`
+  (LaTeX + BibTeX bundle), `lib/export/markdown.ts` (GFM `.md`),
+  `lib/refs/bibtex-out.ts`, `lib/refs/export-library.ts`
   (RIS), `lib/export/print-html.ts`, `lib/projects/backup.ts` (JSON backup).
 - **Invariants**:
   - Active EndNote export produces well-formed OOXML with `ADDIN EN.CITE` field
     codes; record numbers match bibliography order.
   - Placeholder export emits `{Author, Year #N}` tokens EndNote CWYW can resolve.
   - LaTeX bundle compiles citation keys consistent between `.tex` and `.bib`.
+  - Markdown export (`ed_export_markdown`) is a single self-contained GFM file:
+    in-text citations rendered in the active style (superscript styles wrapped
+    in `<sup>`), bibliography in final style order, pipe tables, `$$` equations,
+    figures embedded as base64 data URIs, prose escaped so Markdown-significant
+    characters survive round-tripping. Merged table cells and unmatched
+    citations/cross-references append warnings as an HTML comment footer rather
+    than failing the export.
   - JSON backup round-trips: `restore(backup(project)) ≡ project` and restore
     validates the version field, rejecting incompatible payloads instead of
     silently corrupting the library.
@@ -243,7 +251,7 @@ worker, Google Drive OAuth, Tauri shell. Exercised manually.
 
 | Area | Current executable coverage |
 |---|---|
-| Document import/export | docx parse/build, rich export, template docx, print HTML, LaTeX |
+| Document import/export | docx parse/build, rich export, template docx, print HTML, LaTeX, Markdown |
 | Citation/reference core | marker detection, bibliography parsing, import formats, dedupe, styles |
 | AI safety/provider core | guard, provider resolution, structured schemas, citation safety, URL guard |
 | Writing support | abstract, abbreviations, letters, checklists, compliance, stats, spellcheck |

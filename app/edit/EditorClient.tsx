@@ -29,6 +29,7 @@ import { StyleEditor, type StyleSeed } from '@/components/Style/StyleEditor';
 import { RefDetail } from '@/components/RefDetail/RefDetail';
 import { BibliographyPreview } from '@/components/Bibliography/BibliographyPreview';
 import { buildLatex } from '@/lib/tex/build';
+import { buildMarkdown } from '@/lib/export/markdown';
 import JSZip from 'jszip';
 import { CitationPopover } from '@/components/Editor/CitationPopover';
 import { CitationHoverCard } from '@/components/Editor/CitationHoverCard';
@@ -2254,6 +2255,24 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
     download(blob, `${slug}-latex.zip`);
   }
 
+  function exportMarkdown(): void {
+    const { markdown, warnings } = buildMarkdown({
+      doc: doc as any,
+      refsById,
+      refOrder,
+      style,
+      title,
+      abstractText: includeAbstractExport ? abstractText : undefined,
+      keywords: includeAbstractExport ? keywords : undefined,
+      bibHeading: 'References',
+    });
+    const body = warnings.length > 0
+      ? `${markdown}\n<!-- Export warnings:\n${warnings.map((w) => `  - ${w}`).join('\n')}\n-->\n`
+      : markdown;
+    const blob = new Blob([body], { type: 'text/markdown;charset=utf-8' });
+    download(blob, `${slugify(title)}.md`);
+  }
+
   /**
    * "Save as PDF" via the browser print pipeline. A faithful snapshot of the
    * live editor DOM (citation markers, figures, KaTeX, three-line tables are
@@ -2653,6 +2672,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
     { id: 'export-ris', group: t('cmd_g_export'), label: t('ed_export_ris'), run: exportRis },
     { id: 'export-jcm', group: t('cmd_g_export'), label: t('ed_export_jcm'), run: () => void exportDocxTemplate('jcm') },
     { id: 'export-latex', group: t('cmd_g_export'), label: t('ed_export_latex'), run: exportLatex },
+    { id: 'export-markdown', group: t('cmd_g_export'), label: t('ed_export_markdown'), run: exportMarkdown },
     { id: 'export-pdf', group: t('cmd_g_export'), label: t('ed_export_pdf'), run: exportPdf },
     { id: 'export-json', group: t('cmd_g_export'), label: 'JSON', run: exportProjectJson },
     { id: 'import-docx', group: t('cmd_g_doc'), label: t('ed_import_docx'), run: () => { setShowImportModal(true); setImportPreview(null); setImportError(null); setImportPasteText(''); setPastedHtmlParagraphs(null); setPastedPlainReference(null); } },
@@ -2743,6 +2763,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
               <DropItem onClick={() => void exportDocxTemplate('jcm')}>📰 {t('ed_export_jcm')}</DropItem>
               <DropItem onClick={exportRis}>🗂️ {t('ed_export_ris')}</DropItem>
               <DropItem onClick={exportLatex}>📐 {t('ed_export_latex')}</DropItem>
+              <DropItem onClick={exportMarkdown}>📃 {t('ed_export_markdown')}</DropItem>
               <DropItem onClick={exportPdf}>📄 {t('ed_export_pdf')}</DropItem>
               <DropItem onClick={exportProjectJson}>💾 {t('ed_export_json')}</DropItem>
             </HeaderDropdown>
