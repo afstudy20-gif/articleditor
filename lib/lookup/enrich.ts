@@ -1,6 +1,11 @@
 import type { Ref } from '@/store/types';
 import { searchCrossRef, getCrossRefByDoi } from './crossref';
-import { searchPubmed, fetchPubmedSummaries, fetchPubmedAbstract } from './pubmed';
+import {
+  searchPubmed,
+  fetchPubmedSummaries,
+  fetchPubmedAbstract,
+  type PubmedSearchOptions,
+} from './pubmed';
 import { getOpenAlexByDoi, searchOpenAlex } from './openalex';
 
 export type EnrichOptions = {
@@ -91,45 +96,54 @@ export async function enrichRef(ref: Ref, opts: EnrichOptions = {}): Promise<Ref
     if (oa) enriched = mergePartial(enriched, oa);
   }
 
-  // PubMed efetch pass: if still no abstract but ref has DOI/title, try to find PMID then efetch.
-  if (!enriched.abstract && (enriched.doi || enriched.title || enriched.pmid)) {
-    let pmid: string | undefined = enriched.pmid;
-    if (!pmid && enriched.doi) {
-      // PubMed esearch needs [doi] field tag for exact DOI lookup, otherwise
-      // it tokenizes the DOI string and returns unrelated papers.
-      const pmids = await searchPubmed(`${enriched.doi}[doi]`, {
-        apiKey: opts.ncbiKey,
-        email: opts.ncbiEmail,
-        retmax: 1,
-      }).catch(() => [] as string[]);
-      pmid = pmids[0];
-    }
-    if (!pmid && enriched.title) {
-      // Title + first author family + year — narrowest field-tagged query.
-      const parts = [`${enriched.title}[Title]`];
-      const fam = enriched.authors[0]?.family;
-      if (fam) parts.push(`${fam}[Author]`);
-      if (enriched.year) parts.push(`${enriched.year}[PDAT]`);
-      const pmids = await searchPubmed(parts.join(' AND '), {
-        apiKey: opts.ncbiKey,
-        email: opts.ncbiEmail,
-        retmax: 1,
-      }).catch(() => [] as string[]);
-      pmid = pmids[0];
-    }
+  // PubMed pass: CrossRef/OpenAlex frequently omit volume/issue/pages for
+  // ahead-of-print articles or journals that do not deposit full metadata to
+  // CrossRef, yet PubMed's esummary carries them. It is also the abstract
+  // source of last resort. Resolve the PMID once, then fill whatever is still
+  // missing (biblio via esummary, abstract via efetch).
+  const needsBiblio = !enriched.volume || !enriched.issue || !enriched.pages;
+  if ((needsBiblio || !enriched.abstract) && (enriched.doi || enriched.title || enriched.pmid)) {
+    const pmOpts: PubmedSearchOptions = { apiKey: opts.ncbiKey, email: opts.ncbiEmail };
+    const pmid = await resolvePmid(enriched, pmOpts);
     if (pmid) {
-      const abs = await fetchPubmedAbstract(pmid, { apiKey: opts.ncbiKey, email: opts.ncbiEmail }).catch(
-        () => null,
-      );
-      if (abs) {
-        enriched = { ...enriched, abstract: abs, pmid: enriched.pmid || pmid };
-      } else if (!enriched.pmid) {
-        enriched = { ...enriched, pmid };
+      if (!enriched.pmid) enriched = { ...enriched, pmid };
+      if (needsBiblio) {
+        const [summary] = await fetchPubmedSummaries([pmid], pmOpts).catch(() => [] as Ref[]);
+        if (summary) enriched = mergePartial(enriched, summary);
+      }
+      if (!enriched.abstract) {
+        const abs = await fetchPubmedAbstract(pmid, pmOpts).catch(() => null);
+        if (abs) enriched = { ...enriched, abstract: abs };
       }
     }
   }
 
   return enriched;
+}
+
+/** Resolve a PMID from an existing pmid, an exact DOI match, or a
+ *  title/author/year query — the narrowest field-tagged query first. */
+async function resolvePmid(ref: Ref, opts: PubmedSearchOptions): Promise<string | undefined> {
+  if (ref.pmid) return ref.pmid;
+  if (ref.doi) {
+    // PubMed esearch needs the [doi] field tag for exact DOI lookup, otherwise
+    // it tokenizes the DOI string and returns unrelated papers.
+    const pmids = await searchPubmed(`${ref.doi}[doi]`, { ...opts, retmax: 1 }).catch(
+      () => [] as string[],
+    );
+    if (pmids[0]) return pmids[0];
+  }
+  if (ref.title) {
+    const parts = [`${ref.title}[Title]`];
+    const fam = ref.authors[0]?.family;
+    if (fam) parts.push(`${fam}[Author]`);
+    if (ref.year) parts.push(`${ref.year}[PDAT]`);
+    const pmids = await searchPubmed(parts.join(' AND '), { ...opts, retmax: 1 }).catch(
+      () => [] as string[],
+    );
+    if (pmids[0]) return pmids[0];
+  }
+  return undefined;
 }
 
 function mergePartial(original: Ref, partial: Partial<Ref>): Ref {

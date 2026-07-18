@@ -93,6 +93,10 @@ of the flows listed here.
     (identifiers/abstract only) or not at all — a low-confidence candidate must
     never replace the user's title/authors/year with an unrelated paper.
   - DOI/PMID are normalized (prefix-stripped, trimmed) before comparison.
+  - When CrossRef/OpenAlex resolve a DOI but omit volume/issue/pages (common for
+    ahead-of-print articles or journals that do not deposit full metadata to
+    CrossRef), the PMID is resolved once and PubMed's esummary fills the missing
+    biblio fields; the same PMID serves the abstract-of-last-resort efetch.
 
 ### F5 — Editor & numbering
 - **Entry**: `/edit` TipTap editor; CitationPopover, CitationInsertPicker,

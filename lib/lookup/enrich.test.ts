@@ -82,6 +82,86 @@ describe('enrichRef — DOI path', () => {
     assert.equal(out.pmid, '999');
   });
 
+  it('fills volume/issue/pages from PubMed when CrossRef omits them (ahead-of-print)', async () => {
+    // CrossRef resolves the DOI but has no volume/issue/pages yet (online-first).
+    routes.push({
+      match: (u) => u.includes('api.crossref.org/works/'),
+      respond: () =>
+        jsonResponse({
+          message: {
+            type: 'journal-article',
+            author: [{ family: 'Sun', given: 'Y' }],
+            title: ['Aggregate index of systemic inflammation'],
+            'container-title': ['Anatolian Journal of Cardiology'],
+            issued: { 'date-parts': [[2026]] },
+            DOI: '10.14744/anatoljcardiol.2026.5439',
+            abstract: '<jats:p>Existing abstract.</jats:p>',
+          },
+        }),
+    });
+    // PubMed esearch by [doi] resolves the PMID…
+    routes.push({
+      match: (u) => u.includes('esearch.fcgi'),
+      respond: () => jsonResponse({ esearchresult: { idlist: ['41877468'] } }),
+    });
+    // …and esummary carries the biblio fields CrossRef lacked.
+    routes.push({
+      match: (u) => u.includes('esummary.fcgi'),
+      respond: () =>
+        jsonResponse({
+          result: {
+            uids: ['41877468'],
+            '41877468': {
+              uid: '41877468',
+              title: 'Aggregate index of systemic inflammation',
+              source: 'Anatol J Cardiol',
+              pubdate: '2026 Mar 24',
+              authors: [{ name: 'Sun Y', authtype: 'Author' }],
+              volume: '30',
+              issue: '7',
+              pages: '455-64',
+              elocationid: 'doi: 10.14744/AnatolJCardiol.2026.5439',
+            },
+          },
+        }),
+    });
+    const out = await enrichRef(ref({ doi: '10.14744/anatoljcardiol.2026.5439' }));
+    assert.equal(out.volume, '30');
+    assert.equal(out.issue, '7');
+    assert.equal(out.pages, '455-64');
+    assert.equal(out.pmid, '41877468');
+    // Pre-existing abstract from CrossRef is not overwritten.
+    assert.equal(out.abstract, 'Existing abstract.');
+    assert.ok(requested.some((u) => u.includes('esummary.fcgi')));
+  });
+
+  it('does not query PubMed when CrossRef already supplies full biblio', async () => {
+    routes.push({
+      match: (u) => u.includes('api.crossref.org/works/'),
+      respond: () =>
+        jsonResponse({
+          message: {
+            type: 'journal-article',
+            author: [{ family: 'Smith', given: 'J' }],
+            title: ['Complete record'],
+            'container-title': ['Journal'],
+            issued: { 'date-parts': [[2020]] },
+            volume: '5',
+            issue: '2',
+            page: '10-20',
+            DOI: '10.1000/full',
+            abstract: '<jats:p>Body.</jats:p>',
+          },
+        }),
+    });
+    const out = await enrichRef(ref({ doi: '10.1000/full' }));
+    assert.equal(out.volume, '5');
+    assert.equal(out.issue, '2');
+    assert.equal(out.pages, '10-20');
+    assert.ok(!requested.some((u) => u.includes('esearch.fcgi')));
+    assert.ok(!requested.some((u) => u.includes('esummary.fcgi')));
+  });
+
   it('returns the ref unchanged (bar DOI cleaning) when all providers fail', async () => {
     // No routes → every fetch 404s; catch()s downgrade to null.
     const original = ref({ doi: 'doi:10.1000/broken.', title: 'Original title' });
