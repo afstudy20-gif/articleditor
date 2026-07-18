@@ -7,6 +7,7 @@ import {
   extractDoi,
   extractPmid,
   extractArticleAbstract,
+  extractCitationLocators,
   refFromArticleText,
 } from './article-metadata';
 
@@ -126,7 +127,56 @@ describe('extractArticleAbstract', () => {
   });
 });
 
+describe('extractCitationLocators', () => {
+  it('parses journal, volume, issue and pages from a "Cite this article as" line', () => {
+    const text = [
+      'Copyright@Author(s)',
+      'Cite this article as: Sun Y, Wang W, Feng Y. The Relation Between the',
+      'aggregate index and mortality in the elderly',
+      'population. Anatol J Cardiol. 2026;30(7):455-464.',
+      'DOI: 10.14744/AnatolJCardiol.2026.5439',
+    ].join('\n');
+    const loc = extractCitationLocators(text);
+    assert.equal(loc.volume, '30');
+    assert.equal(loc.issue, '7');
+    assert.equal(loc.pages, '455-464');
+    assert.equal(loc.containerTitle, 'Anatol J Cardiol');
+  });
+
+  it('handles a bare Year;Vol(Issue):Pages string with no cite anchor', () => {
+    const loc = extractCitationLocators('Circulation 2019;140(3):e1-e10 was reported.');
+    assert.equal(loc.volume, '140');
+    assert.equal(loc.issue, '3');
+    assert.equal(loc.pages, 'e1-e10');
+    assert.equal(loc.containerTitle, undefined);
+  });
+
+  it('returns empty object when no locator pattern is present', () => {
+    assert.deepEqual(extractCitationLocators('A plain sentence with a 2020 year only.'), {});
+    assert.deepEqual(extractCitationLocators(''), {});
+  });
+});
+
 describe('refFromArticleText', () => {
+  it('captures journal/volume/issue/pages from the article citation line', () => {
+    const text = [
+      'The Relation Between the Aggregate Index of Systemic Inflammation and Mortality',
+      'ABSTRACT',
+      'Background: Cardiovascular disease is a leading cause of death and is closely',
+      'associated with inflammation in the elderly population studied here at length.',
+      'Cite this article as: Sun Y, Wang W, Feng Y. The Relation … elderly',
+      'population. Anatol J Cardiol. 2026;30(7):455-464.',
+      'DOI: 10.14744/AnatolJCardiol.2026.5439',
+    ].join('\n');
+    const ref = refFromArticleText({ filename: '1782720593-en.pdf', text });
+    assert.equal(ref.volume, '30');
+    assert.equal(ref.issue, '7');
+    assert.equal(ref.pages, '455-464');
+    assert.equal(ref.containerTitle, 'Anatol J Cardiol');
+    assert.equal(ref.doi, '10.14744/AnatolJCardiol.2026.5439');
+  });
+
+
   it('builds a complete Ref from a realistic article text', () => {
     const ref = refFromArticleText({ filename: 'smith-2021.pdf', text: SAMPLE_ARTICLE });
     assert.equal(ref.type, 'journal-article');

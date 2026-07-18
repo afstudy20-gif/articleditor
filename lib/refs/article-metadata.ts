@@ -67,6 +67,66 @@ export function extractPmid(text: string): string | undefined {
   return m ? m[1] : undefined;
 }
 
+export type CitationLocators = {
+  containerTitle?: string;
+  volume?: string;
+  issue?: string;
+  pages?: string;
+};
+
+// Vancouver-style locator: `Year;Volume(Issue):Pages`, e.g. "2026;30(7):455-464".
+// Issue and pages are optional-ish; pages may be numeric, a range, or "e12345".
+const VOL_ISSUE_PAGES =
+  /\b(?:19|20)\d{2}\s*;\s*(\d{1,4})\s*(?:\(\s*([0-9A-Za-z-]{1,8})\s*\))?\s*:\s*([0-9A-Za-z]+(?:\s*[-–]\s*[0-9A-Za-z]+)?)/;
+
+/**
+ * Journal citation locators (journal name, volume, issue, pages) from an
+ * article's own printed citation. Most journals stamp a "Cite this article as:
+ * … Journal. Year;Vol(Issue):Pages." line on the title page — CrossRef and
+ * OpenAlex frequently lack these for ahead-of-print articles, so reading them
+ * straight from the PDF fills the gap offline and survives as a fallback when a
+ * later DOI lookup returns no volume/issue/pages.
+ */
+export function extractCitationLocators(text: string): CitationLocators {
+  if (!text) return {};
+  const flat = text.replace(/\s+/g, ' ');
+  // Prefer the journal's own "Cite this article as:" block when present; it is
+  // the canonical citation and avoids matching a Year;Vol(Issue):Pages string
+  // that belongs to a bibliography entry deeper in the body.
+  const citeIdx = flat.search(/cite this article as:?/i);
+  const scope = citeIdx >= 0
+    ? flat.slice(citeIdx, citeIdx + 400)
+    : flat.slice(0, 2500);
+
+  const out: CitationLocators = {};
+  const m = scope.match(VOL_ISSUE_PAGES);
+  if (m) {
+    out.volume = m[1];
+    if (m[2]) out.issue = m[2];
+    out.pages = m[3].replace(/\s*[-–]\s*/, '-');
+  }
+
+  if (citeIdx >= 0) {
+    // Journal name is the segment immediately before ". Year;" — take the text
+    // after the last sentence break so the authors/title prefix is dropped.
+    const beforeYear = scope.slice(0, scope.search(/(?:19|20)\d{2}\s*;/));
+    if (beforeYear) {
+      const segments = beforeYear.split(/\.\s+/).map((s) => s.trim()).filter(Boolean);
+      const candidate = segments[segments.length - 1]?.replace(/[.,]+$/, '').trim();
+      if (
+        candidate
+        && candidate.length >= 3
+        && candidate.length <= 60
+        && candidate.split(/\s+/).length <= 8
+        && /[A-Za-z]/.test(candidate)
+      ) {
+        out.containerTitle = candidate;
+      }
+    }
+  }
+  return out;
+}
+
 const ABSTRACT_STOP =
   '(?=\\n\\s*(?:#{1,6}\\s*)?(?:keywords?|key\\s+words?|introduction|1\\.?\\s+introduction|abbreviations?|article\\s+information|references)\\b)';
 
@@ -114,6 +174,7 @@ export function refFromArticleText({ filename, text }: ArticleFileRefInput): Ref
   const abstract = extractArticleAbstract(text) || undefined;
   const firstAuthor = cleaned ? extractFirstAuthor(cleaned) : '';
   const authors: Author[] = firstAuthor ? [{ literal: firstAuthor }] : [];
+  const { containerTitle, volume, issue, pages } = extractCitationLocators(text);
 
   return {
     id: newId('ref'),
@@ -124,6 +185,10 @@ export function refFromArticleText({ filename, text }: ArticleFileRefInput): Ref
     doi,
     pmid,
     abstract,
+    containerTitle,
+    volume,
+    issue,
+    pages,
     raw: title,
     source: 'pdf_folder',
   };
