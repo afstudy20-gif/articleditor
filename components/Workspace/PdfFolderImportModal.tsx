@@ -7,6 +7,7 @@ import { isFsAccessSupported } from '@/lib/fs/workspace';
 import { pdfFileToMarkdown, markdownFilenameFor } from '@/lib/pdf/pdf-to-markdown';
 import { refFromArticleText } from '@/lib/refs/article-metadata';
 import { appendUniqueRefs } from '@/lib/refs/dedupe';
+import { enrichRefViaServer } from '@/lib/refs/enrich-client';
 import { downloadBlob } from '@/lib/download';
 
 type Props = {
@@ -40,23 +41,6 @@ async function collectPdfHandles(
     }
   }
   return out;
-}
-
-/** Best-effort DOI/title enrichment via the server lookup proxy — only
- *  title + first author + year (or a DOI) ever leaves the browser. */
-async function enrichViaServer(ref: Ref): Promise<Ref> {
-  try {
-    const res = await fetch('/api/lookup', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mode: 'enrich', ref }),
-    });
-    if (!res.ok) return ref;
-    const data = (await res.json().catch(() => null)) as { ref?: Ref } | null;
-    return data?.ref ?? ref;
-  } catch {
-    return ref;
-  }
 }
 
 function matchesQuery(item: Item, query: string): boolean {
@@ -109,7 +93,7 @@ export function PdfFolderImportModal({ existingRefs, onClose, onAddRefs }: Props
         let ref = refFromArticleText({ filename: path, text });
         setItems((prev) => prev.map((it) => (it.key === path ? { ...it, status: 'enriching', ref, markdown } : it)));
         if (ref.doi || ref.title) {
-          ref = await enrichViaServer(ref);
+          ref = await enrichRefViaServer(ref);
         }
         setItems((prev) => prev.map((it) => (it.key === path ? { ...it, status: 'ok', ref } : it)));
       } catch (err) {

@@ -3,6 +3,10 @@
 import { getDb } from '@/store/db';
 import { newId } from '@/lib/id';
 import { findMatchingRef } from '@/lib/refs/dedupe';
+import { enrichRefViaServer } from '@/lib/refs/enrich-client';
+import { refFromArticleText } from '@/lib/refs/article-metadata';
+import { pdfFileToMarkdown } from '@/lib/pdf/pdf-to-markdown';
+import { base64ToBytes } from '@/lib/pdf/base64';
 import type { Project, Ref, Author } from '@/store/types';
 
 // Type for external ref data coming from RefDown extension
@@ -59,6 +63,36 @@ function externalToRef(data: ExternalRefData): Ref {
   };
 }
 
+const REF_TYPE_TO_EXTERNAL: Partial<Record<Ref['type'], string>> = {
+  'journal-article': 'article-journal',
+  'book': 'book',
+  'book-chapter': 'chapter',
+  'conference-paper': 'paper-conference',
+  'thesis': 'thesis',
+  'report': 'report',
+  'webpage': 'webpage',
+};
+
+/** Inverse of externalToRef, for metadata ARTED hands back to the extension. */
+function refToExternal(ref: Ref): ExternalRefData {
+  return {
+    title: ref.title,
+    authors: ref.authors,
+    year: ref.year,
+    doi: ref.doi,
+    pmid: ref.pmid,
+    url: ref.url,
+    containerTitle: ref.containerTitle,
+    volume: ref.volume,
+    issue: ref.issue,
+    pages: ref.pages,
+    abstract: ref.abstract,
+    publisher: ref.publisher,
+    type: REF_TYPE_TO_EXTERNAL[ref.type] ?? 'article-journal',
+    source: 'arted-pdf',
+  };
+}
+
 export function setupExtensionBridge(): void {
   if (typeof window === 'undefined') return;
 
@@ -112,6 +146,31 @@ export function setupExtensionBridge(): void {
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       return { success: false, error: msg };
+    }
+  };
+
+  /**
+   * Reads bibliographic metadata out of a PDF's own text.
+   *
+   * Chrome renders PDFs in a plugin viewer the extension cannot scrape, so
+   * RefDown fetches the bytes itself and hands them over base64-encoded (the
+   * only shape that survives the extension/page boundary). Extraction reuses
+   * the same pdf.js pipeline as the Library PDF import, then the DOI/title is
+   * enriched through the server lookup proxy.
+   */
+  (window as any).__aeExtractPdfMeta = async (
+    base64: string,
+    filename = 'document.pdf',
+  ): Promise<{ ok: true; ref: ExternalRefData } | { ok: false; error: string }> => {
+    try {
+      const bytes = base64ToBytes(base64);
+      const file = new File([bytes as BlobPart], filename, { type: 'application/pdf' });
+      const { text } = await pdfFileToMarkdown(file, undefined, { extractImages: false });
+      let ref = refFromArticleText({ filename, text });
+      if (ref.doi || ref.title) ref = await enrichRefViaServer(ref);
+      return { ok: true, ref: refToExternal(ref) };
+    } catch (e: unknown) {
+      return { ok: false, error: e instanceof Error ? e.message : String(e) };
     }
   };
 

@@ -69,6 +69,16 @@ of the flows listed here.
   pdf.js's worker-based text extraction can misparse pages using uncommon
   filter stacks (e.g. ASCII85+Flate/DCT) — rare in real academic PDFs,
   documented in the module, not auto-detected.
+- **RefDown extension bridge** (`lib/extension-bridge.ts`): an open ARTED tab
+  exposes `__aeReady`, `__aeListProjects`, `__aeAddRefToProject` and
+  `__aeExtractPdfMeta(base64, filename)`. The last one exists because Chrome
+  renders PDFs in a plugin viewer no content script can scrape, so the extension
+  fetches the bytes itself and hands them over base64-encoded (the only shape
+  that survives the extension/page boundary); ARTED runs them through the same
+  `pdf-to-markdown` → `article-metadata` → `/api/lookup` enrich chain as
+  PDF-folder import and returns an `ExternalRefData`. Invariants: the bridge
+  never throws across the boundary (always `{ok:false,error}`), and the PDF
+  bytes are used in-memory only — nothing is written to the library by this call.
 - **PDF → Markdown, library-free** (ProjectAssetsPanel → PdfToMarkdownModal):
   sibling tool to PDF-folder import above, same folder/file picker and same
   `lib/pdf/pdf-to-markdown.ts` conversion, but deliberately does none of
