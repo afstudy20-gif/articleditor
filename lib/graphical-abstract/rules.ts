@@ -13,7 +13,7 @@
 import type { GaSpec } from './spec';
 import { MODE_PANEL_FIELDS } from './spec';
 import type { GaMode, GaTarget } from './targets';
-import { canvasPxToPt, isModeAllowed } from './targets';
+import { canvasPxToPt, isModeAllowed, maxPanelsForTarget, textBudget } from './targets';
 import { hasFigure } from './figure-catalog';
 import { collectSpecFields, collectDataFields, collectFigureRefs, collectFontSizes } from './spec-fields';
 
@@ -46,7 +46,9 @@ export type GaIssueCode =
   | 'low_contrast'
   | 'ai_policy_prohibited'
   | 'ai_policy_restricted'
-  | 'duplicates_existing_figure';
+  | 'duplicates_existing_figure'
+  | 'label_too_long_for_panel'
+  | 'text_too_long_for_panel';
 
 /**
  * Okabe-Ito, the palette verified under protanopia, deuteranopia and tritanopia
@@ -135,7 +137,26 @@ function categoricalColors(spec: GaSpec): string[] {
 const STUDY_DESIGN_RE =
   /\b(randomi[sz]ed|randomi[sz]ation|RCT|cohort|case[- ]control|cross[- ]sectional|retrospective|prospective|systematic review|meta[- ]analys|registry|trial|survey|observational)\b|\b(randomize|kohort|olgu[- ]kontrol|kesitsel|retrospektif|prospektif|sistematik derleme|meta[- ]analiz|çalışma deseni)\b/i;
 
-const SAMPLE_SIZE_RE = /\b(n\s*=\s*\d|\d[\d.,]*\s*(patients|participants|subjects|cases|hasta|katılımcı|olgu|denek))/i;
+const SAMPLE_SIZE_RE =
+  /\b(n\s*=\s*\d|\d[\d.,]*\s*(patients|participants|subjects|cases|hasta|katılımcı|olgu|denek)|\d[\d.,]*\s*(per|başına)\s+(arm|group|kol|grup))/i;
+
+/** Panels whose whole job is to state the population. */
+const POPULATION_PANEL_RE = /\b(patients|population|participants|sample|cohort|enrol|hasta|örneklem|katılımcı|nüfus)\b/i;
+
+/**
+ * A visual abstract states its sample size, but not always in a sentence: the canonical
+ * layout puts a bare "1,378" in a stat under a "PATIENTS" header, which reads perfectly
+ * and matches no prose pattern.
+ */
+function statesSampleSize(spec: GaSpec, allText: string): boolean {
+  if (SAMPLE_SIZE_RE.test(allText)) return true;
+  return [...(spec.panels ?? []), ...(spec.boxes ?? [])].some((p) => {
+    const context = `${p.label ?? ''} ${p.heading ?? ''} ${p.stat?.label ?? ''}`;
+    if (!POPULATION_PANEL_RE.test(context)) return false;
+    const value = `${p.stat?.value ?? ''} ${p.heading ?? ''}`;
+    return /\d{2,}/.test(value.replace(/[.,\s]/g, ''));
+  });
+}
 
 const GA_HEADING_RE = /\b(graphical abstract|visual abstract|grafiksel özet|görsel özet)\b/i;
 
@@ -159,13 +180,51 @@ export function validateGaSpec(spec: GaSpec, ctx: RuleContext): GaIssue[] {
   const allText = allFields.map((f) => f.text).join(' \n');
 
   // ── structure ────────────────────────────────────────────────────────────
-  if (panels.length > target.maxPanels) {
+  // The ceiling is the tighter of the publisher's rule and what the canvas can carry
+  // legibly: MDPI permits four panels, but four on its 550 px canvas leaves each one too
+  // narrow to hold a header without overlapping its neighbour.
+  const maxPanels = maxPanelsForTarget(target);
+  if (panels.length > maxPanels) {
     issues.push({
       code: 'panel_count_exceeded',
       severity: 'error',
-      params: { count: panels.length, max: target.maxPanels, publisher: target.publisher },
+      params: { count: panels.length, max: maxPanels, publisher: target.publisher },
     });
   }
+
+  // ── text that will overflow its panel ────────────────────────────────────
+  // The renderer has no ellipsis and never truncates: text that does not fit is drawn
+  // over whatever is next to it, which is how a spec with correct content still comes out
+  // unusable.
+  const budget = textBudget(target, Math.max(panels.length, 1));
+  panels.forEach((p, i) => {
+    if (p.label && p.label.length > budget.label) {
+      issues.push({
+        code: 'label_too_long_for_panel',
+        severity: 'warning',
+        path: `panels[${i}].label`,
+        params: { length: p.label.length, max: budget.label },
+      });
+    }
+    p.rows?.forEach((row, j) => {
+      if (row.label && row.label.length > budget.rowLabel * 2) {
+        issues.push({
+          code: 'text_too_long_for_panel',
+          severity: 'warning',
+          path: `panels[${i}].rows[${j}].label`,
+          params: { length: row.label.length, max: budget.rowLabel * 2 },
+        });
+      }
+      if (row.value && row.value.length > budget.rowValue * 3) {
+        issues.push({
+          code: 'text_too_long_for_panel',
+          severity: 'warning',
+          path: `panels[${i}].rows[${j}].value`,
+          params: { length: row.value.length, max: budget.rowValue * 3 },
+        });
+      }
+    });
+  });
 
   panels.forEach((p, i) => {
     const results = (p.rows?.length ?? 0) + (p.items?.length ?? 0);
@@ -212,7 +271,7 @@ export function validateGaSpec(spec: GaSpec, ctx: RuleContext): GaIssue[] {
     if (!STUDY_DESIGN_RE.test(allText)) {
       issues.push({ code: 'visual_missing_study_design', severity: 'warning' });
     }
-    if (!SAMPLE_SIZE_RE.test(allText)) {
+    if (!statesSampleSize(spec, allText)) {
       issues.push({ code: 'visual_missing_sample_size', severity: 'warning' });
     }
     if (dataFields.length === 0) {

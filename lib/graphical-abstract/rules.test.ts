@@ -316,3 +316,32 @@ describe('checkArmConsistency', () => {
     assert.deepEqual(checkArmConsistency(fields, buildSourceIndex(source)), []);
   });
 });
+
+describe('sample-size detection', () => {
+  it('accepts a bare count in a stat under a population header', () => {
+    // The canonical layout puts "1,378" in a stat under "PATIENTS" — it reads perfectly
+    // and matches no prose pattern.
+    const spec: GaSpec = {
+      title: 'Drug A versus placebo',
+      theme: { palette: ['#0072b2'] },
+      panels: [
+        { label: 'DESIGN', heading: 'Randomised controlled trial', figure: 'ev-prisma-clipboard' },
+        { label: 'PATIENTS', stat: { value: '1,378', label: '689 per arm' }, figure: 'pp-group3' },
+        { label: 'OUTCOME', figure: 'ev-forest-plot', rows: [{ label: 'Mortality', value: '12.4% vs 18.9%' }] },
+      ],
+    };
+    assert.ok(!codes(spec).includes('visual_missing_sample_size'));
+  });
+
+  it('still warns when no count is stated anywhere', () => {
+    const spec: GaSpec = {
+      title: 'Drug A versus placebo',
+      theme: { palette: ['#0072b2'] },
+      panels: [
+        { label: 'DESIGN', heading: 'Randomised controlled trial', figure: 'ev-prisma-clipboard' },
+        { label: 'OUTCOME', figure: 'ev-forest-plot', rows: [{ label: 'Mortality', value: 'Lower' }] },
+      ],
+    };
+    assert.ok(codes(spec).includes('visual_missing_sample_size'));
+  });
+});

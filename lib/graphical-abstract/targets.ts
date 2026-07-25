@@ -35,11 +35,22 @@ export interface GaTarget {
   publisher: string;
   /** AcademicFlow preset id — must exist in flow-app's PRESETS. */
   presetId: string;
-  /** Export size in pixels, i.e. canvas x (dpi / 96) in flow-app. */
-  widthPx: number;
-  heightPx: number;
+  /**
+   * The preset's canvas size in flow-app — what the GA engine lays out on, and what
+   * decides how much text fits. NOT the exported pixel size: flow-app exports at
+   * `canvas x exportDpi / 96`, so these two differ by 2x or more. Storing the canvas is
+   * what keeps the layout budgets honest; use `exportSize()` for the publisher check.
+   */
+  canvasW: number;
+  canvasH: number;
   /** flow-app preset dpi: the export multiplier, not the print resolution. */
   exportDpi: number;
+  /**
+   * The publisher's stated pixel requirement, and whether it is a floor or a ceiling.
+   * These genuinely differ in kind: MDPI's 1100x560 is a minimum, ACS's 3.25x1.75 in is a
+   * maximum, and treating either as the other produces a non-compliant figure.
+   */
+  requiredPx?: { w: number; h: number; kind: 'min' | 'max' };
   /** Print resolution the publisher requires — converts export pixels to points. */
   printDpi: number;
   /** Smallest legible font the publisher states, in points. null = no number published. */
@@ -61,8 +72,9 @@ export const GA_TARGETS: readonly GaTarget[] = [
     id: 'elsevier',
     publisher: 'Elsevier',
     presetId: 'el-ga',
-    widthPx: 1328,
-    heightPx: 531,
+    canvasW: 664,
+    canvasH: 266,
+    requiredPx: { w: 1328, h: 531 , kind: 'min' },
     exportDpi: 192,
     printDpi: 300,
     minFontPt: null,
@@ -77,8 +89,9 @@ export const GA_TARGETS: readonly GaTarget[] = [
     id: 'cell',
     publisher: 'Cell Press',
     presetId: 'cell-ga',
-    widthPx: 1650,
-    heightPx: 1650,
+    canvasW: 825,
+    canvasH: 825,
+    requiredPx: { w: 1650, h: 1650 , kind: 'min' },
     exportDpi: 192,
     printDpi: 300,
     minFontPt: 12,
@@ -93,8 +106,9 @@ export const GA_TARGETS: readonly GaTarget[] = [
     id: 'acs',
     publisher: 'ACS',
     presetId: 'acs-toc',
-    widthPx: 974,
-    heightPx: 524,
+    canvasW: 487,
+    canvasH: 262,
+    requiredPx: { w: 974, h: 524 , kind: 'max' },
     exportDpi: 192,
     printDpi: 300,
     minFontPt: 6,
@@ -109,8 +123,9 @@ export const GA_TARGETS: readonly GaTarget[] = [
     id: 'mdpi',
     publisher: 'MDPI',
     presetId: 'mdpi-ga',
-    widthPx: 1100,
-    heightPx: 560,
+    canvasW: 550,
+    canvasH: 280,
+    requiredPx: { w: 1100, h: 560 , kind: 'min' },
     exportDpi: 192,
     printDpi: 300,
     minFontPt: null,
@@ -125,8 +140,9 @@ export const GA_TARGETS: readonly GaTarget[] = [
     id: 'taylor-francis',
     publisher: 'Taylor & Francis',
     presetId: 'tf-ga',
-    widthPx: 1200,
-    heightPx: 600,
+    canvasW: 600,
+    canvasH: 300,
+    requiredPx: { w: 1200, h: 600 , kind: 'min' },
     exportDpi: 192,
     printDpi: 300,
     minFontPt: null,
@@ -141,8 +157,9 @@ export const GA_TARGETS: readonly GaTarget[] = [
     id: 'wiley',
     publisher: 'Wiley',
     presetId: 'wiley-toc',
-    widthPx: 650,
-    heightPx: 592,
+    canvasW: 325,
+    canvasH: 296,
+    requiredPx: { w: 650, h: 592 , kind: 'min' },
     exportDpi: 192,
     printDpi: 300,
     minFontPt: 10,
@@ -157,8 +174,9 @@ export const GA_TARGETS: readonly GaTarget[] = [
     id: 'wiley-banner',
     publisher: 'Wiley',
     presetId: 'wiley-banner',
-    widthPx: 1300,
-    heightPx: 236,
+    canvasW: 650,
+    canvasH: 118,
+    requiredPx: { w: 1300, h: 236 , kind: 'min' },
     exportDpi: 192,
     printDpi: 300,
     minFontPt: 10,
@@ -173,8 +191,9 @@ export const GA_TARGETS: readonly GaTarget[] = [
     id: 'springer-nature',
     publisher: 'Springer Nature',
     presetId: 'ga-square',
-    widthPx: 1200,
-    heightPx: 1200,
+    canvasW: 1000,
+    canvasH: 1000,
+    requiredPx: { w: 1200, h: 1200 , kind: 'min' },
     exportDpi: 300,
     printDpi: 300,
     minFontPt: 8,
@@ -189,8 +208,9 @@ export const GA_TARGETS: readonly GaTarget[] = [
     id: 'rsc',
     publisher: 'Royal Society of Chemistry',
     presetId: 'rsc-toc',
-    widthPx: 1892,
-    heightPx: 944,
+    canvasW: 473,
+    canvasH: 236,
+    requiredPx: { w: 1892, h: 944 , kind: 'max' },
     exportDpi: 384,
     printDpi: 600,
     minFontPt: null,
@@ -205,8 +225,8 @@ export const GA_TARGETS: readonly GaTarget[] = [
     id: 'generic-wide',
     publisher: 'Generic',
     presetId: 'ga-wide',
-    widthPx: 1200,
-    heightPx: 750,
+    canvasW: 1200,
+    canvasH: 750,
     exportDpi: 300,
     printDpi: 300,
     minFontPt: 8,
@@ -251,4 +271,76 @@ export function minCanvasPxForTarget(target: GaTarget): number | null {
  */
 export function isModeAllowed(mode: GaMode, target: GaTarget): boolean {
   return mode === 'graphical' || target.allowsDataItems;
+}
+
+// AcademicFlow layout constants (flow-app index.html: GA_PAD, default margin and panelGap).
+const GA_PAD = 13;
+const GA_MARGIN = 26;
+const GA_PANEL_GAP = 16;
+/** Below this, a text panel wraps every second word and the columns collide. */
+const MIN_PANEL_INNER_PX = 104;
+/** Arial averages a little over half the font size per character. */
+const CHAR_WIDTH_RATIO = 0.53;
+
+/**
+ * Exported pixel size, which is what the publisher's requirement is stated in.
+ * flow-app rasterises at `canvas x dpi / 96` (index.html renderPNGBlob).
+ */
+export function exportSize(target: GaTarget): { w: number; h: number } {
+  const scale = target.exportDpi / 96;
+  return { w: Math.round(target.canvasW * scale), h: Math.round(target.canvasH * scale) };
+}
+
+/** Canvas width of the target, i.e. what the GA engine lays out on. */
+export function canvasWidth(target: GaTarget): number {
+  return target.canvasW;
+}
+
+/** Usable width inside one panel card, given how many share the row. */
+export function panelInnerWidth(target: GaTarget, panelCount: number): number {
+  const w = canvasWidth(target);
+  const row = w - 2 * GA_MARGIN - Math.max(0, panelCount - 1) * GA_PANEL_GAP;
+  return Math.floor(row / Math.max(1, panelCount)) - 2 * GA_PAD;
+}
+
+/**
+ * How many panels this target can actually carry.
+ *
+ * The publisher's own ceiling is only half the story: MDPI permits a PICO layout, but its
+ * 1100x560 canvas is 550 px wide, and four panels there leave ~86 px of usable width each —
+ * narrow enough that headers clip and the label/value columns overlap. Layout has to
+ * constrain the count too, not just editorial convention.
+ */
+export function maxPanelsForTarget(target: GaTarget): number {
+  const w = canvasWidth(target);
+  const fits = Math.floor((w - 2 * GA_MARGIN + GA_PANEL_GAP) / (MIN_PANEL_INNER_PX + 2 * GA_PAD + GA_PANEL_GAP));
+  return Math.max(1, Math.min(target.maxPanels, fits));
+}
+
+export interface TextBudget {
+  /** Characters per line in a panel header band or chip. */
+  label: number;
+  /** Characters per line for heading / body / note text. */
+  body: number;
+  /** Row label column — the engine gives it 56% of the panel. */
+  rowLabel: number;
+  /** Row value column — 42% of the panel. */
+  rowValue: number;
+}
+
+/**
+ * Characters that fit on one line, per panel region. These go into the prompt as concrete
+ * limits: a model told "keep it short" writes a 39-character header, and the engine has no
+ * ellipsis — overlong text overlaps its neighbour instead of being cut.
+ */
+export function textBudget(target: GaTarget, panelCount: number): TextBudget {
+  const inner = panelInnerWidth(target, panelCount);
+  const chars = (width: number, fontPx: number): number =>
+    Math.max(6, Math.floor(width / (fontPx * CHAR_WIDTH_RATIO)));
+  return {
+    label: chars(inner, 11.5),
+    body: chars(inner, 11),
+    rowLabel: chars(inner * 0.56, 11),
+    rowValue: chars(inner * 0.42, 11),
+  };
 }

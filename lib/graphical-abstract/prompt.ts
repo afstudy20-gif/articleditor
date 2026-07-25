@@ -17,7 +17,7 @@ import { figuresIn } from './figure-catalog';
 import { MODE_PANEL_FIELDS, PANEL_BLOCK_ORDER } from './spec';
 import { OKABE_ITO } from './rules';
 import type { GaMode, GaTarget } from './targets';
-import { minCanvasPxForTarget } from './targets';
+import { minCanvasPxForTarget, maxPanelsForTarget, textBudget, exportSize } from './targets';
 import { PIPELINE_STARTER, OUTCOMES_STARTER } from './spec.fixtures';
 import type { ManuscriptExcerpt } from './excerpt';
 
@@ -99,12 +99,15 @@ export function buildGaPrompt(input: GaPromptInput): string {
 
   sections.push(modeBrief(mode, target));
 
+  const maxPanels = maxPanelsForTarget(target);
+  const budget = textBudget(target, maxPanels);
+
   sections.push(
     [
       '# Output target',
-      `Publisher: ${target.publisher}. Canvas preset: "${target.presetId}" (${target.widthPx}x${target.heightPx} px export).`,
+      `Publisher: ${target.publisher}. Canvas preset: "${target.presetId}" (exports at ${exportSize(target).w}x${exportSize(target).h} px).`,
       `Set "preset": "${target.presetId}" in the spec.`,
-      `Use at most ${target.maxPanels} panel${target.maxPanels === 1 ? '' : 's'}.`,
+      `Use at most ${maxPanels} panel${maxPanels === 1 ? '' : 's'}. Fewer, fuller panels read better than more, thinner ones.`,
       target.note ? `Publisher note: ${target.note}` : '',
       minPx
         ? `Keep every font size at or above ${Math.ceil(minPx)} (canvas px) — ${target.publisher} requires ${target.minFontPt} pt and this target exports at ${target.exportDpi} dpi.`
@@ -122,6 +125,18 @@ export function buildGaPrompt(input: GaPromptInput): string {
       '',
       `Panel fields you may use in this mode: ${allowedFields.join(', ')}.`,
       'Any other panel field will be rejected.',
+      '',
+      '## Text length — this is a hard layout limit, not a style preference',
+      `At ${maxPanels} panel${maxPanels === 1 ? '' : 's'} on this canvas, one line holds roughly:`,
+      `- panel "label": ${budget.label} characters. Keep labels to ONE line — a label that wraps`,
+      `  overlaps the next panel's header, because the renderer has no ellipsis and never truncates.`,
+      `- "heading", "body", "note", item text: ${budget.body} characters per line.`,
+      `- "rows[].label": ${budget.rowLabel} characters per line; "rows[].value": ${budget.rowValue} characters per line.`,
+      '',
+      'Write telegraphic phrases, not sentences. "CA-AKI at 72 h" beats "Primary outcome:',
+      'contrast-associated acute kidney injury within 72 hours". Put units and statistics in the',
+      'value, the concept in the label, and abbreviations in "source".',
+      'If the content does not fit these limits, use fewer panels rather than longer text.',
     ].join('\n'),
   );
 

@@ -2,7 +2,10 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { GaSpecSchema } from './spec';
 import { PIPELINE_STARTER, OUTCOMES_STARTER, BMR_STARTER } from './spec.fixtures';
-import { GA_TARGETS, canvasPxToPt, minCanvasPxForTarget, getTarget, isModeAllowed } from './targets';
+import {
+  GA_TARGETS, canvasPxToPt, minCanvasPxForTarget, getTarget, isModeAllowed,
+  exportSize, maxPanelsForTarget, textBudget,
+} from './targets';
 import { FLOW_FIGURES, hasFigure, figuresIn } from './figure-catalog';
 import {
   gaArtifactBaseName, gaImageFilename, gaSpecFilename, isGaSpecAsset, nextGaBaseName, specNameForImage,
@@ -94,6 +97,46 @@ describe('GA_TARGETS', () => {
     assert.equal(isModeAllowed('visual', cell), false);
     assert.equal(isModeAllowed('graphical', cell), true);
     assert.equal(isModeAllowed('visual', getTarget('mdpi')!), true);
+  });
+});
+
+describe('exportSize', () => {
+  it('matches what each publisher requires', () => {
+    // flow-app rasterises at canvas x dpi/96, so the canvas alone does not tell you
+    // whether the export meets the publisher's pixel requirement.
+    for (const t of GA_TARGETS) {
+      if (!t.requiredPx) continue;
+      const got = exportSize(t);
+      if (t.requiredPx.kind === 'min') {
+        assert.ok(got.w >= t.requiredPx.w, `${t.id} width ${got.w} < min ${t.requiredPx.w}`);
+        assert.ok(got.h >= t.requiredPx.h, `${t.id} height ${got.h} < min ${t.requiredPx.h}`);
+      } else {
+        assert.ok(got.w <= t.requiredPx.w, `${t.id} width ${got.w} > max ${t.requiredPx.w}`);
+        assert.ok(got.h <= t.requiredPx.h, `${t.id} height ${got.h} > max ${t.requiredPx.h}`);
+      }
+    }
+  });
+});
+
+describe('panel budgets', () => {
+  it('caps panels by what the canvas can carry, not only by the publisher rule', () => {
+    // MDPI permits four panels, but four on its 550 px canvas leaves each too narrow to
+    // hold a header without overlapping its neighbour.
+    const mdpi = getTarget('mdpi')!;
+    assert.equal(mdpi.maxPanels, 4);
+    assert.ok(maxPanelsForTarget(mdpi) < 4);
+    // Cell's single-panel rule is stricter than its wide canvas would allow.
+    assert.equal(maxPanelsForTarget(getTarget('cell')!), 1);
+    // Never zero, however narrow the target.
+    for (const t of GA_TARGETS) assert.ok(maxPanelsForTarget(t) >= 1, t.id);
+  });
+
+  it('gives a wider text budget when fewer panels share the row', () => {
+    const mdpi = getTarget('mdpi')!;
+    assert.ok(textBudget(mdpi, 2).label > textBudget(mdpi, 4).label);
+    // Row values get the narrowest column, so they are the tightest budget.
+    const b = textBudget(mdpi, 3);
+    assert.ok(b.rowValue < b.rowLabel && b.rowLabel < b.label);
   });
 });
 
