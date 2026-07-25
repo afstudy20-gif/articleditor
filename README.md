@@ -137,3 +137,36 @@ arted/
 Free for personal, clinical and academic use.
 
 © 2026 Dr. Yusuf Hoşoğlu
+
+## Graphical abstracts (optional, local)
+
+ARTED can draft a graphical or visual abstract from the manuscript and have
+[AcademicFlow](https://github.com/) render it. The model writes a JSON layout
+spec — it never generates an image — and AcademicFlow draws the figure from a
+fixed library of icons. That distinction matters: Elsevier bans general-purpose
+generative-AI image tools for graphical abstracts but permits AI-assisted
+schematics with disclosure, and Springer Nature bans AI imagery outright, so the
+panel warns per journal and hands you a disclosure paragraph to paste into the
+paper.
+
+It runs locally only. Two prerequisites, both in the flow-app repo:
+
+```bash
+npx playwright install chromium   # once
+npm run serve                     # render server on 127.0.0.1:8787
+```
+
+Then in `.env.local`:
+
+```
+FLOW_SERVER_URL=http://127.0.0.1:8787
+NEXT_PUBLIC_FLOW_APP_URL=http://127.0.0.1:8899
+AI_LOCAL_CLI_TEXT=claude          # or kimi | codex — uses your existing CLI session
+```
+
+Set `AF_API_KEY` and `AF_CORS_ORIGIN` on the render server too: its defaults let
+any page you visit reach `127.0.0.1:8787`. Mirror the key as `FLOW_API_KEY` here.
+
+Every number in the generated figure is checked against your manuscript before
+it can be inserted, and a visual abstract asks you to confirm the study-arm
+labels — transposed arms are a documented failure that no automatic check sees.
