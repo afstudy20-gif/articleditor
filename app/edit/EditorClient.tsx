@@ -79,6 +79,9 @@ import { LettersPanel } from '@/components/Letters/LettersPanel';
 import { PhrasebankPanel } from '@/components/Phrasebank/PhrasebankPanel';
 import { SupplementaryPanel } from '@/components/Supplementary/SupplementaryPanel';
 import { AbbreviationsPanel } from '@/components/Abbreviations/AbbreviationsPanel';
+import { GraphicalAbstractPanel } from '@/components/Editor/GraphicalAbstractPanel';
+import { gaImageFilename, gaSpecFilename } from '@/lib/graphical-abstract/artifact';
+import { collectFigureCaptions } from '@/components/Editor/extensions/figure';
 import { SpellcheckPanel } from '@/components/Spellcheck/SpellcheckPanel';
 import { StickyNote } from '@/components/StickyNote';
 import { AbstractPanel } from '@/components/Abstract/AbstractPanel';
@@ -304,6 +307,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
   const [abstractText, setAbstractText] = useState<string>(project.abstractText ?? '');
   const [suppOpen, setSuppOpen] = useState(false);
   const [abbrOpen, setAbbrOpen] = useState(false);
+  const [gaOpen, setGaOpen] = useState(false);
   const [spellcheckOpen, setSpellcheckOpen] = useState(false);
   const [phrasebankSection, setPhrasebankSection] = useState<string | null>(null);
   const [wordGoal, setWordGoal] = useState(0);
@@ -2787,9 +2791,10 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
                 setLettersOpen(false);
                 setAbstractOpen(false);
                 setAbbrOpen(false);
+                setGaOpen(false);
               }}
               className={`px-1.5 py-0.5 rounded text-[11px] font-semibold transition flex items-center gap-1 shrink-0 ${
-                (!tablesOpen && !figuresOpen && !suppOpen && !lettersOpen && !abstractOpen && !abbrOpen)
+                (!tablesOpen && !figuresOpen && !suppOpen && !lettersOpen && !abstractOpen && !abbrOpen && !gaOpen)
                   ? 'bg-teal text-white shadow-sm'
                   : 'text-secondary hover:text-primary hover:bg-slate-100'
               }`}
@@ -2804,6 +2809,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
                 setLettersOpen(false);
                 setAbstractOpen(false);
                 setAbbrOpen(false);
+                setGaOpen(false);
                 setAbstractOpen(true);
               }}
               className={`px-1.5 py-0.5 rounded text-[11px] font-semibold transition flex items-center gap-1 shrink-0 ${
@@ -2820,6 +2826,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
                 setFiguresOpen(false);
                 setSuppOpen(false);
                 setAbbrOpen(false);
+                setGaOpen(false);
                 setAbstractOpen(false);
                 setLettersOpen(true);
               }}
@@ -2839,6 +2846,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
                 setLettersOpen(false);
                 setAbstractOpen(false);
                 setAbbrOpen(false);
+                setGaOpen(false);
               }}
               className={`px-1.5 py-0.5 rounded text-[11px] font-semibold transition flex items-center gap-1 shrink-0 ${
                 figuresOpen
@@ -2856,6 +2864,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
                 setSuppOpen(false);
                 setLettersOpen(false);
                 setAbbrOpen(false);
+                setGaOpen(false);
               }}
               className={`px-1.5 py-0.5 rounded text-[11px] font-semibold transition flex items-center gap-1 shrink-0 ${
                 tablesOpen
@@ -2873,6 +2882,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
                 setLettersOpen(false);
                 setAbstractOpen(false);
                 setAbbrOpen(false);
+                setGaOpen(false);
               }}
               className={`px-1.5 py-0.5 rounded text-[11px] font-semibold transition flex items-center gap-1 shrink-0 ${
                 suppOpen
@@ -2885,6 +2895,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
             <button
               onClick={() => {
                 setAbbrOpen(true);
+                setGaOpen(false);
                 setSuppOpen(false);
                 setTablesOpen(false);
                 setFiguresOpen(false);
@@ -2898,6 +2909,24 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
               }`}
             >
               🔤 {lang === 'tr' ? 'Kısaltmalar' : 'Abbreviations'}
+            </button>
+            <button
+              onClick={() => {
+                setGaOpen(true);
+                setAbbrOpen(false);
+                setSuppOpen(false);
+                setTablesOpen(false);
+                setFiguresOpen(false);
+                setLettersOpen(false);
+                setAbstractOpen(false);
+              }}
+              className={`px-1.5 py-0.5 rounded text-[11px] font-semibold transition flex items-center gap-1 shrink-0 ${
+                gaOpen
+                  ? 'bg-teal text-white shadow-sm'
+                  : 'text-secondary hover:text-primary hover:bg-slate-100'
+              }`}
+            >
+              🖼️ {lang === 'tr' ? 'Grafiksel Özet' : 'Graphical Abstract'}
             </button>
           </div>
         </div>
@@ -2980,6 +3009,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
                 setLettersOpen(false);
                 setAbstractOpen(false);
                 setAbbrOpen(false);
+                setGaOpen(false);
               }}
               onAIReview={runAIReview}
               onAIScore={runAIScore}
@@ -3128,6 +3158,7 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
             setLettersOpen(false);
             setAbstractOpen(false);
             setAbbrOpen(false);
+            setGaOpen(false);
           }}
           onAIReview={runAIReview}
           onAIScore={runAIScore}
@@ -3462,6 +3493,51 @@ export function EditorClient({ project, onExit, onSaved, onExitToProjects, onGoT
             onRestore={restoreSnapshot}
             onClose={() => setSnapshotsOpen(false)}
             t={t}
+          />
+        </div>
+      )}
+
+      {gaOpen && editorInstance.current && (
+        <div className="fixed right-4 top-24 bottom-4 w-[460px] max-w-[calc(100vw-2rem)] z-40 shadow-2xl">
+          <GraphicalAbstractPanel
+            lang={lang}
+            manuscript={{
+              title,
+              abstractText,
+              keywords,
+              bodyText: editorInstance.current.getText({ blockSeparator: '\n' }),
+              captions: collectFigureCaptions(editorInstance.current.state.doc),
+            }}
+            existingAssetNames={(project.assets ?? []).map((a) => a.name)}
+            onSaveArtifacts={async ({ base, pngDataUrl, specJson }) => {
+              // The PNG is what the manuscript carries; the spec is what makes the figure
+              // editable again later, so both are stored and paired by filename.
+              const now = Date.now();
+              const specBytes = new TextEncoder().encode(specJson);
+              const fresh = await getProject(project.id);
+              const assets = [...(fresh?.assets ?? project.assets ?? [])];
+              assets.push({
+                id: newId('asset'), name: gaImageFilename(base), type: 'image/png',
+                size: Math.round((pngDataUrl.length * 3) / 4), dataUrl: pngDataUrl,
+                createdAt: now, updatedAt: now,
+              });
+              assets.push({
+                id: newId('asset'), name: gaSpecFilename(base), type: 'application/json',
+                size: specBytes.byteLength,
+                dataUrl: `data:application/json;base64,${btoa(String.fromCharCode(...specBytes))}`,
+                createdAt: now, updatedAt: now, submissionIncluded: false,
+              });
+              await saveProject({ ...(fresh ?? project), assets });
+            }}
+            onInsertFigure={async (dataUrl, caption) => {
+              const ed = editorInstance.current;
+              if (!ed) return;
+              await autoSnapshot(t('snap_auto_label'));
+              ed.chain().focus().insertFigure({ src: dataUrl, caption, kind: 'figure' }).run();
+              setDoc(ed.getJSON());
+            }}
+            onDisclosure={(text) => setSupplementary((prev) => (prev.includes(text) ? prev : `${prev ? `${prev}\n\n` : ''}${text}`))}
+            onClose={() => setGaOpen(false)}
           />
         </div>
       )}

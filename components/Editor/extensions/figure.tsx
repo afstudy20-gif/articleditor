@@ -29,6 +29,23 @@ export function collectFigureIds(doc: any, kind: FigureKind): string[] {
   return ids;
 }
 
+/**
+ * Captions of the figures already in the document. Several publishers require a graphical
+ * abstract to differ from the paper's own figures, so the generator needs to know what is
+ * already there.
+ */
+export function collectFigureCaptions(doc: any, kind: FigureKind = 'figure'): string[] {
+  const captions: string[] = [];
+  doc.descendants((n: any) => {
+    if (n.type?.name === 'figure' && (n.attrs?.kind ?? 'figure') === kind) {
+      const caption = String(n.attrs?.caption ?? '').trim();
+      if (caption) captions.push(caption);
+    }
+    return true;
+  });
+  return captions;
+}
+
 /** 1-based number of a figure within its kind, or 0 if not found. */
 function figureNumber(doc: any, figId: string, kind: FigureKind): number {
   const ids = collectFigureIds(doc, kind);
