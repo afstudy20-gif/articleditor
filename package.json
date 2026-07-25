@@ -15,6 +15,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
     "@google/generative-ai": "^0.24.1",
+    "@tiptap/core": "^2.27.2",
     "@tiptap/extension-color": "^2.27.2",
     "@tiptap/extension-highlight": "^2.27.2",
     "@tiptap/extension-image": "^2.27.2",
@@ -50,6 +51,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@next/eslint-plugin-next": "^16.2.11",
     "@playwright/test": "^1.61.1",
     "@tauri-apps/cli": "^2.11.2",
     "@types/katex": "0.16.7",
