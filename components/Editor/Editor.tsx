@@ -23,6 +23,7 @@ import { ManuscriptTable, ManuscriptTableView } from './extensions/manuscript-ta
 import { AcademicReviewDecorations } from './extensions/academic-review-plugin';
 import type { Ref } from '@/store/types';
 import { useLang } from '@/lib/i18n/hooks';
+import { OutlinePanel } from './OutlinePanel';
 import { isNumericStyle } from '@/lib/refs/styles';
 import { getNextNumbering, isNumberingPrefix } from '@/lib/editor/numbering';
 import { computeWritingStats } from '@/lib/stats/writing-stats';
@@ -297,9 +298,10 @@ export function ArticleEditor({
 
   return (
     <div
-      className="card flex flex-col h-full"
+      className="card relative flex flex-col h-full"
       style={{ '--editor-font-family': fontFamily } as React.CSSProperties}
     >
+      <OutlinePanel editor={editor} />
       <div className="flex items-center gap-0.5 border-b border-border px-2 py-1.5 flex-wrap text-sm">
         <ToolbarButton
           onClick={() => editor.chain().focus().undo().run()}
