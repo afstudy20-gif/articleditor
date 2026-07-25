@@ -8,7 +8,9 @@
  * signal to regenerate, not to loosen the schema.
  */
 
-export const PIPELINE_STARTER = {
+import type { GaSpec } from './spec';
+
+export const PIPELINE_STARTER: GaSpec = {
     "version": 1,
     "type": "graphical-abstract",
     "layout": "pipeline",
@@ -139,9 +141,9 @@ export const PIPELINE_STARTER = {
       }
     },
     "source": "Data source: national multiple-cause-of-death database (1999–2023)  |  AAMR: age-adjusted mortality rate  |  APC: annual percent change  |  * p < 0.05"
-  } as const;
+  };
 
-export const OUTCOMES_STARTER = {
+export const OUTCOMES_STARTER: GaSpec = {
     "version": 1,
     "type": "graphical-abstract",
     "layout": "outcomes",
@@ -259,9 +261,9 @@ export const OUTCOMES_STARTER = {
       "text": "Both agents show comparable efficacy and safety. Drug A requires a lower infusion volume and reaches the target faster in subgroup analyses, but no overall clinical superiority was demonstrated. Larger randomised trials are needed."
     },
     "source": "MD: mean difference  |  CI: confidence interval  |  ns: not significant"
-  } as const;
+  };
 
-export const BMR_STARTER = {
+export const BMR_STARTER: GaSpec = {
     "version": 1,
     "type": "graphical-abstract",
     "layout": "bmr",
@@ -337,4 +339,4 @@ export const BMR_STARTER = {
       "text": "Severity of disease tracks structural remodelling and supports individualised cardiovascular risk stratification."
     },
     "source": "Single-centre retrospective cohort — competing-risk analysis"
-  } as const;
+  };
